@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-This repository specifies **lisp-min**, an immutable Lisp (core + standard library v0.2.0), and implements an interpreter for it in **C23**, following `IMPLEMENTATION-PLAN.md` phase by phase. Each phase ends with its tests passing and one commit. Phases 1 (values, buffer, utf8), 2 (reader, positions, printer, conformance runner), 3 (expander, evaluator, primitives, `import` of `io`), 4 (`include`) and 5 (the libraries `list`/`text`/`function`, CLI, REPL) are done: all 241 core and 29 stdlib cases pass. Phase 6 (README, final sanitizer pass) remains.
+This repository specifies **lisp-min**, an immutable Lisp (core + standard library v0.2.0), and implements an interpreter for it in **C23**, following `IMPLEMENTATION-PLAN.md` phase by phase. Each phase ends with its tests passing and one commit. All six phases are done: all 241 core and 29 stdlib cases and the unit tests pass, also under `make asan`. `README.md` covers building, running, the source map, the design and the choices made where the spec is silent; keep that last list current when such a choice changes.
 
 | File | Role |
 | --- | --- |
@@ -13,6 +13,7 @@ This repository specifies **lisp-min**, an immutable Lisp (core + standard libra
 | `conformance.json` | 241 core cases (`read`, `read-error`, `read-positions`, `eval`); programs import at most `io` |
 | `stdlib-conformance.json` | 29 stdlib `eval` cases; programs import `list`, `text` or `function` |
 | `IMPLEMENTATION-PLAN.md` | Architecture, decisions, file layout, phases, test runners |
+| `README.md` | Building, running, source map, design, choices where the spec is silent |
 | `implementation-notes.md` | Non-normative advice (refcounting, position-table address reuse) |
 
 The specs and the conformance files are the only source of truth. When the prose and a conformance case disagree, or the prose is silent, the case wins. Core §12.4 lists behaviors that only the tests fix, such as `first`/`rest` of `()` → `:wrong-type`.
