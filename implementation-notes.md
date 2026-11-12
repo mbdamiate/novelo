@@ -1,4 +1,4 @@
-# Implementation Notes — Immutable Lisp
+# Implementation Notes — Novelo
 
 **Non-normative.** This file gives advice for implementers. Nothing in it is a requirement or is tested: the specification (`core-specification.md`, `standard-library.md`) and the conformance files are the only reference. An implementation that ignores this file but passes the conformance cases is correct.
 

@@ -1,5 +1,5 @@
-/* core §8.7 — the command line: `lisp-min file.lisp` runs a program,
- * `lisp-min` alone starts the REPL.
+/* core §8.7 — the command line: `novelo file.novelo` runs a program,
+ * `novelo` alone starts the REPL.
  *
  * Exit codes: 0 when every form was evaluated (or the REPL reached the end
  * of its input), 1 for a read error or an uncaught error, 2 for bad
@@ -25,9 +25,9 @@ static void write_to_stderr(void *, const char *bytes, size_t length) {
 }
 
 static void usage(FILE *stream) {
-    fputs("usage: lisp-min [file.lisp]\n"
+    fputs("usage: novelo [file.novelo]\n"
           "  with a file, runs the program; without one, starts the REPL.\n"
-          "  LISP_MIN_STDLIB names the standard library document (standard-library.md).\n",
+          "  NOVELO_STDLIB names the standard library document (standard-library.md).\n",
           stream);
 }
 
@@ -42,7 +42,7 @@ static int run_program(LispState *state, const char *path) {
     lisp_buffer_init(&source);
     LispFileSystem disk = lisp_file_system_disk();
     if (!disk.read_file(disk.context, path, &source)) {
-        fprintf(stderr, "lisp-min: cannot read %s\n", path);
+        fprintf(stderr, "novelo: cannot read %s\n", path);
         lisp_buffer_free(&source);
         return 2;
     }
@@ -106,7 +106,7 @@ int main(int argument_count, char **arguments) {
     if (argument_count == 2) request.path = arguments[1];
     /* Deep non-tail recursion uses the C stack: run on a large one. */
     if (!lisp_run_on_large_stack(run, &request)) {
-        fputs("lisp-min: cannot create the interpreter thread\n", stderr);
+        fputs("novelo: cannot create the interpreter thread\n", stderr);
         return 2;
     }
     return request.exit_code;

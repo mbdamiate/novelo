@@ -28,7 +28,7 @@ extern const char *const lisp_library_names[];
  * while loading) pending. */
 [[nodiscard]] Value *lisp_import(LispState *state, Value *name, Value *prefix, Value *context);
 
-/* The path of the standard library document: $LISP_MIN_STDLIB if set,
+/* The path of the standard library document: $NOVELO_STDLIB if set,
  * otherwise the path fixed at build time. */
 const char *lisp_default_library_path(void);
 

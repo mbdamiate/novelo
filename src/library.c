@@ -19,8 +19,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifndef LISP_MIN_STDLIB_DEFAULT
-#define LISP_MIN_STDLIB_DEFAULT "standard-library.md"
+#ifndef LISP_STDLIB_DEFAULT
+#define LISP_STDLIB_DEFAULT "standard-library.md"
 #endif
 
 static const LispLibrary library_list = {.name = "list", .section = "4.1"};
@@ -39,8 +39,8 @@ constexpr size_t LIBRARY_COUNT = sizeof libraries / sizeof libraries[0];
 const char *const lisp_library_names[] = {"io", "list", "text", "function", nullptr};
 
 const char *lisp_default_library_path(void) {
-    const char *path = getenv("LISP_MIN_STDLIB");
-    return path && *path ? path : LISP_MIN_STDLIB_DEFAULT;
+    const char *path = getenv("NOVELO_STDLIB");
+    return path && *path ? path : LISP_STDLIB_DEFAULT;
 }
 
 static const LispLibrary *find_library(const Value *name) {
@@ -128,7 +128,7 @@ static Value *library_forms(LispState *state, const LispLibrary *library, Value 
     LispFileSystem disk = lisp_file_system_disk();
     if (!disk.read_file(disk.context, path, &document)) {
         lisp_error(state, "import-error", LISP_LIST(name, lisp_keyword_cstr("cannot-open")),
-                   "cannot open the standard library %s (set LISP_MIN_STDLIB)", path);
+                   "cannot open the standard library %s (set NOVELO_STDLIB)", path);
     } else if (!lisp_library_source(document.data ? document.data : "", document.length, library->section,
                                     &source)) {
         lisp_error(state, "import-error", LISP_LIST(name, lisp_keyword_cstr("cannot-open")),

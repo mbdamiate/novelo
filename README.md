@@ -1,6 +1,8 @@
-# lisp-min
+# Novelo
 
-An interpreter, written in C23, for **lisp-min**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.2.1) and the standard library (`standard-library.md`, v0.2.0). The language has no other name yet.
+An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.2.2) and the standard library (`standard-library.md`, v0.2.1).
+
+*Novelo* is Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as Novelo's lists are. Source files end in `.novelo`.
 
 Every case of both conformance suites passes:
 
@@ -26,7 +28,7 @@ Those runs report no leaks, and they also pass under AddressSanitizer and Undefi
 It needs a C23 compiler, such as clang 18+ or gcc 14+, plus `make`, libc and pthreads. There are no other dependencies.
 
 ```bash
-make            # builds build/lisp-min
+make            # builds build/novelo
 make test       # unit tests + both conformance suites
 make asan       # the same, rebuilt in build/asan with ASan + UBSan
 make clean
@@ -35,8 +37,8 @@ make clean
 ## Running
 
 ```bash
-build/lisp-min program.lisp   # run a program
-build/lisp-min                # start the REPL
+build/novelo program.novelo   # run a program
+build/novelo                # start the REPL
 ```
 
 | Exit code | Meaning |
@@ -48,7 +50,7 @@ build/lisp-min                # start the REPL
 Messages go to standard error, after whatever the program had already printed:
 
 ```
-program.lisp:3:1: read error :odd-map: map with an odd number of datums
+program.novelo:3:1: read error :odd-map: map with an odd number of datums
 error :unbound-symbol: unbound symbol car car
 ```
 
@@ -59,15 +61,15 @@ error :unbound-symbol: unbound symbol car car
 (import list)          ; map, filter, fold, sort, ...
 (import text t)        ; t/split, t/join (and the names of list, as t/map, ...)
 (import function)      ; partial
-(include "lib/geometry.lisp" geo)   ; geo/area, ...
+(include "lib/geometry.novelo" geo)   ; geo/area, ...
 ```
 
 **The REPL** starts with all four libraries imported. An input may span several lines: while a list, map or string is still open, the REPL keeps reading. Each value except `#void` is printed with the `write!` rules. After an error the REPL reports it and reads the next input. The `> ` prompt appears only when standard input is a terminal, so piping a file through the REPL prints only the values.
 
-**The standard library** is not compiled in. On each `import`, `list`, `text` and `function` are read from the `lisp` code blocks of `standard-library.md` §4.1–4.3, so the code that runs is the normative code. The build fixes the absolute path of that document. To use another copy, set `LISP_MIN_STDLIB`:
+**The standard library** is not compiled in. On each `import`, `list`, `text` and `function` are read from the `lisp` code blocks of `standard-library.md` §4.1–4.3, so the code that runs is the normative code. The build fixes the absolute path of that document. To use another copy, set `NOVELO_STDLIB`:
 
 ```bash
-LISP_MIN_STDLIB=/usr/local/share/lisp-min/standard-library.md build/lisp-min program.lisp
+NOVELO_STDLIB=/usr/local/share/novelo/standard-library.md build/novelo program.novelo
 ```
 
 ## Tests
@@ -86,7 +88,7 @@ make conformance
   - Has its own JSON parser.
   - Compares results with `equal?` and errors by their `:kind`.
   - Matches the exact output.
-  - Runs each case with a fresh state on a large stack. A case's `files` sit in an in-memory file system around `/main.lisp`.
+  - Runs each case with a fresh state on a large stack. A case's `files` sit in an in-memory file system around `/main.novelo`.
   - After each case, no object and no position entry may remain alive.
 
 ## Source map

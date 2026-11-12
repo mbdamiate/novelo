@@ -138,7 +138,7 @@ static void t_errors(void) {
     library_run_finish(&run);
 
     /* a read error in a library's source, at its line in the document */
-    char path[] = "/tmp/lisp-min-library-XXXXXX";
+    char path[] = "/tmp/novelo-library-XXXXXX";
     int descriptor = mkstemp(path);
     CHECK(descriptor >= 0);
     if (descriptor < 0) return;

@@ -1,7 +1,7 @@
-# Implementation plan: lisp-min in C23
+# Implementation plan: Novelo in C23
 
 ## Goal
-An interpreter for the lisp-min core (v0.2.1) and standard library (v0.2.0), written in C23. Its only inputs are the specification and the conformance suites:
+An interpreter for the Novelo core (v0.2.2) and standard library (v0.2.1), written in C23. Its only inputs are the specification and the conformance suites:
 
 - `core-specification.md`
 - `standard-library.md`
@@ -119,13 +119,13 @@ tests/
   - **Libraries (§8.9):**
     - Nothing is loaded before the program. `(import name prefix?)` goes through the same context machinery as `include`, keyed by library name instead of file path.
     - `io` is native: its primitives live in `library_io.c` and are bound only by `import`, never in the global table.
-    - `list`, `text` and `function` are read from the `lisp` code blocks of `standard-library.md` §4.1–4.3, so the normative definitions are what runs. The path comes from the build, and `LISP_MIN_STDLIB` overrides it.
+    - `list`, `text` and `function` are read from the `lisp` code blocks of `standard-library.md` §4.1–4.3, so the normative definitions are what runs. The path comes from the build, and `NOVELO_STDLIB` overrides it.
 - **IO:**
   - Output goes through a callback.
   - Stdin is a line reader that ends a line only at U+000A, so a CR stays in the line (§9).
   - The file system is an interface with two implementations: the disk, and an in-memory map for tests.
 - **CLI and REPL:**
-  - `lisp-min file.lisp` runs a program, and `lisp-min` alone starts the REPL. The REPL starts with `io`, `list`, `text` and `function` imported (§8.7); files import explicitly.
+  - `novelo file.novelo` runs a program, and `novelo` alone starts the REPL. The REPL starts with `io`, `list`, `text` and `function` imported (§8.7); files import explicitly.
   - **Exit codes:**
     - 0 on success.
     - 1 on a read error or an uncaught error, with a message on stderr.

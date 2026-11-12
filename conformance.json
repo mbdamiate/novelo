@@ -1,5 +1,5 @@
 {
-  "spec": "Core Specification — Immutable Lisp, version 0.2.1",
+  "spec": "Core Specification — Novelo, version 0.2.2",
   "format": {
     "read": "Read 'input' (UTF-8). With 'equivalent': also read that text and compare the two datum sequences with equal?. With 'types': the sequence read has exactly these types, in order.",
     "read-error": "Read 'input' (or the bytes of 'input_hex'). Reading MUST fail with the code 'error' at position [line, column].",
@@ -1878,9 +1878,9 @@
       "id": "include-001",
       "kind": "eval",
       "section": "8.8",
-      "program": "(include \"geo.lisp\") (area 2 3)",
+      "program": "(include \"geo.novelo\") (area 2 3)",
       "files": {
-        "geo.lisp": "(define area (lambda (w h) (* w h)))"
+        "geo.novelo": "(define area (lambda (w h) (* w h)))"
       },
       "value": "6",
       "output": ""
@@ -1889,9 +1889,9 @@
       "id": "include-002",
       "kind": "eval",
       "section": "8.8",
-      "program": "(import io)\n(display! \"1\") (include \"a.lisp\")",
+      "program": "(import io)\n(display! \"1\") (include \"a.novelo\")",
       "files": {
-        "a.lisp": "(display! \"a\")"
+        "a.novelo": "(display! \"a\")"
       },
       "value": "#void",
       "output": "1a"
@@ -1900,9 +1900,9 @@
       "id": "include-003",
       "kind": "eval",
       "section": "8.8",
-      "program": "(define area :mine) (include \"geo.lisp\" geo) (list area (geo/square-area 3) (geo/area 2 5))",
+      "program": "(define area :mine) (include \"geo.novelo\" geo) (list area (geo/square-area 3) (geo/area 2 5))",
       "files": {
-        "geo.lisp": "(define area (lambda (w h) (* w h)))\n(define square-area (lambda (s) (area s s)))"
+        "geo.novelo": "(define area (lambda (w h) (* w h)))\n(define square-area (lambda (s) (area s s)))"
       },
       "value": "(:mine 9 10)",
       "output": ""
@@ -1911,9 +1911,9 @@
       "id": "include-004",
       "kind": "eval",
       "section": "8.8",
-      "program": "(include \"geo.lisp\" geo) (area 2 3)",
+      "program": "(include \"geo.novelo\" geo) (area 2 3)",
       "files": {
-        "geo.lisp": "(define area (lambda (w h) (* w h)))\n(define square-area (lambda (s) (area s s)))"
+        "geo.novelo": "(define area (lambda (w h) (* w h)))\n(define square-area (lambda (s) (area s s)))"
       },
       "error": ":unbound-symbol",
       "output": ""
@@ -1922,9 +1922,9 @@
       "id": "include-005",
       "kind": "eval",
       "section": "8.8",
-      "program": "(include \"parity.lisp\" p) (list (p/my-even? 10) (p/my-odd? 7) (p/my-even? 7))",
+      "program": "(include \"parity.novelo\" p) (list (p/my-even? 10) (p/my-odd? 7) (p/my-even? 7))",
       "files": {
-        "parity.lisp": "(define my-even? (lambda (n) (if (= n 0) #true otherwise (my-odd? (- n 1)))))\n(define my-odd? (lambda (n) (if (= n 0) #false otherwise (my-even? (- n 1)))))"
+        "parity.novelo": "(define my-even? (lambda (n) (if (= n 0) #true otherwise (my-odd? (- n 1)))))\n(define my-odd? (lambda (n) (if (= n 0) #false otherwise (my-even? (- n 1)))))"
       },
       "value": "(#true #true #false)",
       "output": ""
@@ -1933,9 +1933,9 @@
       "id": "include-006",
       "kind": "eval",
       "section": "8.8",
-      "program": "(define factor 3) (include \"lib.lisp\" l) (list (l/scaled 2) (l/echo 5) l/x)",
+      "program": "(define factor 3) (include \"lib.novelo\" l) (list (l/scaled 2) (l/echo 5) l/x)",
       "files": {
-        "lib.lisp": "(define scaled (lambda (x) (* x factor)))\n(define x 100)\n(define echo (lambda (x) x))"
+        "lib.novelo": "(define scaled (lambda (x) (* x factor)))\n(define x 100)\n(define echo (lambda (x) x))"
       },
       "value": "(6 5 100)",
       "output": ""
@@ -1944,9 +1944,9 @@
       "id": "include-007",
       "kind": "eval",
       "section": "8.8",
-      "program": "(define base :main) (include \"lib.lisp\" l) (list base l/base)",
+      "program": "(define base :main) (include \"lib.novelo\" l) (list base l/base)",
       "files": {
-        "lib.lisp": "(define base (list base :lib))"
+        "lib.novelo": "(define base (list base :lib))"
       },
       "value": "(:main (:main :lib))",
       "output": ""
@@ -1955,9 +1955,9 @@
       "id": "include-008",
       "kind": "eval",
       "section": "8.8",
-      "program": "(include \"lib.lisp\" g) (g/names)",
+      "program": "(include \"lib.novelo\" g) (g/names)",
       "files": {
-        "lib.lisp": "(define area 1)\n(define names (lambda () (list 'area (string-to-symbol \"area\"))))"
+        "lib.novelo": "(define area 1)\n(define names (lambda () (list 'area (string-to-symbol \"area\"))))"
       },
       "value": "(area area)",
       "output": ""
@@ -1966,9 +1966,9 @@
       "id": "include-009",
       "kind": "eval",
       "section": "8.8",
-      "program": "(include \"lib.lisp\" m) (list m/four (m/twice 3))",
+      "program": "(include \"lib.novelo\" m) (list m/four (m/twice 3))",
       "files": {
-        "lib.lisp": "(define-macro twice (lambda (x) (list '+ x x)))\n(define four (twice 2))"
+        "lib.novelo": "(define-macro twice (lambda (x) (list '+ x x)))\n(define four (twice 2))"
       },
       "value": "(4 6)",
       "output": ""
@@ -1977,9 +1977,9 @@
       "id": "include-010",
       "kind": "eval",
       "section": "8.8",
-      "program": "(include \"lib.lisp\" m) (m/sq 3)",
+      "program": "(include \"lib.novelo\" m) (m/sq 3)",
       "files": {
-        "lib.lisp": "(define square (lambda (x) (* x x)))\n(define-macro sq (lambda (x) (list 'square x)))"
+        "lib.novelo": "(define square (lambda (x) (* x x)))\n(define-macro sq (lambda (x) (list 'square x)))"
       },
       "error": ":unbound-symbol",
       "output": ""
@@ -1988,9 +1988,9 @@
       "id": "include-011",
       "kind": "eval",
       "section": "8.8",
-      "program": "(include \"lib.lisp\" m) (m/sq 3)",
+      "program": "(include \"lib.novelo\" m) (m/sq 3)",
       "files": {
-        "lib.lisp": "(define square (lambda (x) (* x x)))\n(define-macro sq (lambda (x) (list 'm/square x)))"
+        "lib.novelo": "(define square (lambda (x) (* x x)))\n(define-macro sq (lambda (x) (list 'm/square x)))"
       },
       "value": "9",
       "output": ""
@@ -1999,9 +1999,9 @@
       "id": "include-012",
       "kind": "eval",
       "section": "8.8",
-      "program": "(include \"lib.lisp\" m) (m/quoted (a b))",
+      "program": "(include \"lib.novelo\" m) (m/quoted (a b))",
       "files": {
-        "lib.lisp": "(define wrap (lambda (x) (list 'quote x)))\n(define-macro quoted (lambda (x) (wrap x)))"
+        "lib.novelo": "(define wrap (lambda (x) (list 'quote x)))\n(define-macro quoted (lambda (x) (wrap x)))"
       },
       "value": "(a b)",
       "output": ""
@@ -2010,12 +2010,12 @@
       "id": "include-013",
       "kind": "eval",
       "section": "8.8",
-      "program": "(include \"lib/a.lisp\") (list (a) top)",
+      "program": "(include \"lib/a.novelo\") (list (a) top)",
       "files": {
-        "lib/a.lisp": "(include \"b.lisp\")\n(include \"../top.lisp\")\n(define a (lambda () (b)))",
-        "lib/b.lisp": "(define b (lambda () :lib))",
-        "b.lisp": "(define b (lambda () :root))",
-        "top.lisp": "(define top :top)"
+        "lib/a.novelo": "(include \"b.novelo\")\n(include \"../top.novelo\")\n(define a (lambda () (b)))",
+        "lib/b.novelo": "(define b (lambda () :lib))",
+        "b.novelo": "(define b (lambda () :root))",
+        "top.novelo": "(define top :top)"
       },
       "value": "(:lib :top)",
       "output": ""
@@ -2024,10 +2024,10 @@
       "id": "include-014",
       "kind": "eval",
       "section": "8.8",
-      "program": "(include \"geo.lisp\" geo) (list (geo/tidy) (geo/u/clean))",
+      "program": "(include \"geo.novelo\" geo) (list (geo/tidy) (geo/u/clean))",
       "files": {
-        "util.lisp": "(define clean (lambda () :clean))",
-        "geo.lisp": "(include \"util.lisp\" u)\n(define tidy (lambda () (u/clean)))"
+        "util.novelo": "(define clean (lambda () :clean))",
+        "geo.novelo": "(include \"util.novelo\" u)\n(define tidy (lambda () (u/clean)))"
       },
       "value": "(:clean :clean)",
       "output": ""
@@ -2036,10 +2036,10 @@
       "id": "include-015",
       "kind": "eval",
       "section": "8.8",
-      "program": "(include \"geo.lisp\" geo) (list (geo/tidy) (geo/clean))",
+      "program": "(include \"geo.novelo\" geo) (list (geo/tidy) (geo/clean))",
       "files": {
-        "util.lisp": "(define clean (lambda () :clean))",
-        "geo.lisp": "(include \"util.lisp\")\n(define tidy (lambda () (clean)))"
+        "util.novelo": "(define clean (lambda () :clean))",
+        "geo.novelo": "(include \"util.novelo\")\n(define tidy (lambda () (clean)))"
       },
       "value": "(:clean :clean)",
       "output": ""
@@ -2048,9 +2048,9 @@
       "id": "include-016",
       "kind": "eval",
       "section": "8.8",
-      "program": "(import io)\n(include \"u.lisp\") (include \"./u.lisp\") (include \"lib/../u.lisp\") (include \"u.lisp\" p) (include \"u.lisp\" p)",
+      "program": "(import io)\n(include \"u.novelo\") (include \"./u.novelo\") (include \"lib/../u.novelo\") (include \"u.novelo\" p) (include \"u.novelo\" p)",
       "files": {
-        "u.lisp": "(display! \"u\")"
+        "u.novelo": "(display! \"u\")"
       },
       "value": "#void",
       "output": "uu"
@@ -2059,10 +2059,10 @@
       "id": "include-017",
       "kind": "eval",
       "section": "8.8",
-      "program": "(import io)\n(include \"util.lisp\" u) (include \"geo.lisp\" geo) (list (u/clean) (geo/u/clean))",
+      "program": "(import io)\n(include \"util.novelo\" u) (include \"geo.novelo\" geo) (list (u/clean) (geo/u/clean))",
       "files": {
-        "util.lisp": "(display! \"u\")\n(define clean (lambda () :clean))",
-        "geo.lisp": "(include \"util.lisp\" u)"
+        "util.novelo": "(display! \"u\")\n(define clean (lambda () :clean))",
+        "geo.novelo": "(include \"util.novelo\" u)"
       },
       "value": "(:clean :clean)",
       "output": "uu"
@@ -2071,10 +2071,10 @@
       "id": "include-018",
       "kind": "eval",
       "section": "8.8",
-      "program": "(include \"a.lisp\" a)",
+      "program": "(include \"a.novelo\" a)",
       "files": {
-        "a.lisp": "(include \"b.lisp\" b)",
-        "b.lisp": "(include \"a.lisp\" a)"
+        "a.novelo": "(include \"b.novelo\" b)",
+        "b.novelo": "(include \"a.novelo\" a)"
       },
       "error": ":include-error",
       "output": ""
@@ -2083,7 +2083,7 @@
       "id": "include-019",
       "kind": "eval",
       "section": "8.8",
-      "program": "(import io)\n(display! \"x\") (include \"main.lisp\")",
+      "program": "(import io)\n(display! \"x\") (include \"main.novelo\")",
       "error": ":include-error",
       "output": "x"
     },
@@ -2091,7 +2091,7 @@
       "id": "include-020",
       "kind": "eval",
       "section": "8.8",
-      "program": "(import io)\n(display! \"a\") (include \"missing.lisp\")",
+      "program": "(import io)\n(display! \"a\") (include \"missing.novelo\")",
       "error": ":include-error",
       "output": "a"
     },
@@ -2099,9 +2099,9 @@
       "id": "include-021",
       "kind": "eval",
       "section": "8.8",
-      "program": "(import io)\n(display! \"a\") (include \"bad.lisp\")",
+      "program": "(import io)\n(display! \"a\") (include \"bad.novelo\")",
       "files": {
-        "bad.lisp": "(define x 1)\n(define y"
+        "bad.novelo": "(define x 1)\n(define y"
       },
       "error": ":include-error",
       "output": "a"
@@ -2110,9 +2110,9 @@
       "id": "include-022",
       "kind": "eval",
       "section": "8.8",
-      "program": "(include \"bad.lisp\")",
+      "program": "(include \"bad.novelo\")",
       "files": {
-        "bad.lisp": "(first ())"
+        "bad.novelo": "(first ())"
       },
       "error": ":wrong-type",
       "output": ""
@@ -2121,9 +2121,9 @@
       "id": "include-023",
       "kind": "eval",
       "section": "8.8",
-      "program": "(define f (lambda () (include \"a.lisp\")))",
+      "program": "(define f (lambda () (include \"a.novelo\")))",
       "files": {
-        "a.lisp": "(define a 1)"
+        "a.novelo": "(define a 1)"
       },
       "error": ":expansion-error",
       "output": ""
@@ -2132,9 +2132,9 @@
       "id": "include-024",
       "kind": "eval",
       "section": "8.8",
-      "program": "(include geo.lisp)",
+      "program": "(include geo.novelo)",
       "files": {
-        "geo.lisp": "(define area (lambda (w h) (* w h)))\n(define square-area (lambda (s) (area s s)))"
+        "geo.novelo": "(define area (lambda (w h) (* w h)))\n(define square-area (lambda (s) (area s s)))"
       },
       "error": ":expansion-error",
       "output": ""
@@ -2143,9 +2143,9 @@
       "id": "include-025",
       "kind": "eval",
       "section": "8.8",
-      "program": "(include \"geo.lisp\" :geo)",
+      "program": "(include \"geo.novelo\" :geo)",
       "files": {
-        "geo.lisp": "(define area (lambda (w h) (* w h)))\n(define square-area (lambda (s) (area s s)))"
+        "geo.novelo": "(define area (lambda (w h) (* w h)))\n(define square-area (lambda (s) (area s s)))"
       },
       "error": ":expansion-error",
       "output": ""
@@ -2154,9 +2154,9 @@
       "id": "include-026",
       "kind": "eval",
       "section": "8.8",
-      "program": "(define-macro use (lambda (p) (list 'sequence (list 'include \"geo.lisp\" p)))) (use g) (g/area 2 2)",
+      "program": "(define-macro use (lambda (p) (list 'sequence (list 'include \"geo.novelo\" p)))) (use g) (g/area 2 2)",
       "files": {
-        "geo.lisp": "(define area (lambda (w h) (* w h)))\n(define square-area (lambda (s) (area s s)))"
+        "geo.novelo": "(define area (lambda (w h) (* w h)))\n(define square-area (lambda (s) (area s s)))"
       },
       "value": "4",
       "output": ""
@@ -2165,9 +2165,9 @@
       "id": "include-027",
       "kind": "eval",
       "section": "8.8",
-      "program": "(define-macro swap (lambda (a b) (list b a))) (include \"lib.lisp\" l) l/v",
+      "program": "(define-macro swap (lambda (a b) (list b a))) (include \"lib.novelo\" l) l/v",
       "files": {
-        "lib.lisp": "(define v (swap 1 -))"
+        "lib.novelo": "(define v (swap 1 -))"
       },
       "value": "-1",
       "output": ""
@@ -2256,9 +2256,9 @@
       "id": "import-011",
       "kind": "eval",
       "section": "8.9",
-      "program": "(include \"say.lisp\" s)\n(s/say! \"ok\")",
+      "program": "(include \"say.novelo\" s)\n(s/say! \"ok\")",
       "files": {
-        "say.lisp": "(import io)\n(define say! (lambda (text) (display! text)))"
+        "say.novelo": "(import io)\n(define say! (lambda (text) (display! text)))"
       },
       "value": "#void",
       "output": "ok"
@@ -2267,9 +2267,9 @@
       "id": "import-012",
       "kind": "eval",
       "section": "8.9",
-      "program": "(include \"say.lisp\" s)\n(display! \"x\")",
+      "program": "(include \"say.novelo\" s)\n(display! \"x\")",
       "files": {
-        "say.lisp": "(import io)\n(define say! (lambda (text) (display! text)))"
+        "say.novelo": "(import io)\n(define say! (lambda (text) (display! text)))"
       },
       "error": ":unbound-symbol",
       "output": ""

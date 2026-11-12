@@ -224,14 +224,14 @@ static void run_eval_on_thread(void *argument) {
     lisp_buffer_init(&input);
     case_input(test_case, &input);
 
-    /* §12.4: the program is main.lisp and the files are relative to its
+    /* §12.4: the program is main.novelo and the files are relative to its
      * directory, here the root of an in-memory file system. A path missing
      * from `files` cannot be opened. */
     const Json *files = json_member(test_case, "files");
     size_t file_count = files ? files->count : 0;
     LispMemoryFile *memory_files = calloc(file_count + 1, sizeof(LispMemoryFile));
     char **paths = calloc(file_count + 1, sizeof(char *));
-    memory_files[0] = (LispMemoryFile){.path = "/main.lisp", .text = program, .length = program_length};
+    memory_files[0] = (LispMemoryFile){.path = "/main.novelo", .text = program, .length = program_length};
     for (size_t index = 0; index < file_count; index++) {
         size_t length = strlen(files->keys[index]) + 2;
         paths[index] = malloc(length);
@@ -257,7 +257,7 @@ static void run_eval_on_thread(void *argument) {
     LispState *state = lisp_state_new(&options);
     Value *last_value = nullptr;
     LispReadError read_error;
-    LispRunResult run = lisp_run_source(state, program, program_length, "main.lisp", &last_value, &read_error);
+    LispRunResult run = lisp_run_source(state, program, program_length, "main.novelo", &last_value, &read_error);
 
     const char *expected_value = string_member(test_case, "value");
     const char *expected_error = string_member(test_case, "error");

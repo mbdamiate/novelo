@@ -1,6 +1,6 @@
-# lisp-min — build, tests and sanitizers.
+# Novelo — build, tests and sanitizers.
 #
-#   make              build the interpreter, build/lisp-min
+#   make              build the interpreter, build/novelo
 #   make test         unit tests + conformance suites
 #   make unit         unit tests only
 #   make conformance  conformance suites only
@@ -26,7 +26,7 @@ UNIT_BIN := $(BUILD)/unit-tests
 CONFORMANCE_SRC := $(wildcard tests/conformance/*.c)
 CONFORMANCE_OBJ := $(CONFORMANCE_SRC:tests/conformance/%.c=$(BUILD)/tests/conformance/%.o)
 CONFORMANCE_BIN := $(BUILD)/conformance
-CLI_BIN := $(BUILD)/lisp-min
+CLI_BIN := $(BUILD)/novelo
 
 .PHONY: all test unit conformance asan clean
 
@@ -55,8 +55,8 @@ $(UNIT_BIN): $(UNIT_OBJ) $(LIB_OBJ)
 $(CONFORMANCE_BIN): $(CONFORMANCE_OBJ) $(LIB_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-# The standard library document read by import (stdlib §4); LISP_MIN_STDLIB overrides it.
-$(BUILD)/src/library.o: CFLAGS += -DLISP_MIN_STDLIB_DEFAULT='"$(CURDIR)/standard-library.md"'
+# The standard library document read by import (stdlib §4); NOVELO_STDLIB overrides it.
+$(BUILD)/src/library.o: CFLAGS += -DLISP_STDLIB_DEFAULT='"$(CURDIR)/standard-library.md"'
 
 $(BUILD)/src/%.o: src/%.c
 	@mkdir -p $(dir $@)
