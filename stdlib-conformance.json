@@ -176,9 +176,9 @@
       "id": "library-022",
       "kind": "eval",
       "section": "1",
-      "program": "(include \"lib.novelo\" l) (l/doubled (list 1 2))",
+      "program": "(include \"lib.nvl\" l) (l/doubled (list 1 2))",
       "files": {
-        "lib.novelo": "(import list)\n(define doubled (lambda (xs) (map (lambda (x) (* 2 x)) xs)))"
+        "lib.nvl": "(import list)\n(define doubled (lambda (xs) (map (lambda (x) (* 2 x)) xs)))"
       },
       "value": "(2 4)",
       "output": ""

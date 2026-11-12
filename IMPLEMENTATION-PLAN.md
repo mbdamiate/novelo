@@ -125,7 +125,7 @@ tests/
   - Stdin is a line reader that ends a line only at U+000A, so a CR stays in the line (§9).
   - The file system is an interface with two implementations: the disk, and an in-memory map for tests.
 - **CLI and REPL:**
-  - `novelo file.novelo` runs a program, and `novelo` alone starts the REPL. The REPL starts with `io`, `list`, `text` and `function` imported (§8.7); files import explicitly.
+  - `novelo file.nvl` runs a program, and `novelo` alone starts the REPL. The REPL starts with `io`, `list`, `text` and `function` imported (§8.7); files import explicitly.
   - **Exit codes:**
     - 0 on success.
     - 1 on a read error or an uncaught error, with a message on stderr.

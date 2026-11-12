@@ -2,7 +2,7 @@
 
 An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.2.2) and the standard library (`standard-library.md`, v0.2.1).
 
-*Novelo* is Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as Novelo's lists are. Source files end in `.novelo`.
+*Novelo* is Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as Novelo's lists are. Source files end in `.nvl`.
 
 Every case of both conformance suites passes:
 
@@ -37,8 +37,8 @@ make clean
 ## Running
 
 ```bash
-build/novelo program.novelo   # run a program
-build/novelo                # start the REPL
+build/novelo program.nvl   # run a program
+build/novelo               # start the REPL
 ```
 
 | Exit code | Meaning |
@@ -50,7 +50,7 @@ build/novelo                # start the REPL
 Messages go to standard error, after whatever the program had already printed:
 
 ```
-program.novelo:3:1: read error :odd-map: map with an odd number of datums
+program.nvl:3:1: read error :odd-map: map with an odd number of datums
 error :unbound-symbol: unbound symbol car car
 ```
 
@@ -61,7 +61,7 @@ error :unbound-symbol: unbound symbol car car
 (import list)          ; map, filter, fold, sort, ...
 (import text t)        ; t/split, t/join (and the names of list, as t/map, ...)
 (import function)      ; partial
-(include "lib/geometry.novelo" geo)   ; geo/area, ...
+(include "lib/geometry.nvl" geo)   ; geo/area, ...
 ```
 
 **The REPL** starts with all four libraries imported. An input may span several lines: while a list, map or string is still open, the REPL keeps reading. Each value except `#void` is printed with the `write!` rules. After an error the REPL reports it and reads the next input. The `> ` prompt appears only when standard input is a terminal, so piping a file through the REPL prints only the values.
@@ -69,7 +69,7 @@ error :unbound-symbol: unbound symbol car car
 **The standard library** is not compiled in. On each `import`, `list`, `text` and `function` are read from the `lisp` code blocks of `standard-library.md` §4.1–4.3, so the code that runs is the normative code. The build fixes the absolute path of that document. To use another copy, set `NOVELO_STDLIB`:
 
 ```bash
-NOVELO_STDLIB=/usr/local/share/novelo/standard-library.md build/novelo program.novelo
+NOVELO_STDLIB=/usr/local/share/novelo/standard-library.md build/novelo program.nvl
 ```
 
 ## Tests
@@ -88,7 +88,7 @@ make conformance
   - Has its own JSON parser.
   - Compares results with `equal?` and errors by their `:kind`.
   - Matches the exact output.
-  - Runs each case with a fresh state on a large stack. A case's `files` sit in an in-memory file system around `/main.novelo`.
+  - Runs each case with a fresh state on a large stack. A case's `files` sit in an in-memory file system around `/main.nvl`.
   - After each case, no object and no position entry may remain alive.
 
 ## Source map

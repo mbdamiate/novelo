@@ -27,12 +27,12 @@ static void check_path(const char *file, int line, const char *directory, const 
 #define CHECK_PATH(directory, path, expected) check_path(__FILE__, __LINE__, (directory), (path), (expected))
 
 static void t_path_resolution(void) {
-    CHECK_PATH("/a/b", "c.novelo", "/a/b/c.novelo");
-    CHECK_PATH("/a/b", "./c.novelo", "/a/b/c.novelo");
-    CHECK_PATH("/a/b", "../c.novelo", "/a/c.novelo");
-    CHECK_PATH("/a/b", "lib/../c.novelo", "/a/b/c.novelo");
-    CHECK_PATH("/a/b", "/x//y/./z.novelo", "/x/y/z.novelo");
-    CHECK_PATH("/", "../../c.novelo", "/c.novelo");
+    CHECK_PATH("/a/b", "c.nvl", "/a/b/c.nvl");
+    CHECK_PATH("/a/b", "./c.nvl", "/a/b/c.nvl");
+    CHECK_PATH("/a/b", "../c.nvl", "/a/c.nvl");
+    CHECK_PATH("/a/b", "lib/../c.nvl", "/a/b/c.nvl");
+    CHECK_PATH("/a/b", "/x//y/./z.nvl", "/x/y/z.nvl");
+    CHECK_PATH("/", "../../c.nvl", "/c.nvl");
     CHECK_PATH("/a", "..", "/");
     CHECK_PATH("/", "", "/");
 }
@@ -47,10 +47,10 @@ typedef struct FileRun {
     Value *value;
 } FileRun;
 
-/* Runs main.novelo at the root, with the given extra files (path, text, …). */
+/* Runs main.nvl at the root, with the given extra files (path, text, …). */
 static void file_run(FileRun *run, const char *program, size_t file_count, const LispMemoryFile *files) {
     LispMemoryFile *all = calloc(file_count + 1, sizeof(LispMemoryFile));
-    all[0] = (LispMemoryFile){"/main.novelo", program, strlen(program)};
+    all[0] = (LispMemoryFile){"/main.nvl", program, strlen(program)};
     memcpy(all + 1, files, file_count * sizeof(LispMemoryFile));
     run->files = (LispMemoryFiles){all, file_count + 1};
     lisp_buffer_init(&run->output);
@@ -62,7 +62,7 @@ static void file_run(FileRun *run, const char *program, size_t file_count, const
     run->state = lisp_state_new(&options);
     run->value = nullptr;
     LispReadError read_error;
-    run->result = lisp_run_source(run->state, program, strlen(program), "main.novelo", &run->value, &read_error);
+    run->result = lisp_run_source(run->state, program, strlen(program), "main.nvl", &run->value, &read_error);
 }
 
 static void file_run_finish(FileRun *run) {
@@ -90,16 +90,16 @@ static void check_error_values(const char *file, int line, FileRun *run, const c
 
 static void t_error_values(void) {
     FileRun run;
-    file_run(&run, "(include \"missing.novelo\")", 0, nullptr);
-    CHECK_ERROR_VALUES(&run, "(\"missing.novelo\" :cannot-open)");
+    file_run(&run, "(include \"missing.nvl\")", 0, nullptr);
+    CHECK_ERROR_VALUES(&run, "(\"missing.nvl\" :cannot-open)");
     file_run_finish(&run);
 
-    file_run(&run, "(include \"lib/bad.novelo\")", 1, (LispMemoryFile[]){FILE("/lib/bad.novelo", "(define x 1)\n  {:a}")});
-    CHECK_ERROR_VALUES(&run, "(\"lib/bad.novelo\" :odd-map 2 3)");
+    file_run(&run, "(include \"lib/bad.nvl\")", 1, (LispMemoryFile[]){FILE("/lib/bad.nvl", "(define x 1)\n  {:a}")});
+    CHECK_ERROR_VALUES(&run, "(\"lib/bad.nvl\" :odd-map 2 3)");
     file_run_finish(&run);
 
-    file_run(&run, "(include \"a.novelo\")", 1, (LispMemoryFile[]){FILE("/a.novelo", "(include \"./a.novelo\" again)")});
-    CHECK_ERROR_VALUES(&run, "(\"./a.novelo\" :cycle)");
+    file_run(&run, "(include \"a.nvl\")", 1, (LispMemoryFile[]){FILE("/a.nvl", "(include \"./a.nvl\" again)")});
+    CHECK_ERROR_VALUES(&run, "(\"./a.nvl\" :cycle)");
     file_run_finish(&run);
 
     file_run(&run, "(include \"lib\")", 0, nullptr); /* not a file of the in-memory system */
@@ -109,11 +109,11 @@ static void t_error_values(void) {
 
 static void t_nested_directories(void) {
     FileRun run;
-    file_run(&run, "(include \"a/b/c.novelo\" c) (c/where)", 3,
+    file_run(&run, "(include \"a/b/c.nvl\" c) (c/where)", 3,
              (LispMemoryFile[]){
-                 FILE("/a/b/c.novelo", "(include \"../d.novelo\")\n(define where (lambda () (list here there)))"),
-                 FILE("/a/d.novelo", "(include \"/e.novelo\")\n(define here :a-d)"),
-                 FILE("/e.novelo", "(define there :root-e)"),
+                 FILE("/a/b/c.nvl", "(include \"../d.nvl\")\n(define where (lambda () (list here there)))"),
+                 FILE("/a/d.nvl", "(include \"/e.nvl\")\n(define here :a-d)"),
+                 FILE("/e.nvl", "(define there :root-e)"),
              });
     CHECK_INT(run.result, LISP_RUN_OK);
     CHECK_EQUAL(run.value, "(:a-d :root-e)");
@@ -123,8 +123,8 @@ static void t_nested_directories(void) {
 /* Definitions made before an error in an included file remain (§8.8). */
 static void t_definitions_before_error_remain(void) {
     FileRun run;
-    file_run(&run, "(include \"lib.novelo\" l)", 1,
-             (LispMemoryFile[]){FILE("/lib.novelo", "(define kept 1)\n(error \"stop\")\n(define lost 2)")});
+    file_run(&run, "(include \"lib.nvl\" l)", 1,
+             (LispMemoryFile[]){FILE("/lib.nvl", "(define kept 1)\n(error \"stop\")\n(define lost 2)")});
     CHECK_INT(run.result, LISP_RUN_ERROR);
     CHECK(lisp_global_find(run.state, lisp_symbol_cstr("l/kept")) != nullptr);
     CHECK(lisp_global_find(run.state, lisp_symbol_cstr("l/lost")) == nullptr);
@@ -135,7 +135,7 @@ static void t_definitions_before_error_remain(void) {
 
 /* A file that could not be opened may be included later (as in the REPL). */
 static void t_retry_after_failure(void) {
-    LispMemoryFile file = FILE("/later.novelo", "(define later :here)");
+    LispMemoryFile file = FILE("/later.nvl", "(define later :here)");
     LispMemoryFiles empty = {nullptr, 0};
     LispMemoryFiles with_file = {&file, 1};
     LispBuffer output;
@@ -146,12 +146,12 @@ static void t_retry_after_failure(void) {
         .working_directory = "/",
     };
     LispState *state = lisp_state_new(&options);
-    const char *include = "(include \"later.novelo\")";
+    const char *include = "(include \"later.nvl\")";
     LispReadError read_error;
     CHECK_INT(lisp_run_source(state, include, strlen(include), nullptr, nullptr, &read_error), LISP_RUN_ERROR);
     state->files = lisp_file_system_from_memory(&with_file);
     Value *value = nullptr;
-    const char *again = "(include \"later.novelo\") later";
+    const char *again = "(include \"later.nvl\") later";
     CHECK_INT(lisp_run_source(state, again, strlen(again), nullptr, &value, &read_error), LISP_RUN_OK);
     CHECK_EQUAL(value, ":here");
     lisp_release(value);
@@ -163,7 +163,7 @@ static void t_disk(void) {
     char directory[] = "/tmp/novelo-include-XXXXXX";
     CHECK(mkdtemp(directory) != nullptr);
     char path[512];
-    snprintf(path, sizeof path, "%s/lib.novelo", directory);
+    snprintf(path, sizeof path, "%s/lib.nvl", directory);
     FILE *file = fopen(path, "w");
     CHECK(file != nullptr);
     if (!file) return;
@@ -174,10 +174,10 @@ static void t_disk(void) {
     lisp_buffer_init(&output);
     LispStateOptions options = {.output = lisp_output_to_buffer(&output), .working_directory = directory};
     LispState *state = lisp_state_new(&options);
-    const char *program = "(include \"lib.novelo\" d) d/from-disk";
+    const char *program = "(include \"lib.nvl\" d) d/from-disk";
     Value *value = nullptr;
     LispReadError read_error;
-    CHECK_INT(lisp_run_source(state, program, strlen(program), "main.novelo", &value, &read_error), LISP_RUN_OK);
+    CHECK_INT(lisp_run_source(state, program, strlen(program), "main.nvl", &value, &read_error), LISP_RUN_OK);
     if (value) CHECK_EQUAL(value, ":yes");
     lisp_release(value);
     lisp_state_free(state);

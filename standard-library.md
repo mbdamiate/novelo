@@ -12,7 +12,7 @@ The reference definitions in section 4 are normative. The implementation MAY rep
 
 **Version:** 0.2.1, draft, on top of core 0.2.2.
 
-**Changes since 0.2.0.** The language is named Novelo (core 0.2.2); the cases in `stdlib-conformance.json` use `.novelo` file names. The libraries are unchanged.
+**Changes since 0.2.0.** The language is named Novelo (core 0.2.2); the cases in `stdlib-conformance.json` use `.nvl` file names. The libraries are unchanged.
 
 **Changes since 0.1.0.** The library is split into `list`, `text` and `function`, each imported explicitly with `import`, instead of being loaded before every program.
 

@@ -1,4 +1,4 @@
-/* core §8.7 — the command line: `novelo file.novelo` runs a program,
+/* core §8.7 — the command line: `novelo file.nvl` runs a program,
  * `novelo` alone starts the REPL.
  *
  * Exit codes: 0 when every form was evaluated (or the REPL reached the end
@@ -25,7 +25,7 @@ static void write_to_stderr(void *, const char *bytes, size_t length) {
 }
 
 static void usage(FILE *stream) {
-    fputs("usage: novelo [file.novelo]\n"
+    fputs("usage: novelo [file.nvl]\n"
           "  with a file, runs the program; without one, starts the REPL.\n"
           "  NOVELO_STDLIB names the standard library document (standard-library.md).\n",
           stream);

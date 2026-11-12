@@ -18,13 +18,13 @@ The core is a three-stage pipeline:
 
 **Out of scope.** The standard library, with the libraries `list`, `text` and `function` and functions such as `map`, `filter` and `sort`, has its own specification. The extensions already planned, such as multi-pair `if`, sum types and gradual typing, belong to the full specification. The core only reserves the names they use (section 8.2).
 
-**Name.** The language is called **Novelo**, Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as the lists of the language are. Source files use the extension `.novelo`; the extension is a convention, and `include` accepts any path (8.8).
+**Name.** The language is called **Novelo**, Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as the lists of the language are. Source files use the extension `.nvl`; the extension is a convention, and `include` accepts any path (8.8).
 
 **Normative terms.** MUST indicates a mandatory requirement. MUST NOT indicates a prohibition. MAY indicates implementation freedom that does not affect observable behavior.
 
 **Version:** core 0.2.2, draft.
 
-**Changes since 0.2.1.** The language is named Novelo, and source files use the extension `.novelo`. In the conformance file, the program of an `eval` case is the file `main.novelo` (12.4). Nothing else changes.
+**Changes since 0.2.1.** The language is named Novelo, and source files use the extension `.nvl`. In the conformance file, the program of an `eval` case is the file `main.nvl` (12.4). Nothing else changes.
 
 **Changes since 0.2.0.** Points the text left open are now fixed: the order of errors inside `\u{…}` (4.3, 7.3), `define-macro` with a transformer that is not a function (8.2), macro names used as values (8.2), the call depth an implementation MUST support and `:stack-overflow` (8.4, 8.5), `read-line!` with invalid UTF-8 and `:io-error` (8.5, 9), when a file or library counts as loaded (8.8, 8.9), the reasons of `:import-error` (8.9) and how `display!` prints strings inside collections (10).
 
@@ -520,17 +520,17 @@ Redefining a name with `define` replaces the previous binding (8.2). The REPL en
 **Resolving names in a context.** A symbol `x` in code from a non-empty context that is not bound locally (8.2) names the global `F/x`, where `F` is the full prefix of the context, if `x` is at that moment a name of the context; otherwise it names the global `x`. The test happens when the symbol is evaluated, like every global lookup, so a function may call another one defined further down in the same file. The head of a form is a macro under the same rule, tested when the form is expanded. Names the file does not define resolve as usual: the primitives, the libraries imported in the empty context and whatever the including program defined are all visible. The rule applies only to symbols evaluated as variables and to macro heads: quoted data, symbols built with `string-to-symbol` and the names of special forms, derived forms, `include` and `import` are never prefixed.
 
 ```lisp
-;; geo.novelo
+;; geo.nvl
 (define area (lambda (w h) (* w h)))
 (define square-area (lambda (s) (area s s)))   ; area resolves to geo/area
 
-;; main.novelo
+;; main.nvl
 (define area :mine)
-(include "geo.novelo" geo)
+(include "geo.nvl" geo)
 (list area (geo/square-area 3))                ; → (:mine 9)
 ```
 
-**Macros across files.** The datum a macro returns is expanded in the context of the form that uses it, not in the context where the macro was defined. Macros are not hygienic (8.2), so the symbols of a template resolve in the caller: a macro of `geo.novelo`, included with `geo`, whose template mentions `area` produces a reference to `area`, not to `geo/area`. A macro meant for use outside its file MUST write those names with the full prefix, as `geo/area`, or not refer to them. The transformer itself is an ordinary function of its file, and the names in its body resolve in that file's context.
+**Macros across files.** The datum a macro returns is expanded in the context of the form that uses it, not in the context where the macro was defined. Macros are not hygienic (8.2), so the symbols of a template resolve in the caller: a macro of `geo.nvl`, included with `geo`, whose template mentions `area` produces a reference to `area`, not to `geo/area`. A macro meant for use outside its file MUST write those names with the full prefix, as `geo/area`, or not refer to them. The transformer itself is an ordinary function of its file, and the names in its body resolve in that file's context.
 
 **Repetition.** A file is loaded at most once per context: an `include` of a file that was already included in the same resulting context is ignored. A file counts as included once it has been opened and read without a read error, before its first form runs. So an `include` that failed with `:cannot-open` or a read error leaves nothing recorded, and in the REPL the same `include` can be tried again once the file is fixed; a file whose forms raised an error does count as included. The same file in another context is loaded again, with its own names, and the effects of its top-level forms, such as `display!`, happen again. An `include` of a file that is still being loaded, either the program itself or a file whose `include` has not finished, is an error in any context; this rules out cycles.
 
@@ -722,7 +722,7 @@ The file `conformance.json` has 253 cases, each with an `id`, the section it tes
 | `read-positions` | 2 | the node indicated by each `path` is in the position table with the expected `position` |
 | `eval` | 191 | `program` runs as a file, with `input` (or the bytes of `input_hex`) on standard input; it imports at most the library `io`; the output is exactly `output`, and the program ends with the value `value` or with an uncaught error of the `:kind` given in `error` |
 
-An `eval` case that tests `include` (8.8) also has `files`, an object that maps each relative path, with `/` as separator, to the text of that file. The program is the file `main.novelo`, and the paths are relative to its directory. A path missing from `files` cannot be opened.
+An `eval` case that tests `include` (8.8) also has `files`, an object that maps each relative path, with `/` as separator, to the text of that file. The program is the file `main.nvl`, and the paths are relative to its directory. A path missing from `files` cannot be opened.
 
 The `eval` cases cover the special and derived forms, tail calls with one million iterations, 10,000 nested non-tail calls and `:stack-overflow`, equality, arithmetic and overflows, primitives, `read-line!` with invalid UTF-8, printing (including `display!` of strings inside collections), `catch` and `raise`, both callback patterns, `include` with and without prefixes, and `import` (8.9). Some cases check that what was removed from the core does not exist: `/`, `same?`, named `lambda`, the names without `!`, the standard library functions without `import`, and the `io` functions without `import`. The library has its own cases, in the file `stdlib-conformance.json`.
 
