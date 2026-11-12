@@ -22,3 +22,15 @@ Positions live in a side table keyed by node identity (core §6). When identity 
 - keep the table alive exactly as long as the datums it describes;
 - remove a node's entry when the node is freed;
 - use weak references as keys.
+
+## 3. Persistent maps
+
+Core §8.6 requires `associate`, `dissociate` and `get` to cost at most logarithmically in the size of the map. Copying the map on each `associate` does not meet it: building a map of a million keys that way copies about half a trillion entries.
+
+**A hash array mapped trie (HAMT) is enough.** Each node covers 5 bits of the key's hash and holds up to 32 slots. A bitmap says which slots are used, so a node stores only the slots it has. `associate` copies the path from the root to the changed slot, at most 13 nodes for a 64-bit hash, and shares everything else with the original map. Two different keys whose hashes are fully equal end in a collision node, a short list compared with `equal?`.
+
+**Keep the hash consistent with `equal?`.** Equal keys must hash equally, including maps compared regardless of order and lists compared element by element. A hash that stops descending at some depth is consistent, at the price of collisions for keys that differ only below that depth.
+
+**Order is free to choose.** The iteration order of a map is unspecified (core §2.3), but a map literal is evaluated left to right (core §8.4), so the expander needs the reading order of a literal map. One way to keep it is a sequence number per entry, given at insertion and kept when a value is replaced, and iterating in that order.
+
+**Release trie nodes iteratively,** like list cells (section 1): a map of a million keys has tens of thousands of nodes.

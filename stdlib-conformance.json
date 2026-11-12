@@ -1,7 +1,7 @@
 {
-  "spec": "Standard Library — Novelo, version 0.2.1",
+  "spec": "Standard Library — Novelo, version 0.3.0",
   "format": {
-    "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text and function available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
+    "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text, function and map available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
   },
   "cases": [
     {
@@ -237,6 +237,94 @@
       "section": "2",
       "program": "(import list)\n(import text)\n(import list)\n(count (range 0 3))",
       "value": "3",
+      "output": ""
+    },
+    {
+      "id": "library-030",
+      "kind": "eval",
+      "section": "4.4",
+      "program": "(import map)\n(define m {:a 3 :b 1 :c 2})\n(list (sort < (values m)) (entries {:a 1}) (equal? (from-entries (entries m)) m) (values {}) (entries {}))",
+      "value": "((1 2 3) ((:a 1)) #true () ())",
+      "output": ""
+    },
+    {
+      "id": "library-031",
+      "kind": "eval",
+      "section": "4.4",
+      "program": "(import map)\n(list (from-entries (list (list :a 1) (list :b 2) (list :a 3))) (from-entries ()))",
+      "value": "({:a 3 :b 2} {})",
+      "output": ""
+    },
+    {
+      "id": "library-032",
+      "kind": "eval",
+      "section": "4.4",
+      "program": "(import map)\n(from-entries (list (list :a 1) (list :b)))",
+      "error": ":error",
+      "output": ""
+    },
+    {
+      "id": "library-033",
+      "kind": "eval",
+      "section": "4.4",
+      "program": "(import map)\n(list (update :n (lambda (x) (+ x 1)) {:n 1 :m 5}) (update :n (lambda (x) x) {:n 1}))",
+      "value": "({:n 2 :m 5} {:n 1})",
+      "output": ""
+    },
+    {
+      "id": "library-034",
+      "kind": "eval",
+      "section": "4.4",
+      "program": "(import map)\n(update :missing (lambda (x) x) {:n 1})",
+      "error": ":missing-key",
+      "output": ""
+    },
+    {
+      "id": "library-035",
+      "kind": "eval",
+      "section": "4.4",
+      "program": "(import map)\n(list (merge {:a 1 :b 2} {:b 3 :c 4}) (merge {} {:a 1}) (merge {:a 1} {}))",
+      "value": "({:a 1 :b 3 :c 4} {:a 1} {:a 1})",
+      "output": ""
+    },
+    {
+      "id": "library-036",
+      "kind": "eval",
+      "section": "4.4",
+      "program": "(import map)\n(list (map-values (lambda (x) (* x 2)) {:a 1 :b 2}) (map-values (lambda (x) x) {}))",
+      "value": "({:a 2 :b 4} {})",
+      "output": ""
+    },
+    {
+      "id": "library-037",
+      "kind": "eval",
+      "section": "4.4",
+      "program": "(import map)\n(list (filter-entries (lambda (key value) (> value 1)) {:a 1 :b 2 :c 3}) (filter-entries (lambda (key value) (equal? key :a)) {:a 1 :b 2}) (filter-entries (lambda (key value) #false) {:a 1}))",
+      "value": "({:b 2 :c 3} {:a 1} {})",
+      "output": ""
+    },
+    {
+      "id": "library-038",
+      "kind": "eval",
+      "section": "4.4",
+      "program": "(import map)\n(list (fold-entries (lambda (acc key value) (+ acc value)) 0 {:a 1 :b 2 :c 3}) (fold-entries (lambda (acc key value) (+ acc 1)) 0 {}) (sort < (fold-entries (lambda (acc key value) (prepend value acc)) () {:x 2 :y 1})))",
+      "value": "(6 0 (1 2))",
+      "output": ""
+    },
+    {
+      "id": "library-039",
+      "kind": "eval",
+      "section": "4.4",
+      "program": "(import map)\n(define m (from-entries (map (lambda (n) (list n (* n n))) (range 0 100000))))\n(define even (filter-entries (lambda (key value) (= 0 (remainder key 2))) m))\n(list (count m) (count even) (get even 99998) (contains? even 99999) (fold-entries (lambda (acc key value) (+ acc key)) 0 even))",
+      "value": "(100000 50000 9999600004 #false 2499950000)",
+      "output": ""
+    },
+    {
+      "id": "library-040",
+      "kind": "eval",
+      "section": "4.4",
+      "program": "(import map m)\n(list (m/merge {:a 1} {:b 2}) (m/reverse (list 1 2)) (catch (lambda () merge) (lambda (problem) (get problem :kind))))",
+      "value": "({:a 1 :b 2} (2 1) :unbound-symbol)",
       "output": ""
     }
   ]

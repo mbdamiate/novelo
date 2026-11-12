@@ -290,6 +290,99 @@ static void t_map_growth_and_structural_keys(void) {
     RELEASE_ALL(key, map);
 }
 
+/* core §8.6 — the trie against a plain model, under random associate and
+ * dissociate. Keys from 1800 up are wrapped in ten lists: lisp_hash stops at
+ * depth 8, so their hashes are all equal and they share collision nodes. The
+ * snapshots check that older versions never change. */
+constexpr int MODEL_KEYS = 2000;
+constexpr int MODEL_SNAPSHOTS = 20;
+
+typedef struct MapModel {
+    int64_t values[MODEL_KEYS]; /* -1: absent */
+    size_t count;
+} MapModel;
+
+static Value *model_key(int number) {
+    Value *key = lisp_integer(number);
+    if (number < 1800) return key;
+    for (int depth = 0; depth < 10; depth++) key = lisp_prepend_take(key, LISP_EMPTY);
+    return key;
+}
+
+static void check_against_model(const char *file, int line, const Value *map, const MapModel *model) {
+    if (lisp_map_count(map) != model->count) {
+        test_fail(file, line, "count %zu, expected %zu", lisp_map_count(map), model->count);
+        return;
+    }
+    for (int number = 0; number < MODEL_KEYS; number++) {
+        Value *key = model_key(number);
+        Value *found = lisp_map_get(map, key);
+        lisp_release(key);
+        int64_t expected = model->values[number];
+        if ((found == nullptr) != (expected < 0) || (found && lisp_integer_value(found) != expected)) {
+            test_fail(file, line, "key %d: got %lld, expected %lld", number,
+                      found ? (long long)lisp_integer_value(found) : -1LL, (long long)expected);
+            return;
+        }
+    }
+    size_t visited = 0;
+    Value *key, *value;
+    for (size_t cursor = 0; lisp_map_next(map, &cursor, &key, &value);) visited++;
+    if (visited != model->count) test_fail(file, line, "iteration visited %zu keys of %zu", visited, model->count);
+}
+
+static void t_map_trie_against_model(void) {
+    static MapModel model, snapshot_models[MODEL_SNAPSHOTS];
+    Value *snapshots[MODEL_SNAPSHOTS];
+    size_t snapshot_count = 0;
+    for (int number = 0; number < MODEL_KEYS; number++) model.values[number] = -1;
+    model.count = 0;
+
+    Value *map = lisp_map_new(0);
+    uint64_t random = 12345;
+    for (int step = 1; step <= 40000; step++) {
+        random = random * 6364136223846793005ULL + 1442695040888963407ULL;
+        int number = (int)((random >> 33) % MODEL_KEYS);
+        bool associate = ((random >> 20) & 3) != 0; /* three associates for each dissociate */
+        Value *key = model_key(number);
+        Value *next;
+        if (associate) {
+            Value *value = lisp_integer(step);
+            next = lisp_map_associate(map, key, value);
+            lisp_release(value);
+            if (model.values[number] < 0) model.count++;
+            model.values[number] = step;
+        } else {
+            next = lisp_map_dissociate(map, key);
+            if (model.values[number] >= 0) model.count--;
+            model.values[number] = -1;
+        }
+        lisp_release(key);
+        lisp_release(map);
+        map = next;
+        if (step % 2000 == 0 && snapshot_count < MODEL_SNAPSHOTS) {
+            snapshots[snapshot_count] = lisp_retain(map);
+            snapshot_models[snapshot_count++] = model;
+        }
+    }
+    check_against_model(__FILE__, __LINE__, map, &model);
+    for (size_t index = 0; index < snapshot_count; index++) {
+        check_against_model(__FILE__, __LINE__, snapshots[index], &snapshot_models[index]);
+    }
+
+    /* Dissociating every key leaves the empty map. */
+    for (int number = 0; number < MODEL_KEYS; number++) {
+        Value *key = model_key(number);
+        Value *next = lisp_map_dissociate(map, key);
+        lisp_release(key);
+        lisp_release(map);
+        map = next;
+    }
+    CHECK_INT(lisp_map_count(map), 0);
+    CHECK(map == lisp_map_new(0));
+    for (size_t index = 0; index < snapshot_count; index++) lisp_release(snapshots[index]);
+}
+
 static void t_map_equality_ignores_order(void) {
     Value *key_a = lisp_keyword_cstr("a"), *key_b = lisp_keyword_cstr("b"), *key_c = lisp_keyword_cstr("c");
     Value *one = lisp_integer(1), *two = lisp_integer(2);
@@ -335,6 +428,7 @@ const TestSuite value_suite = {"value", (const TestCase[]){
     {"maps keep insertion order", t_map_keeps_insertion_order},
     {"maps grow and take structural keys", t_map_growth_and_structural_keys},
     {"map equality ignores order", t_map_equality_ignores_order},
+    {"the map trie matches a model, with collisions and snapshots", t_map_trie_against_model},
     {"hash is consistent with equal?", t_hash_consistent},
     {},
 }};

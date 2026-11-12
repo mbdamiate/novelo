@@ -59,12 +59,8 @@ static void destroy(Value *object) {
     }
     case LISP_KIND_MAP: {
         LispMap *map = (LispMap *)object;
-        for (size_t index = 0; index < map->count; index++) {
-            lisp_release(map->entries[index].key);
-            lisp_release(map->entries[index].value);
-        }
-        free(map->entries);
-        free(map->slots);
+        lisp_release(map->root); /* trie nodes are opaque objects, released through the work stack */
+        free(map->ordered);
         break;
     }
     case LISP_KIND_CLOSURE: {
@@ -302,126 +298,304 @@ void lisp_list_builder_discard(LispListBuilder *builder) {
     lisp_list_builder_init(builder);
 }
 
-/* ---- maps -------------------------------------------------------------------------- */
+/* ---- maps: a hash array mapped trie (§8.6) ----------------------------------------- */
 
-static size_t slot_capacity_for(size_t count) {
-    size_t capacity = 8;
-    while (capacity < 2 * count) capacity *= 2;
-    return capacity;
+/* Each node covers 5 bits of the hash, from the lowest up, and stores only
+ * the slots it uses: entry_map and child_map say which of the 32 slots hold
+ * an entry or a child, and the arrays keep them in slot order. Below the last
+ * 64-bit level, keys with fully equal hashes share a collision node, a plain
+ * list of entries. A node other than the root always holds two keys or more:
+ * dissociate pulls a lone entry back into its parent. */
+typedef struct TrieNode {
+    LispOpaque base;
+    uint32_t entry_map;
+    uint32_t child_map;
+    uint32_t collision_count; /* nonzero: a collision node, with that many entries */
+    LispMapEntry *entries;
+    Value **children;
+} TrieNode;
+
+constexpr unsigned TRIE_BITS = 5;
+constexpr unsigned TRIE_HASH_BITS = 64;
+
+static void drop_trie_node(Value *self) {
+    TrieNode *node = (TrieNode *)self;
+    size_t entry_count = node->collision_count ? node->collision_count : (size_t)__builtin_popcount(node->entry_map);
+    for (size_t index = 0; index < entry_count; index++) {
+        lisp_release(node->entries[index].key);
+        lisp_release(node->entries[index].value);
+    }
+    size_t child_count = (size_t)__builtin_popcount(node->child_map);
+    for (size_t index = 0; index < child_count; index++) lisp_release(node->children[index]);
+    free(node->entries);
+    free(node->children);
 }
 
-static LispMap *map_alloc(size_t entry_capacity) {
+static const LispClass trie_node_class = {"MapNode", drop_trie_node};
+
+static const TrieNode *as_trie(const Value *node) { return (const TrieNode *)node; }
+
+static TrieNode *trie_node_new(size_t entry_count, size_t child_count) {
+    TrieNode *node = (TrieNode *)lisp_opaque_new(&trie_node_class, sizeof(TrieNode));
+    node->entries = entry_count ? lisp_xmalloc(entry_count * sizeof(LispMapEntry)) : nullptr;
+    node->children = child_count ? lisp_xmalloc(child_count * sizeof(Value *)) : nullptr;
+    return node;
+}
+
+/* Copies an entry, retaining its key and value. */
+static LispMapEntry entry_copy(const LispMapEntry *entry) {
+    return (LispMapEntry){
+        .key = lisp_retain(entry->key),
+        .value = lisp_retain(entry->value),
+        .hash = entry->hash,
+        .sequence = entry->sequence,
+    };
+}
+
+static uint32_t slot_bit(uint64_t hash, unsigned shift) { return 1u << ((hash >> shift) & 31); }
+
+static size_t slot_index(uint32_t map, uint32_t bit) { return (size_t)__builtin_popcount(map & (bit - 1)); }
+
+static bool same_key(const LispMapEntry *entry, const Value *key, uint64_t hash) {
+    return entry->hash == hash && lisp_equal(entry->key, key);
+}
+
+static size_t node_entry_count(const TrieNode *node) {
+    return node->collision_count ? node->collision_count : (size_t)__builtin_popcount(node->entry_map);
+}
+
+static const LispMapEntry *trie_find(const Value *root, const Value *key, uint64_t hash) {
+    unsigned shift = 0;
+    for (const TrieNode *node = as_trie(root); node; shift += TRIE_BITS) {
+        if (node->collision_count) {
+            for (size_t index = 0; index < node->collision_count; index++) {
+                if (same_key(&node->entries[index], key, hash)) return &node->entries[index];
+            }
+            return nullptr;
+        }
+        uint32_t bit = slot_bit(hash, shift);
+        if (node->entry_map & bit) {
+            const LispMapEntry *entry = &node->entries[slot_index(node->entry_map, bit)];
+            return same_key(entry, key, hash) ? entry : nullptr;
+        }
+        if (!(node->child_map & bit)) return nullptr;
+        node = as_trie(node->children[slot_index(node->child_map, bit)]);
+    }
+    return nullptr;
+}
+
+/* A copy of a node in which the slot `bit` holds `entry` (copied), or
+ * `child` (taken), or nothing when both are nullptr. */
+static Value *node_with_slot(const TrieNode *node, uint32_t bit, const LispMapEntry *entry, Value *child) {
+    uint32_t entry_map = (node->entry_map & ~bit) | (entry ? bit : 0);
+    uint32_t child_map = (node->child_map & ~bit) | (child ? bit : 0);
+    TrieNode *copy = trie_node_new((size_t)__builtin_popcount(entry_map), (size_t)__builtin_popcount(child_map));
+    copy->entry_map = entry_map;
+    copy->child_map = child_map;
+    size_t entry_index = 0, child_index = 0;
+    for (unsigned slot = 0; slot < 32; slot++) {
+        uint32_t current = 1u << slot;
+        if (current == bit) {
+            if (entry) copy->entries[entry_index++] = entry_copy(entry);
+            if (child) copy->children[child_index++] = child;
+        } else if (entry_map & current) {
+            copy->entries[entry_index++] = entry_copy(&node->entries[slot_index(node->entry_map, current)]);
+        } else if (child_map & current) {
+            copy->children[child_index++] = lisp_retain(node->children[slot_index(node->child_map, current)]);
+        }
+    }
+    return &copy->base.header;
+}
+
+/* A node holding two entries whose hashes agree below `shift`. */
+static Value *pair_node(const LispMapEntry *first, const LispMapEntry *second, unsigned shift) {
+    if (shift >= TRIE_HASH_BITS) {
+        TrieNode *collision = trie_node_new(2, 0);
+        collision->collision_count = 2;
+        collision->entries[0] = entry_copy(first);
+        collision->entries[1] = entry_copy(second);
+        return &collision->base.header;
+    }
+    uint32_t first_bit = slot_bit(first->hash, shift), second_bit = slot_bit(second->hash, shift);
+    if (first_bit == second_bit) {
+        TrieNode *node = trie_node_new(0, 1);
+        node->child_map = first_bit;
+        node->children[0] = pair_node(first, second, shift + TRIE_BITS);
+        return &node->base.header;
+    }
+    TrieNode *node = trie_node_new(2, 0);
+    node->entry_map = first_bit | second_bit;
+    bool first_is_lower = first_bit < second_bit;
+    node->entries[0] = entry_copy(first_is_lower ? first : second);
+    node->entries[1] = entry_copy(first_is_lower ? second : first);
+    return &node->base.header;
+}
+
+/* The trie with the entry (borrowed) in it. A key already present keeps its
+ * sequence and gets the new value; *added tells which case happened. */
+static Value *trie_associate(const Value *root, unsigned shift, const LispMapEntry *entry, bool *added) {
+    if (!root) {
+        TrieNode *node = trie_node_new(1, 0);
+        node->entry_map = slot_bit(entry->hash, shift);
+        node->entries[0] = entry_copy(entry);
+        *added = true;
+        return &node->base.header;
+    }
+    const TrieNode *node = as_trie(root);
+    if (node->collision_count) {
+        size_t count = node->collision_count;
+        size_t found = count;
+        for (size_t index = 0; index < count; index++) {
+            if (same_key(&node->entries[index], entry->key, entry->hash)) found = index;
+        }
+        *added = found == count;
+        TrieNode *copy = trie_node_new(count + (*added ? 1 : 0), 0);
+        copy->collision_count = (uint32_t)(count + (*added ? 1 : 0));
+        for (size_t index = 0; index < count; index++) copy->entries[index] = entry_copy(&node->entries[index]);
+        if (*added) {
+            copy->entries[count] = entry_copy(entry);
+        } else {
+            lisp_release(copy->entries[found].value);
+            copy->entries[found].value = lisp_retain(entry->value);
+        }
+        return &copy->base.header;
+    }
+    uint32_t bit = slot_bit(entry->hash, shift);
+    if (node->entry_map & bit) {
+        const LispMapEntry *existing = &node->entries[slot_index(node->entry_map, bit)];
+        if (same_key(existing, entry->key, entry->hash)) {
+            LispMapEntry replaced = *existing;
+            replaced.value = entry->value;
+            *added = false;
+            return node_with_slot(node, bit, &replaced, nullptr);
+        }
+        *added = true;
+        return node_with_slot(node, bit, nullptr, pair_node(existing, entry, shift + TRIE_BITS));
+    }
+    if (node->child_map & bit) {
+        Value *child = node->children[slot_index(node->child_map, bit)];
+        return node_with_slot(node, bit, nullptr, trie_associate(child, shift + TRIE_BITS, entry, added));
+    }
+    *added = true;
+    return node_with_slot(node, bit, entry, nullptr);
+}
+
+/* The trie without the key: nullptr when nothing is left. The key must be
+ * present. */
+static Value *trie_dissociate(const Value *root, unsigned shift, const Value *key, uint64_t hash) {
+    const TrieNode *node = as_trie(root);
+    if (node->collision_count) {
+        size_t count = node->collision_count;
+        TrieNode *copy = trie_node_new(count - 1, 0);
+        copy->collision_count = (uint32_t)(count - 1);
+        size_t kept = 0;
+        for (size_t index = 0; index < count; index++) {
+            if (!same_key(&node->entries[index], key, hash)) copy->entries[kept++] = entry_copy(&node->entries[index]);
+        }
+        return &copy->base.header;
+    }
+    uint32_t bit = slot_bit(hash, shift);
+    if (node->entry_map & bit) {
+        if (node_entry_count(node) == 1 && node->child_map == 0) return nullptr;
+        return node_with_slot(node, bit, nullptr, nullptr);
+    }
+    Value *child = trie_dissociate(node->children[slot_index(node->child_map, bit)], shift + TRIE_BITS, key, hash);
+    const TrieNode *remaining = child ? as_trie(child) : nullptr;
+    if (remaining && remaining->child_map == 0 && node_entry_count(remaining) == 1) {
+        /* A lone entry moves up into this node. */
+        Value *result = node_with_slot(node, bit, &remaining->entries[0], nullptr);
+        lisp_release(child);
+        return result;
+    }
+    if (!child && node->entry_map == 0 && node->child_map == bit) return nullptr;
+    return node_with_slot(node, bit, nullptr, child);
+}
+
+/* A map over a trie (taken). */
+static Value *map_from_trie(Value *root, size_t count, uint64_t next_sequence) {
+    if (count == 0) {
+        lisp_release(root);
+        return &empty_map.header;
+    }
     LispMap *map = (LispMap *)lisp_object_new(LISP_KIND_MAP, sizeof(LispMap));
-    map->count = 0;
-    map->entry_capacity = entry_capacity ? entry_capacity : 1;
-    map->entries = lisp_xmalloc(map->entry_capacity * sizeof(LispMapEntry));
-    map->slot_capacity = slot_capacity_for(map->entry_capacity);
-    map->slots = lisp_xcalloc(map->slot_capacity, sizeof(uint32_t));
-    return map;
-}
-
-/* Slot holding the entry for `key`, or the empty slot where it would go. */
-static size_t find_slot(const LispMap *map, const Value *key, uint64_t hash) {
-    size_t mask = map->slot_capacity - 1;
-    for (size_t slot = hash & mask;; slot = (slot + 1) & mask) {
-        uint32_t entry_number = map->slots[slot];
-        if (entry_number == 0) return slot;
-        const LispMapEntry *entry = &map->entries[entry_number - 1];
-        if (entry->hash == hash && lisp_equal(entry->key, key)) return slot;
-    }
-}
-
-static void rebuild_slots(LispMap *map, size_t slot_capacity) {
-    free(map->slots);
-    map->slot_capacity = slot_capacity;
-    map->slots = lisp_xcalloc(slot_capacity, sizeof(uint32_t));
-    size_t mask = slot_capacity - 1;
-    for (size_t index = 0; index < map->count; index++) {
-        size_t slot = map->entries[index].hash & mask;
-        while (map->slots[slot]) slot = (slot + 1) & mask;
-        map->slots[slot] = (uint32_t)(index + 1);
-    }
-}
-
-/* Appends an entry known to be absent; the map must be private to the caller. */
-static void append_entry(LispMap *map, Value *key, Value *value, uint64_t hash) {
-    if (map->count == map->entry_capacity) {
-        map->entry_capacity *= 2;
-        map->entries = lisp_xrealloc(map->entries, map->entry_capacity * sizeof(LispMapEntry));
-    }
-    if (2 * (map->count + 1) > map->slot_capacity) rebuild_slots(map, slot_capacity_for(map->count + 1));
-    size_t slot = find_slot(map, key, hash);
-    map->entries[map->count] = (LispMapEntry){.key = key, .value = value, .hash = hash};
-    map->slots[slot] = (uint32_t)(map->count + 1);
-    map->count++;
+    map->count = count;
+    map->root = root;
+    map->next_sequence = next_sequence;
+    map->ordered = nullptr;
+    return &map->header;
 }
 
 Value *lisp_map_new(size_t expected) {
-    if (expected == 0) return &empty_map.header;
-    return &map_alloc(expected)->header;
+    (void)expected;
+    return &empty_map.header;
 }
 
 bool lisp_map_insert_take(Value **map_reference, Value *key, Value *value) {
     LispMap *map = (LispMap *)*map_reference;
     assert((map->header.flags & LISP_IMMORTAL) || map->header.refs == 1);
-    if (map->count && lisp_map_get(&map->header, key)) {
+    if (lisp_map_get(&map->header, key)) {
         lisp_release(key);
         lisp_release(value);
         return false;
     }
-    if (map->header.flags & LISP_IMMORTAL) { /* the shared empty map: start a real one */
-        map = map_alloc(4);
-        *map_reference = &map->header;
-    }
-    append_entry(map, key, value, lisp_hash(key));
+    *map_reference = lisp_map_associate(&map->header, key, value);
+    lisp_release(&map->header);
+    lisp_release(key);
+    lisp_release(value);
     return true;
 }
 
 Value *lisp_map_get(const Value *map_value, const Value *key) {
     const LispMap *map = (const LispMap *)map_value;
     if (map->count == 0) return nullptr;
-    uint32_t entry_number = map->slots[find_slot(map, key, lisp_hash(key))];
-    return entry_number ? map->entries[entry_number - 1].value : nullptr;
+    const LispMapEntry *entry = trie_find(map->root, key, lisp_hash(key));
+    return entry ? entry->value : nullptr;
 }
 
 Value *lisp_map_associate(const Value *map_value, Value *key, Value *value) {
     const LispMap *map = (const LispMap *)map_value;
-    LispMap *copy = map_alloc(map->count + 1);
-    for (size_t index = 0; index < map->count; index++) {
-        const LispMapEntry *entry = &map->entries[index];
-        append_entry(copy, lisp_retain(entry->key), lisp_retain(entry->value), entry->hash);
-    }
-    uint64_t hash = lisp_hash(key);
-    uint32_t entry_number = copy->slots[find_slot(copy, key, hash)];
-    if (entry_number) { /* replace the value, keeping the key's position */
-        LispMapEntry *entry = &copy->entries[entry_number - 1];
-        lisp_release(entry->value);
-        entry->value = lisp_retain(value);
-    } else {
-        append_entry(copy, lisp_retain(key), lisp_retain(value), hash);
-    }
-    return &copy->header;
+    LispMapEntry entry = {.key = key, .value = value, .hash = lisp_hash(key), .sequence = map->next_sequence};
+    bool added = false;
+    Value *root = trie_associate(map->root, 0, &entry, &added);
+    return map_from_trie(root, map->count + (added ? 1 : 0), map->next_sequence + (added ? 1 : 0));
 }
 
 Value *lisp_map_dissociate(Value *map_value, const Value *key) {
-    if (!lisp_map_get(map_value, key)) return lisp_retain(map_value);
     const LispMap *map = (const LispMap *)map_value;
-    if (map->count == 1) return &empty_map.header;
-    LispMap *copy = map_alloc(map->count - 1);
-    for (size_t index = 0; index < map->count; index++) {
-        const LispMapEntry *entry = &map->entries[index];
-        if (!lisp_equal(entry->key, key)) {
-            append_entry(copy, lisp_retain(entry->key), lisp_retain(entry->value), entry->hash);
-        }
-    }
-    return &copy->header;
+    uint64_t hash = lisp_hash(key);
+    if (map->count == 0 || !trie_find(map->root, key, hash)) return lisp_retain(map_value);
+    Value *root = trie_dissociate(map->root, 0, key, hash);
+    return map_from_trie(root, map->count - 1, map->next_sequence);
+}
+
+/* ---- iteration in insertion order ---- */
+
+static void collect_entries(const Value *root, const LispMapEntry **ordered, size_t *count) {
+    const TrieNode *node = as_trie(root);
+    size_t entry_count = node_entry_count(node);
+    for (size_t index = 0; index < entry_count; index++) ordered[(*count)++] = &node->entries[index];
+    size_t child_count = (size_t)__builtin_popcount(node->child_map);
+    for (size_t index = 0; index < child_count; index++) collect_entries(node->children[index], ordered, count);
+}
+
+static int compare_sequences(const void *left, const void *right) {
+    uint64_t first = (*(const LispMapEntry *const *)left)->sequence;
+    uint64_t second = (*(const LispMapEntry *const *)right)->sequence;
+    return first < second ? -1 : first > second;
 }
 
 bool lisp_map_next(const Value *map_value, size_t *cursor, Value **key, Value **value) {
-    const LispMap *map = (const LispMap *)map_value;
+    LispMap *map = (LispMap *)map_value; /* the order is a cache: the map itself does not change */
     if (*cursor >= map->count) return false;
-    *key = map->entries[*cursor].key;
-    *value = map->entries[*cursor].value;
+    if (!map->ordered) {
+        map->ordered = lisp_xmalloc(map->count * sizeof *map->ordered);
+        size_t collected = 0;
+        collect_entries(map->root, map->ordered, &collected);
+        assert(collected == map->count);
+        qsort(map->ordered, map->count, sizeof *map->ordered, compare_sequences);
+    }
+    *key = map->ordered[*cursor]->key;
+    *value = map->ordered[*cursor]->value;
     (*cursor)++;
     return true;
 }

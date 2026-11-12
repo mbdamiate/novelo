@@ -6,11 +6,13 @@ Nov 10, 2026 · @Matheus Damiate
 
 The standard library is a set of functions written in the language itself, on top of the core primitives. It is not part of the core: an implementation conformant to the core does not need to provide it, and the core tests do not depend on it.
 
-The standard library is made of three libraries, in the sense of core section 8.9: `list`, `text` and `function`. Nothing is loaded before the program: a file imports the libraries it uses, such as `(import list)`, and only then sees their names. Imported with no prefix, the names are ordinary globals, and a program may redefine them. Imported with a prefix, as in `(import list l)`, they are bound as `l/map` and so on.
+The standard library is made of four libraries, in the sense of core section 8.9: `list`, `text`, `function` and `map`. Nothing is loaded before the program: a file imports the libraries it uses, such as `(import list)`, and only then sees their names. Imported with no prefix, the names are ordinary globals, and a program may redefine them. Imported with a prefix, as in `(import list l)`, they are bound as `l/map` and so on.
 
 The reference definitions in section 4 are normative. The implementation MAY replace any of them with a native version, as long as the observable behavior is identical, including errors and the names each library binds.
 
-**Version:** 0.2.1, draft, on top of core 0.3.0.
+**Version:** 0.3.0, draft, on top of core 0.4.0.
+
+**Changes since 0.2.1.** The library `map` (sections 3 and 4.4), with `values`, `entries`, `from-entries`, `update`, `merge`, `map-values`, `filter-entries` and `fold-entries`. The other libraries are unchanged.
 
 **Changes since 0.2.0.** The language is named Novelo (core 0.2.2); the cases in `stdlib-conformance.json` use `.nvl` file names. The libraries are unchanged.
 
@@ -18,12 +20,12 @@ The reference definitions in section 4 are normative. The implementation MAY rep
 
 ## 2. General rules
 
-- **Lists only.** The sequence functions take and return List. Strings and maps are not sequences here: passing one of them produces whatever error the primitive used internally produces, usually `:wrong-type`.
-- **The function comes first and the list last**, as in `(map f xs)`. This makes partial application with `partial` easier.
+- **Lists only.** The sequence functions of `list` and `text` take and return List. Strings and maps are not sequences here: passing one of them produces whatever error the primitive used internally produces, usually `:wrong-type`. The functions of `map` take and return Map; they traverse a map in the order of `keys` (core section 9), so the order in which they call a function is unspecified, like that order.
+- **The function comes first and the collection last**, as in `(map f xs)` and `(map-values f m)`. This makes partial application with `partial` easier. `merge` takes two maps and `update` takes the key, the function and then the map.
 - **Evaluation is eager.** Every function traverses the whole list and returns the finished result.
 - **Constant memory.** Every function that traverses a list does so by tail recursion, so lists of any size are traversed in constant memory.
 - **Helpers.** Since the core has no local recursion, some functions use helpers defined at the top level of their library: `take-step`, `range-step`, `merge-sorted` and `split-step`. They are bound by `import` like the other names, but they are not part of the interface: a program should not rely on them, and a native implementation MAY omit them.
-- **Dependencies.** `text` and `function` import `list` (core 8.9). Importing either of them therefore also binds the names of `list` in the same context.
+- **Dependencies.** `text`, `function` and `map` import `list` (core 8.9). Importing any of them therefore also binds the names of `list` in the same context. The names of `map` differ from those of `list`, so both can be imported without a prefix.
 
 ## 3. Functions
 
@@ -41,12 +43,20 @@ The reference definitions in section 4 are normative. The implementation MAY rep
 | `text` | `split` | `(split separator text)` | List of the parts of `text`; an empty separator is an error |
 | `text` | `join` | `(join separator parts)` | the strings in `parts` joined by `separator` |
 | `function` | `partial` | `(partial f a …)` | the function that calls `f` with `a …` before the arguments it receives |
+| `map` | `values` | `(values m)` | List of the values, in the order of `(keys m)` |
+| `map` | `entries` | `(entries m)` | List of the pairs `(key value)`, in the order of `(keys m)` |
+| `map` | `from-entries` | `(from-entries pairs)` | the map with each pair `(key value)`; a later pair replaces an earlier one with the same key; an element that is not a List of two elements is an error |
+| `map` | `update` | `(update key f m)` | `m` with the value at `key` replaced by `f` applied to it; a missing key is an error, as in `get` |
+| `map` | `merge` | `(merge m other)` | the pairs of both maps; for a key in both, the value of `other` |
+| `map` | `map-values` | `(map-values f m)` | the same keys, with `f` applied to each value |
+| `map` | `filter-entries` | `(filter-entries keep? m)` | the pairs for which `(keep? key value)` is true |
+| `map` | `fold-entries` | `(fold-entries f initial m)` | combines the pairs in the order of `(keys m)`, calling `(f accumulator key value)` |
 
 There is no `find`. To get the first element that satisfies a predicate, take `first` of the `filter` result after checking that it is not empty; to only ask whether such an element exists, use `any?`. To combine from last to first, `fold` the `reverse` of the list.
 
 ## 4. Reference definitions
 
-The source of each library is the concatenation, in order, of the `lisp` code blocks in its section (4.1 for `list`, 4.2 for `text`, 4.3 for `function`). The definitions use only the core and the libraries they import. Parameter names avoid those of the primitives, such as `rest` and `count`, because a parameter with the same name would shadow the primitive inside the function. The order of the definitions does not matter: global names are resolved at call time.
+The source of each library is the concatenation, in order, of the `lisp` code blocks in its section (4.1 for `list`, 4.2 for `text`, 4.3 for `function`, 4.4 for `map`). The definitions use only the core and the libraries they import. Parameter names avoid those of the primitives, such as `rest` and `count`, because a parameter with the same name would shadow the primitive inside the function. The order of the definitions does not matter: global names are resolved at call time.
 
 ### 4.1 `list`
 
@@ -175,8 +185,53 @@ The source of each library is the concatenation, in order, of the `lisp` code bl
     (lambda (&rest more) (apply f (append fixed more)))))
 ```
 
+### 4.4 `map`
+
+Every function goes through `keys`, `get`, `associate` and `dissociate`, which are persistent (core 8.6), so each one costs time proportional to the size of the map times a logarithm, and runs in constant stack, like the functions of `list`.
+
+```lisp
+(import list)
+
+(define values
+  (lambda (m)
+    (map (lambda (key) (get m key)) (keys m))))
+
+(define entries
+  (lambda (m)
+    (map (lambda (key) (list key (get m key))) (keys m))))
+
+(define from-entries
+  (lambda (pairs)
+    (fold (lambda (acc pair)
+            (if (and (list? pair) (= (count pair) 2))
+                (associate acc (first pair) (first (rest pair)))
+                otherwise (error "from-entries: each entry must be a list (key value)" pair)))
+          {} pairs)))
+
+(define update
+  (lambda (key f m)
+    (associate m key (f (get m key)))))
+
+(define merge
+  (lambda (m other)
+    (fold (lambda (acc key) (associate acc key (get other key))) m (keys other))))
+
+(define map-values
+  (lambda (f m)
+    (fold (lambda (acc key) (associate acc key (f (get m key)))) m (keys m))))
+
+(define filter-entries
+  (lambda (keep? m)
+    (fold (lambda (acc key) (if (keep? key (get m key)) acc otherwise (dissociate acc key)))
+          m (keys m))))
+
+(define fold-entries
+  (lambda (f initial m)
+    (fold (lambda (acc key) (f acc key (get m key))) initial (keys m))))
+```
+
 ## 5. Conformance
 
-The file `stdlib-conformance.json` has 29 cases, in the same format as the core `eval` cases, with one difference: the libraries `list`, `text` and `function` are available to `import`. Each program imports what it uses. An implementation that provides the library MUST pass all of them, in addition to the core cases.
+The file `stdlib-conformance.json` has 40 cases, in the same format as the core `eval` cases, with one difference: the libraries `list`, `text`, `function` and `map` are available to `import`. Each program imports what it uses. An implementation that provides the library MUST pass all of them, in addition to the core cases.
 
-The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that imports a library, a traversal of one hundred thousand elements, which only passes if the functions run in constant memory, and `import` itself: names unbound without it, prefixes, the dependencies of `text` and `function` on `list`, and repeated imports.
+The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that imports a library, a traversal of one hundred thousand elements, which only passes if the functions run in constant memory, every function of `map` with its errors, a map of one hundred thousand keys built with `from-entries` and reduced with `filter-entries`, and `import` itself: names unbound without it, prefixes, the dependencies of `text`, `function` and `map` on `list`, and repeated imports.

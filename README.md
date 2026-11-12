@@ -1,6 +1,6 @@
 # Novelo
 
-An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.3.0) and the standard library (`standard-library.md`, v0.2.1).
+An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.4.0) and the standard library (`standard-library.md`, v0.3.0).
 
 *Novelo* is Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as Novelo's lists are. Source files end in `.nvl`.
 
@@ -8,8 +8,8 @@ Every case of both conformance suites passes:
 
 | Suite | Cases |
 | --- | --- |
-| core | 265 |
-| stdlib | 29 |
+| core | 271 |
+| stdlib | 40 |
 
 Those runs report no leaks, and they also pass under AddressSanitizer and UndefinedBehaviorSanitizer.
 
@@ -72,12 +72,13 @@ An uncaught error names the innermost form, read from a file, that contains the 
 (import list)          ; map, filter, fold, sort, ...
 (import text t)        ; t/split, t/join (and the names of list, as t/map, ...)
 (import function)      ; partial
+(import map)           ; values, entries, merge, update, map-values, ...
 (include "lib/geometry.nvl" geo)   ; geo/area, ...
 ```
 
-**The REPL** starts with all four libraries imported. An input may span several lines: while a list, map or string is still open, the REPL keeps reading. Each value except `#void` is printed with the `write!` rules. After an error the REPL reports it and reads the next input. The `> ` prompt appears only when standard input is a terminal, so piping a file through the REPL prints only the values.
+**The REPL** starts with all five libraries imported. An input may span several lines: while a list, map or string is still open, the REPL keeps reading. Each value except `#void` is printed with the `write!` rules. After an error the REPL reports it and reads the next input. The `> ` prompt appears only when standard input is a terminal, so piping a file through the REPL prints only the values.
 
-**The standard library** is not compiled in. On each `import`, `list`, `text` and `function` are read from the `lisp` code blocks of `standard-library.md` §4.1–4.3, so the code that runs is the normative code. The build fixes the absolute path of that document. To use another copy, set `NOVELO_STDLIB`:
+**The standard library** is not compiled in. On each `import`, `list`, `text`, `function` and `map` are read from the `lisp` code blocks of `standard-library.md` §4.1–4.4, so the code that runs is the normative code. The build fixes the absolute path of that document. To use another copy, set `NOVELO_STDLIB`:
 
 ```bash
 NOVELO_STDLIB=/usr/local/share/novelo/standard-library.md build/novelo program.nvl
@@ -106,7 +107,7 @@ make conformance
 
 | File | Spec | Contents |
 | --- | --- | --- |
-| `src/value.h/.c` | core §2 | objects, reference counting, immortal values, interning, `equal?`, hashing, ordered maps |
+| `src/value.h/.c` | core §2, §8.6 | objects, reference counting, immortal values, interning, `equal?`, hashing, persistent maps (a hash array mapped trie) |
 | `src/buffer.h/.c` | | growable byte buffer, allocation helpers |
 | `src/utf8.h/.c` | core §3.2 | strict UTF-8 decoding and encoding |
 | `src/reader.h/.c` | core §3–7 | tokens, literals, escapes, collections, nesting limit, read errors in §7.3 order |
@@ -149,6 +150,13 @@ make conformance
 - Non-tail recursion uses the C stack. The CLI and the conformance runner run on a thread with a 512 MB stack.
 - A guard raises the catchable `:stack-overflow` before that stack runs out.
 
+**Maps are persistent** (core §8.6).
+
+- A map is a hash array mapped trie: 32-way nodes with bitmaps, 5 bits of the 64-bit hash per level, and collision nodes below the last level.
+- `associate` and `dissociate` copy only the path to the changed slot, at most 13 nodes, and share the rest. A map of a million keys builds in about 1.7 s and 90 MB.
+- Trie nodes are internal reference-counted objects, so a large map is released through the same iterative work stack as a long list.
+- Each entry keeps the sequence number of its insertion. The first iteration over a map sorts the entries by it once and keeps that order with the map.
+
 **Positions** live in a side table keyed by node address. Freeing a node removes its entry, so a reused address never inherits a stale position (core §6.4). Each entry also names its file, as an index into a list of file names that the reader fills.
 
 **Positions in errors.**
@@ -161,6 +169,7 @@ make conformance
 
 Core 0.2.1 settled the points that versions up to 0.2.0 left open, such as `display!` of strings inside collections, `:stack-overflow` and `:io-error`. They are now in the specification and in the conformance cases. What the specification still leaves to the implementation, this interpreter does as follows:
 
+- **Order of maps.** The specification leaves the iteration order of a map unspecified (core §2.3). Here it is the order of insertion: `keys`, printing and the functions of `map` see the keys in the order they were first added, and replacing a value keeps its key's place. A map literal is read in the order it is written.
 - **`:file` in error positions.** For the program, it is the path as given on the command line. For an included file, it is the absolute path. For a library written in the language, it is the path of the standard library document, and the line is its line in that document. In the REPL there is no `:file`, and lines count from the start of each input.
 
 - **Call depth.** The specification requires at least 10,000 nested non-tail calls. Here the limit is the 512 MB stack of the CLI and the conformance runner, minus a 16 MB margin, which allows well over 100,000 nested calls. Beyond it, `:stack-overflow` is raised.

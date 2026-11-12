@@ -5,8 +5,8 @@
  * the library's definitions in the context of the import followed by the
  * prefix, and it happens at most once per library and resulting context.
  *
- * The libraries list, text and function are not copied into C: their source
- * is read from the `lisp` blocks of standard-library.md §4.1–4.3, so the
+ * The libraries list, text, function and map are not copied into C: their
+ * source is read from the `lisp` blocks of standard-library.md §4.1–4.4, so the
  * normative definitions are what runs.
  */
 #include "library.h"
@@ -26,17 +26,19 @@
 static const LispLibrary library_list = {.name = "list", .section = "4.1"};
 static const LispLibrary library_text = {.name = "text", .section = "4.2"};
 static const LispLibrary library_function = {.name = "function", .section = "4.3"};
+static const LispLibrary library_map = {.name = "map", .section = "4.4"};
 
 static const LispLibrary *const libraries[] = {
     &lisp_library_io,
     &library_list,
     &library_text,
     &library_function,
+    &library_map,
 };
 
 constexpr size_t LIBRARY_COUNT = sizeof libraries / sizeof libraries[0];
 
-const char *const lisp_library_names[] = {"io", "list", "text", "function", nullptr};
+const char *const lisp_library_names[] = {"io", "list", "text", "function", "map", nullptr};
 
 const char *lisp_default_library_path(void) {
     const char *path = getenv("NOVELO_STDLIB");

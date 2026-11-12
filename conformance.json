@@ -1,5 +1,5 @@
 {
-  "spec": "Core Specification — Novelo, version 0.3.0",
+  "spec": "Core Specification — Novelo, version 0.4.0",
   "format": {
     "read": "Read 'input' (UTF-8). With 'equivalent': also read that text and compare the two datum sequences with equal?. With 'types': the sequence read has exactly these types, in order.",
     "read-error": "Read 'input' (or the bytes of 'input_hex'). Reading MUST fail with the code 'error' at position [line, column].",
@@ -1703,6 +1703,54 @@
       "section": "8.6",
       "program": "(define build (lambda (n acc) (if (= n 0) acc otherwise (build (- n 1) (prepend n acc)))))\n(define walk (lambda (items total) (if (empty? items) total otherwise (walk (rest items) (+ total (first items))))))\n(walk (build 1000000 ()) 0)",
       "value": "500000500000",
+      "output": ""
+    },
+    {
+      "id": "map-001",
+      "kind": "eval",
+      "section": "8.6",
+      "program": "(define build (lambda (n m) (if (= n 0) m otherwise (build (- n 1) (associate m n (* n 2))))))\n(define m (build 1000000 {}))\n(list (count m) (get m 1) (get m 500000) (get m 1000000) (contains? m 0) (get m 0 :none))",
+      "value": "(1000000 2 1000000 2000000 #false :none)",
+      "output": ""
+    },
+    {
+      "id": "map-002",
+      "kind": "eval",
+      "section": "8.6",
+      "program": "(define build (lambda (n m) (if (= n 0) m otherwise (build (- n 1) (associate m n (* n 2))))))\n(define drop-even (lambda (n m) (if (= n 0) m otherwise (drop-even (- n 2) (dissociate m n)))))\n(define m (drop-even 100000 (build 100000 {})))\n(list (count m) (contains? m 2) (contains? m 99999) (get m 99999) (count (dissociate m 2)))",
+      "value": "(50000 #false #true 199998 50000)",
+      "output": ""
+    },
+    {
+      "id": "map-003",
+      "kind": "eval",
+      "section": "8.6",
+      "program": "(define build (lambda (n m) (if (= n 0) m otherwise (build (- n 1) (associate m n (* n 2))))))\n(define a (build 1000 {}))\n(define b (associate a 1 :changed))\n(define c (dissociate a 2))\n(define d (associate a 1001 :new))\n(list (get a 1) (get b 1) (count a) (count b) (count c) (count d) (contains? a 2) (contains? c 2) (contains? a 1001) (equal? a (build 1000 {})))",
+      "value": "(2 :changed 1000 1000 999 1001 #true #false #false #true)",
+      "output": ""
+    },
+    {
+      "id": "map-004",
+      "kind": "eval",
+      "section": "8.6",
+      "program": "(define build (lambda (n m) (if (= n 0) m otherwise (build (- n 1) (associate m n (* n 2))))))\n(define sum (lambda (items total) (if (empty? items) total otherwise (sum (rest items) (+ total (first items))))))\n(define m (build 100000 {}))\n(list (count (keys m)) (sum (keys m) 0))",
+      "value": "(100000 5000050000)",
+      "output": ""
+    },
+    {
+      "id": "map-005",
+      "kind": "eval",
+      "section": "8.6",
+      "program": "(define nest (lambda (n x) (if (= n 0) x otherwise (nest (- n 1) (list x)))))\n(define a (nest 12 1))\n(define b (nest 12 2))\n(define c (nest 12 3))\n(define m (associate (associate (associate {} a :a) b :b) c :c))\n(define without-b (dissociate m b))\n(list (get m a) (get m b) (get m c) (count m) (count without-b) (contains? without-b b) (get without-b c) (equal? m (associate (associate (associate {} c :c) a :a) b :b)) (get m (nest 12 1)))",
+      "value": "(:a :b :c 3 2 #false :c #true :a)",
+      "output": ""
+    },
+    {
+      "id": "map-006",
+      "kind": "eval",
+      "section": "8.6",
+      "program": "(define build (lambda (n m) (if (= n 0) m otherwise (build (- n 1) (associate m n (* n 2))))))\n(define m (build 1000 {}))\n(define replaced (associate m 500 :x))\n(list (count replaced) (get replaced 500) (equal? m replaced) (equal? (associate replaced 500 1000) m) (equal? (dissociate (associate m 0 :zero) 0) m))",
+      "value": "(1000 :x #false #true #true)",
       "output": ""
     },
     {

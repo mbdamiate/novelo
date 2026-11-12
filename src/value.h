@@ -79,18 +79,19 @@ typedef struct LispMapEntry {
     Value *key;
     Value *value;
     uint64_t hash;
+    uint64_t sequence; /* when the key was inserted; replacing a value keeps it */
 } LispMapEntry;
 
-/* A compact hash table: entries in insertion order, plus an index of slots.
- * Iteration follows insertion order, which keeps the reading order of map
- * literals for left-to-right evaluation (§8.4). */
+/* core §8.6 — a persistent hash array mapped trie (value.c). associate and
+ * dissociate copy only the path to the changed slot and share the rest.
+ * Iteration follows the insertion sequence, which keeps the reading order of
+ * map literals for left-to-right evaluation (§8.4). */
 typedef struct LispMap {
     Value header;
     size_t count;
-    size_t entry_capacity;
-    size_t slot_capacity;   /* zero or a power of two, at least twice count */
-    LispMapEntry *entries;  /* entries[0..count) */
-    uint32_t *slots;        /* 0: empty; otherwise the entry index plus one */
+    Value *root;                  /* trie node, or nullptr when empty */
+    uint64_t next_sequence;
+    const LispMapEntry **ordered; /* the entries by sequence, built on the first iteration */
 } LispMap;
 
 typedef struct LispClosure {
@@ -219,7 +220,8 @@ void lisp_list_builder_discard(LispListBuilder *builder);
 
 /* ---- maps ------------------------------------------------------------------ */
 
-/* A new map with room for `expected` keys; the empty map is immortal. */
+/* A new map, which starts as the immortal empty map; `expected` is a hint
+ * the persistent representation does not need. */
 [[nodiscard]] Value *lisp_map_new(size_t expected);
 
 /* Builder insertion into a map that only the caller holds (refs == 1). Takes
@@ -236,7 +238,9 @@ Value *lisp_map_get(const Value *map, const Value *key); /* borrowed, or nullptr
 [[nodiscard]] Value *lisp_map_associate(const Value *map, Value *key, Value *value);
 [[nodiscard]] Value *lisp_map_dissociate(Value *map, const Value *key);
 
-/* Iteration: for (size_t cursor = 0; lisp_map_next(map, &cursor, &key, &value);) … (borrowed). */
+/* Iteration in insertion order: for (size_t cursor = 0;
+ * lisp_map_next(map, &cursor, &key, &value);) … (borrowed). The first call
+ * sorts the entries once and keeps the order with the map. */
 bool lisp_map_next(const Value *map, size_t *cursor, Value **key, Value **value);
 
 /* ---- functions ------------------------------------------------------------- */
