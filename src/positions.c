@@ -9,7 +9,7 @@
 
 typedef struct Entry {
     const Value *node; /* nullptr marks an empty slot */
-    LmPosition position;
+    LispPosition position;
 } Entry;
 
 static Entry *entries;
@@ -29,7 +29,7 @@ static void grow(void) {
     Entry *old_entries = entries;
     size_t old_capacity = capacity;
     capacity = capacity ? capacity * 2 : 1024;
-    entries = lm_xcalloc(capacity, sizeof *entries);
+    entries = lisp_xcalloc(capacity, sizeof *entries);
     for (size_t slot = 0; slot < old_capacity; slot++) {
         if (!old_entries[slot].node) continue;
         size_t target = home_slot(old_entries[slot].node);
@@ -39,15 +39,15 @@ static void grow(void) {
     free(old_entries);
 }
 
-void lm_position_record(Value *node, LmPosition position) {
-    assert(!(node->flags & LM_IMMORTAL));
-    if (capacity == 0) lm_set_position_forget_hook(forget);
+void lisp_position_record(Value *node, LispPosition position) {
+    assert(!(node->flags & LISP_IMMORTAL));
+    if (capacity == 0) lisp_set_position_forget_hook(forget);
     if (2 * (entry_count + 1) > capacity) grow();
     size_t slot = home_slot(node);
     while (entries[slot].node && entries[slot].node != node) slot = (slot + 1) & (capacity - 1);
     if (!entries[slot].node) entry_count++;
     entries[slot] = (Entry){.node = node, .position = position};
-    node->flags |= LM_HAS_POSITION;
+    node->flags |= LISP_HAS_POSITION;
 }
 
 /* Slot of the node, or of the empty slot ending its probe sequence. */
@@ -57,8 +57,8 @@ static size_t find_slot(const Value *node) {
     return slot;
 }
 
-bool lm_position_lookup(const Value *node, LmPosition *position) {
-    if (!(node->flags & LM_HAS_POSITION) || capacity == 0) return false;
+bool lisp_position_lookup(const Value *node, LispPosition *position) {
+    if (!(node->flags & LISP_HAS_POSITION) || capacity == 0) return false;
     size_t slot = find_slot(node);
     if (!entries[slot].node) return false;
     *position = entries[slot].position;
@@ -85,9 +85,9 @@ static void forget(const Value *node) {
     }
 }
 
-size_t lm_position_count(void) { return entry_count; }
+size_t lisp_position_count(void) { return entry_count; }
 
-void lm_positions_shutdown(void) {
+void lisp_positions_shutdown(void) {
     assert(entry_count == 0);
     free(entries);
     entries = nullptr;

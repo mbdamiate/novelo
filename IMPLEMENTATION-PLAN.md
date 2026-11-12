@@ -73,7 +73,7 @@ tests/
   - Arguments are borrowed, unless the function name ends in `_take`.
   - This rule is written at the top of `value.h`.
 - **Iterative release:** release uses an explicit work stack. Freeing a list of a million elements, or a deep tree, does not recurse in C.
-- **Live counter:** `lm_live_objects()` counts the objects that are not immortal. Both test runners use it to detect leaks.
+- **Live counter:** `lisp_live_objects()` counts the objects that are not immortal. Both test runners use it to detect leaks.
 - **Integers:**
   - Arithmetic uses `ckd_add`, `ckd_sub` and `ckd_mul`.
   - Overflow is an error, as the spec requires.
@@ -103,7 +103,7 @@ tests/
   - Reduces each form to the five special forms and builds counted nodes.
   - Enforces the expansion errors and ignores `declare` and `declare-type`.
 - **Evaluation:**
-  - **Tail calls:** `lm_eval(node, env, state)` is a loop. A call in tail position replaces the node and environment and releases the old environment, so tail calls run in constant memory (§8.4).
+  - **Tail calls:** `lisp_eval(node, env, state)` is a loop. A call in tail position replaces the node and environment and releases the old environment, so tail calls run in constant memory (§8.4).
   - **Environments:** counted frames `{parent, n, symbols[], values[]}`.
   - **Lookup:** parameters from the innermost `lambda` outward, then the global name, looked up at call time (§8.2).
   - **Deep non-tail recursion:**

@@ -14,37 +14,37 @@
     abort();
 }
 
-void *lm_xmalloc(size_t size) {
+void *lisp_xmalloc(size_t size) {
     void *memory = malloc(size ? size : 1);
     if (!memory) out_of_memory();
     return memory;
 }
 
-void *lm_xcalloc(size_t count, size_t size) {
+void *lisp_xcalloc(size_t count, size_t size) {
     void *memory = calloc(count ? count : 1, size ? size : 1);
     if (!memory) out_of_memory();
     return memory;
 }
 
-void *lm_xrealloc(void *pointer, size_t size) {
+void *lisp_xrealloc(void *pointer, size_t size) {
     void *memory = realloc(pointer, size ? size : 1);
     if (!memory) out_of_memory();
     return memory;
 }
 
-void lm_buffer_init(LmBuffer *buffer) { *buffer = (LmBuffer){}; }
+void lisp_buffer_init(LispBuffer *buffer) { *buffer = (LispBuffer){}; }
 
-void lm_buffer_free(LmBuffer *buffer) {
+void lisp_buffer_free(LispBuffer *buffer) {
     free(buffer->data);
-    *buffer = (LmBuffer){};
+    *buffer = (LispBuffer){};
 }
 
-void lm_buffer_clear(LmBuffer *buffer) {
+void lisp_buffer_clear(LispBuffer *buffer) {
     buffer->length = 0;
     if (buffer->data) buffer->data[0] = '\0';
 }
 
-static void reserve(LmBuffer *buffer, size_t extra) {
+static void reserve(LispBuffer *buffer, size_t extra) {
     size_t needed;
     if (ckd_add(&needed, buffer->length, extra) || ckd_add(&needed, needed, 1)) out_of_memory();
     if (needed <= buffer->capacity) return;
@@ -52,29 +52,29 @@ static void reserve(LmBuffer *buffer, size_t extra) {
     while (capacity < needed) {
         if (ckd_mul(&capacity, capacity, 2)) out_of_memory();
     }
-    buffer->data = lm_xrealloc(buffer->data, capacity);
+    buffer->data = lisp_xrealloc(buffer->data, capacity);
     buffer->capacity = capacity;
 }
 
-void lm_buffer_append(LmBuffer *buffer, const void *bytes, size_t length) {
+void lisp_buffer_append(LispBuffer *buffer, const void *bytes, size_t length) {
     reserve(buffer, length);
     if (length) memcpy(buffer->data + buffer->length, bytes, length);
     buffer->length += length;
     buffer->data[buffer->length] = '\0';
 }
 
-void lm_buffer_append_byte(LmBuffer *buffer, char byte) { lm_buffer_append(buffer, &byte, 1); }
+void lisp_buffer_append_byte(LispBuffer *buffer, char byte) { lisp_buffer_append(buffer, &byte, 1); }
 
-void lm_buffer_append_string(LmBuffer *buffer, const char *text) {
-    lm_buffer_append(buffer, text, strlen(text));
+void lisp_buffer_append_string(LispBuffer *buffer, const char *text) {
+    lisp_buffer_append(buffer, text, strlen(text));
 }
 
-void lm_buffer_append_code_point(LmBuffer *buffer, uint32_t code_point) {
+void lisp_buffer_append_code_point(LispBuffer *buffer, uint32_t code_point) {
     unsigned char bytes[4];
-    lm_buffer_append(buffer, bytes, lm_utf8_encode(code_point, bytes));
+    lisp_buffer_append(buffer, bytes, lisp_utf8_encode(code_point, bytes));
 }
 
-void lm_buffer_appendf(LmBuffer *buffer, const char *format, ...) {
+void lisp_buffer_appendf(LispBuffer *buffer, const char *format, ...) {
     va_list arguments;
     va_start(arguments, format);
     va_list copy;
@@ -89,10 +89,10 @@ void lm_buffer_appendf(LmBuffer *buffer, const char *format, ...) {
     va_end(arguments);
 }
 
-char *lm_buffer_take(LmBuffer *buffer, size_t *length) {
+char *lisp_buffer_take(LispBuffer *buffer, size_t *length) {
     reserve(buffer, 0);
     char *data = buffer->data;
     if (length) *length = buffer->length;
-    *buffer = (LmBuffer){};
+    *buffer = (LispBuffer){};
     return data;
 }

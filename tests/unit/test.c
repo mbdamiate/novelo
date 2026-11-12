@@ -41,34 +41,34 @@ void test_fail(const char *file, int line, const char *format, ...) {
 
 void test_check_equal(const char *file, int line, const Value *value, const char *expected_text) {
     Value *datums;
-    LmReadError error;
-    if (!lm_read(expected_text, strlen(expected_text), &datums, &error)) {
+    LispReadError error;
+    if (!lisp_read(expected_text, strlen(expected_text), &datums, &error)) {
         test_fail(file, line, "CHECK_EQUAL: cannot read \"%s\": %s", expected_text,
-                  lm_read_error_name(error.code));
+                  lisp_read_error_name(error.code));
         return;
     }
-    if (datums == LM_EMPTY || lm_rest(datums) != LM_EMPTY) {
+    if (datums == LISP_EMPTY || lisp_rest(datums) != LISP_EMPTY) {
         test_fail(file, line, "CHECK_EQUAL: \"%s\" is not exactly one datum", expected_text);
-    } else if (!lm_equal(value, lm_first(datums))) {
-        LmBuffer printed;
-        lm_buffer_init(&printed);
-        lm_print(&printed, value, LM_PRINT_WRITE);
+    } else if (!lisp_equal(value, lisp_first(datums))) {
+        LispBuffer printed;
+        lisp_buffer_init(&printed);
+        lisp_print(&printed, value, LISP_PRINT_WRITE);
         test_fail(file, line, "CHECK_EQUAL: got %s, expected %s", printed.data, expected_text);
-        lm_buffer_free(&printed);
+        lisp_buffer_free(&printed);
     }
-    lm_release(datums);
+    lisp_release(datums);
 }
 
 void test_check_read_error(const char *file, int line, const char *source, const char *code,
                            int expected_line, int expected_column) {
     Value *datums;
-    LmReadError error;
-    if (lm_read(source, strlen(source), &datums, &error)) {
-        lm_release(datums);
+    LispReadError error;
+    if (lisp_read(source, strlen(source), &datums, &error)) {
+        lisp_release(datums);
         test_fail(file, line, "CHECK_READ_ERROR: \"%s\" read without error, expected %s", source, code);
         return;
     }
-    const char *actual = lm_read_error_name(error.code);
+    const char *actual = lisp_read_error_name(error.code);
     if (strcmp(actual, code) != 0 || (int)error.position.line != expected_line
         || (int)error.position.column != expected_column) {
         test_fail(file, line, "CHECK_READ_ERROR: \"%s\" gave %s at %u:%u, expected %s at %d:%d",
@@ -80,9 +80,9 @@ void test_check_read_error(const char *file, int line, const char *source, const
 /* Runs one test in this process; returns true if it passed. */
 static bool run_here(const TestCase *test) {
     failed_checks = 0;
-    size_t live_before = lm_live_objects();
+    size_t live_before = lisp_live_objects();
     test->function();
-    size_t live_after = lm_live_objects();
+    size_t live_after = lisp_live_objects();
     if (live_after != live_before) {
         test_fail(__FILE__, __LINE__, "leak: %zu live objects before, %zu after",
                   live_before, live_after);

@@ -68,60 +68,60 @@ static bool parse_hex4(Parser *parser, uint32_t *value) {
 
 static bool parse_string(Parser *parser, char **string, size_t *string_length) {
     if (!consume(parser, '"')) return parse_error(parser, "expected a string");
-    LmBuffer buffer;
-    lm_buffer_init(&buffer);
+    LispBuffer buffer;
+    lisp_buffer_init(&buffer);
     for (;;) {
         if (parser->position >= parser->length) {
-            lm_buffer_free(&buffer);
+            lisp_buffer_free(&buffer);
             return parse_error(parser, "unterminated string");
         }
         char character = parser->text[parser->position++];
         if (character == '"') break;
         if (character != '\\') {
-            lm_buffer_append_byte(&buffer, character);
+            lisp_buffer_append_byte(&buffer, character);
             continue;
         }
         if (parser->position >= parser->length) {
-            lm_buffer_free(&buffer);
+            lisp_buffer_free(&buffer);
             return parse_error(parser, "unterminated escape");
         }
         char escaped = parser->text[parser->position++];
         switch (escaped) {
-        case '"': lm_buffer_append_byte(&buffer, '"'); break;
-        case '\\': lm_buffer_append_byte(&buffer, '\\'); break;
-        case '/': lm_buffer_append_byte(&buffer, '/'); break;
-        case 'b': lm_buffer_append_byte(&buffer, '\b'); break;
-        case 'f': lm_buffer_append_byte(&buffer, '\f'); break;
-        case 'n': lm_buffer_append_byte(&buffer, '\n'); break;
-        case 'r': lm_buffer_append_byte(&buffer, '\r'); break;
-        case 't': lm_buffer_append_byte(&buffer, '\t'); break;
+        case '"': lisp_buffer_append_byte(&buffer, '"'); break;
+        case '\\': lisp_buffer_append_byte(&buffer, '\\'); break;
+        case '/': lisp_buffer_append_byte(&buffer, '/'); break;
+        case 'b': lisp_buffer_append_byte(&buffer, '\b'); break;
+        case 'f': lisp_buffer_append_byte(&buffer, '\f'); break;
+        case 'n': lisp_buffer_append_byte(&buffer, '\n'); break;
+        case 'r': lisp_buffer_append_byte(&buffer, '\r'); break;
+        case 't': lisp_buffer_append_byte(&buffer, '\t'); break;
         case 'u': {
             uint32_t code_point;
             if (!parse_hex4(parser, &code_point)) {
-                lm_buffer_free(&buffer);
+                lisp_buffer_free(&buffer);
                 return false;
             }
             if (code_point >= 0xD800 && code_point <= 0xDBFF) { /* high surrogate */
                 uint32_t low;
                 if (!consume_word(parser, "\\u") || !parse_hex4(parser, &low)
                     || low < 0xDC00 || low > 0xDFFF) {
-                    lm_buffer_free(&buffer);
+                    lisp_buffer_free(&buffer);
                     return parse_error(parser, "unpaired surrogate");
                 }
                 code_point = 0x10000 + ((code_point - 0xD800) << 10) + (low - 0xDC00);
             } else if (code_point >= 0xDC00 && code_point <= 0xDFFF) {
-                lm_buffer_free(&buffer);
+                lisp_buffer_free(&buffer);
                 return parse_error(parser, "unpaired surrogate");
             }
-            lm_buffer_append_code_point(&buffer, code_point);
+            lisp_buffer_append_code_point(&buffer, code_point);
             break;
         }
         default:
-            lm_buffer_free(&buffer);
+            lisp_buffer_free(&buffer);
             return parse_error(parser, "bad escape");
         }
     }
-    *string = lm_buffer_take(&buffer, string_length);
+    *string = lisp_buffer_take(&buffer, string_length);
     return true;
 }
 
@@ -149,9 +149,9 @@ static bool parse_integer(Parser *parser, Json *result) {
 static void push_item(Json *container, size_t *capacity, Json item, char *key) {
     if (container->count == *capacity) {
         *capacity = *capacity ? *capacity * 2 : 8;
-        container->items = lm_xrealloc(container->items, *capacity * sizeof(Json));
+        container->items = lisp_xrealloc(container->items, *capacity * sizeof(Json));
         if (container->kind == JSON_OBJECT) {
-            container->keys = lm_xrealloc(container->keys, *capacity * sizeof(char *));
+            container->keys = lisp_xrealloc(container->keys, *capacity * sizeof(char *));
         }
     }
     container->items[container->count] = item;

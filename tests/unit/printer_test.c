@@ -6,28 +6,28 @@
 
 #include <string.h>
 
-static Value *dummy_primitive(LmState *, size_t, Value *const *) { return LM_VOID; }
+static Value *dummy_primitive(LispState *, size_t, Value *const *) { return LISP_VOID; }
 
 /* Prints the single datum read from source and checks the text. */
-static void check_printed(const char *file, int line, const char *source, LmPrintMode mode,
+static void check_printed(const char *file, int line, const char *source, LispPrintMode mode,
                           const char *expected) {
     Value *datums;
-    LmReadError error;
-    if (!lm_read(source, strlen(source), &datums, &error)) {
+    LispReadError error;
+    if (!lisp_read(source, strlen(source), &datums, &error)) {
         test_fail(file, line, "cannot read %s", source);
         return;
     }
-    LmBuffer output;
-    lm_buffer_init(&output);
-    lm_print(&output, lm_first(datums), mode);
+    LispBuffer output;
+    lisp_buffer_init(&output);
+    lisp_print(&output, lisp_first(datums), mode);
     if (strcmp(output.data, expected) != 0) {
         test_fail(file, line, "printed %s as %s, expected %s", source, output.data, expected);
     }
-    lm_buffer_free(&output);
-    lm_release(datums);
+    lisp_buffer_free(&output);
+    lisp_release(datums);
 }
-#define CHECK_WRITE(source, expected) check_printed(__FILE__, __LINE__, (source), LM_PRINT_WRITE, (expected))
-#define CHECK_DISPLAY(source, expected) check_printed(__FILE__, __LINE__, (source), LM_PRINT_DISPLAY, (expected))
+#define CHECK_WRITE(source, expected) check_printed(__FILE__, __LINE__, (source), LISP_PRINT_WRITE, (expected))
+#define CHECK_DISPLAY(source, expected) check_printed(__FILE__, __LINE__, (source), LISP_PRINT_DISPLAY, (expected))
 
 static void t_atoms(void) {
     CHECK_WRITE("#true", "#true");
@@ -56,13 +56,13 @@ static void t_collections(void) {
 }
 
 static void t_functions(void) {
-    Value *primitive = lm_primitive("dummy", 0, 0, dummy_primitive);
-    LmBuffer output;
-    lm_buffer_init(&output);
-    lm_print(&output, primitive, LM_PRINT_WRITE);
+    Value *primitive = lisp_primitive("dummy", 0, 0, dummy_primitive);
+    LispBuffer output;
+    lisp_buffer_init(&output);
+    lisp_print(&output, primitive, LISP_PRINT_WRITE);
     CHECK_STR(output.data, "#<function>");
-    lm_buffer_free(&output);
-    lm_release(primitive);
+    lisp_buffer_free(&output);
+    lisp_release(primitive);
 }
 
 /* Reading the printed text gives an equal? value (§10). */
@@ -74,14 +74,14 @@ static void t_round_trip(void) {
     };
     for (size_t index = 0; index < sizeof sources / sizeof sources[0]; index++) {
         Value *datums;
-        LmReadError error;
-        CHECK(lm_read(sources[index], strlen(sources[index]), &datums, &error));
-        LmBuffer output;
-        lm_buffer_init(&output);
-        lm_print(&output, lm_first(datums), LM_PRINT_WRITE);
-        test_check_equal(__FILE__, __LINE__, lm_first(datums), output.data);
-        lm_buffer_free(&output);
-        lm_release(datums);
+        LispReadError error;
+        CHECK(lisp_read(sources[index], strlen(sources[index]), &datums, &error));
+        LispBuffer output;
+        lisp_buffer_init(&output);
+        lisp_print(&output, lisp_first(datums), LISP_PRINT_WRITE);
+        test_check_equal(__FILE__, __LINE__, lisp_first(datums), output.data);
+        lisp_buffer_free(&output);
+        lisp_release(datums);
     }
 }
 

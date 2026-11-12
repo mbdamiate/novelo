@@ -5,7 +5,7 @@
 
 static bool decode(const char *bytes, size_t length, uint32_t *code_point, size_t *next_position) {
     size_t position = 0;
-    bool decoded = lm_utf8_next((const unsigned char *)bytes, length, &position, code_point);
+    bool decoded = lisp_utf8_next((const unsigned char *)bytes, length, &position, code_point);
     *next_position = position;
     return decoded;
 }
@@ -45,12 +45,12 @@ static void t_rejects_invalid(void) {
 
 static void t_reports_first_invalid_byte(void) {
     size_t invalid_offset = 99;
-    CHECK(lm_utf8_valid((const unsigned char *)"abc", 3, &invalid_offset));
-    CHECK(!lm_utf8_valid((const unsigned char *)"\xFF", 1, &invalid_offset));
+    CHECK(lisp_utf8_valid((const unsigned char *)"abc", 3, &invalid_offset));
+    CHECK(!lisp_utf8_valid((const unsigned char *)"\xFF", 1, &invalid_offset));
     CHECK_INT(invalid_offset, 0);
-    CHECK(!lm_utf8_valid((const unsigned char *)"a\xC3", 2, &invalid_offset));
+    CHECK(!lisp_utf8_valid((const unsigned char *)"a\xC3", 2, &invalid_offset));
     CHECK_INT(invalid_offset, 1);
-    CHECK(!lm_utf8_valid((const unsigned char *)"\xC3\xA9x\xED\xA0\x80", 6, &invalid_offset));
+    CHECK(!lisp_utf8_valid((const unsigned char *)"\xC3\xA9x\xED\xA0\x80", 6, &invalid_offset));
     CHECK_INT(invalid_offset, 3);
 }
 
@@ -58,10 +58,10 @@ static void t_encodes_round_trip(void) {
     const uint32_t samples[] = {0, 0x41, 0x7F, 0x80, 0x7FF, 0x800, 0xFFFF, 0x10000, 0x1F600, 0x10FFFF};
     for (size_t index = 0; index < sizeof samples / sizeof samples[0]; index++) {
         unsigned char bytes[4];
-        size_t length = lm_utf8_encode(samples[index], bytes);
+        size_t length = lisp_utf8_encode(samples[index], bytes);
         size_t position = 0;
         uint32_t code_point = 0;
-        CHECK(lm_utf8_next(bytes, length, &position, &code_point));
+        CHECK(lisp_utf8_next(bytes, length, &position, &code_point));
         CHECK_INT(code_point, samples[index]);
         CHECK_INT(position, length);
     }
@@ -69,21 +69,21 @@ static void t_encodes_round_trip(void) {
 
 static void t_counts_and_offsets(void) {
     const char *text = "a\xC3\xA9\xF0\x9F\x98\x80z"; /* a é 😀 z */
-    CHECK_INT(lm_utf8_count(text, 8), 4);
-    CHECK_INT(lm_utf8_offset(text, 8, 0), 0);
-    CHECK_INT(lm_utf8_offset(text, 8, 1), 1);
-    CHECK_INT(lm_utf8_offset(text, 8, 2), 3);
-    CHECK_INT(lm_utf8_offset(text, 8, 3), 7);
-    CHECK_INT(lm_utf8_offset(text, 8, 4), 8);
+    CHECK_INT(lisp_utf8_count(text, 8), 4);
+    CHECK_INT(lisp_utf8_offset(text, 8, 0), 0);
+    CHECK_INT(lisp_utf8_offset(text, 8, 1), 1);
+    CHECK_INT(lisp_utf8_offset(text, 8, 2), 3);
+    CHECK_INT(lisp_utf8_offset(text, 8, 3), 7);
+    CHECK_INT(lisp_utf8_offset(text, 8, 4), 8);
 }
 
 static void t_scalar_values(void) {
-    CHECK(lm_is_scalar(0));
-    CHECK(lm_is_scalar(0xD7FF));
-    CHECK(!lm_is_scalar(0xD800));
-    CHECK(!lm_is_scalar(0xDFFF));
-    CHECK(lm_is_scalar(0x10FFFF));
-    CHECK(!lm_is_scalar(0x110000));
+    CHECK(lisp_is_scalar(0));
+    CHECK(lisp_is_scalar(0xD7FF));
+    CHECK(!lisp_is_scalar(0xD800));
+    CHECK(!lisp_is_scalar(0xDFFF));
+    CHECK(lisp_is_scalar(0x10FFFF));
+    CHECK(!lisp_is_scalar(0x110000));
 }
 
 const TestSuite utf8_suite = {"utf8", (const TestCase[]){

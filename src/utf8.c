@@ -3,7 +3,7 @@
 
 static bool is_continuation(unsigned char byte) { return (byte & 0xC0) == 0x80; }
 
-bool lm_utf8_next(const unsigned char *bytes, size_t length, size_t *position, uint32_t *code_point) {
+bool lisp_utf8_next(const unsigned char *bytes, size_t length, size_t *position, uint32_t *code_point) {
     size_t start = *position;
     unsigned char lead = bytes[start];
     if (lead < 0x80) {
@@ -46,11 +46,11 @@ bool lm_utf8_next(const unsigned char *bytes, size_t length, size_t *position, u
     return true;
 }
 
-bool lm_utf8_valid(const unsigned char *bytes, size_t length, size_t *invalid_offset) {
+bool lisp_utf8_valid(const unsigned char *bytes, size_t length, size_t *invalid_offset) {
     size_t position = 0;
     uint32_t code_point;
     while (position < length) {
-        if (!lm_utf8_next(bytes, length, &position, &code_point)) {
+        if (!lisp_utf8_next(bytes, length, &position, &code_point)) {
             if (invalid_offset) *invalid_offset = position;
             return false;
         }
@@ -58,7 +58,7 @@ bool lm_utf8_valid(const unsigned char *bytes, size_t length, size_t *invalid_of
     return true;
 }
 
-size_t lm_utf8_encode(uint32_t code_point, unsigned char output[static 4]) {
+size_t lisp_utf8_encode(uint32_t code_point, unsigned char output[static 4]) {
     if (code_point < 0x80) {
         output[0] = (unsigned char)code_point;
         return 1;
@@ -81,7 +81,7 @@ size_t lm_utf8_encode(uint32_t code_point, unsigned char output[static 4]) {
     return 4;
 }
 
-size_t lm_utf8_count(const char *text, size_t length) {
+size_t lisp_utf8_count(const char *text, size_t length) {
     size_t count = 0;
     for (size_t position = 0; position < length; position++) {
         if (!is_continuation((unsigned char)text[position])) count++;
@@ -89,7 +89,7 @@ size_t lm_utf8_count(const char *text, size_t length) {
     return count;
 }
 
-size_t lm_utf8_offset(const char *text, size_t length, size_t index) {
+size_t lisp_utf8_offset(const char *text, size_t length, size_t index) {
     for (size_t position = 0; position < length; position++) {
         if (!is_continuation((unsigned char)text[position])) {
             if (index == 0) return position;

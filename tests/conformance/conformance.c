@@ -47,9 +47,9 @@ static bool source_member(const Json *test_case, const char *name, const char **
 }
 
 static Outcome read_or_fail(CaseResult *result, const char *source, size_t length, Value **datums) {
-    LmReadError error;
-    if (lm_read(source, length, datums, &error)) return PASSED;
-    return failure(result, "read failed: %s at %u:%u (%s)", lm_read_error_name(error.code),
+    LispReadError error;
+    if (lisp_read(source, length, datums, &error)) return PASSED;
+    return failure(result, "read failed: %s at %u:%u (%s)", lisp_read_error_name(error.code),
                    error.position.line, error.position.column, error.message);
 }
 
@@ -68,33 +68,33 @@ static Outcome run_read(const Json *test_case, CaseResult *result) {
     if (source_member(test_case, "equivalent", &equivalent, &equivalent_length)) {
         Value *expected;
         if (read_or_fail(result, equivalent, equivalent_length, &expected) != PASSED) {
-            lm_release(datums);
+            lisp_release(datums);
             return FAILED;
         }
-        if (!lm_equal(datums, expected)) outcome = failure(result, "not equal? to the equivalent text");
-        lm_release(expected);
+        if (!lisp_equal(datums, expected)) outcome = failure(result, "not equal? to the equivalent text");
+        lisp_release(expected);
     }
 
     const Json *types = json_member(test_case, "types");
     if (outcome == PASSED && types) {
         const Value *datum = datums;
-        for (size_t index = 0; index < types->count; index++, datum = lm_rest(datum)) {
-            if (datum == LM_EMPTY) {
+        for (size_t index = 0; index < types->count; index++, datum = lisp_rest(datum)) {
+            if (datum == LISP_EMPTY) {
                 outcome = failure(result, "read %zu datums, expected %zu", index, types->count);
                 break;
             }
-            const char *actual = lm_type_name(lm_first(datum));
+            const char *actual = lisp_type_name(lisp_first(datum));
             if (strcmp(actual, types->items[index].string) != 0) {
                 outcome = failure(result, "datum %zu is %s, expected %s", index, actual,
                                   types->items[index].string);
                 break;
             }
         }
-        if (outcome == PASSED && datum != LM_EMPTY) {
+        if (outcome == PASSED && datum != LISP_EMPTY) {
             outcome = failure(result, "read more than %zu datums", types->count);
         }
     }
-    lm_release(datums);
+    lisp_release(datums);
     return outcome;
 }
 
@@ -108,16 +108,16 @@ static int hex_value(char character) {
 }
 
 static Outcome run_read_error(const Json *test_case, CaseResult *result) {
-    LmBuffer source;
-    lm_buffer_init(&source);
+    LispBuffer source;
+    lisp_buffer_init(&source);
     const char *input;
     size_t input_length;
     const char *hex = string_member(test_case, "input_hex");
     if (source_member(test_case, "input", &input, &input_length)) {
-        lm_buffer_append(&source, input, input_length);
+        lisp_buffer_append(&source, input, input_length);
     } else if (hex) {
         for (size_t index = 0; hex[index] && hex[index + 1]; index += 2) {
-            lm_buffer_append_byte(&source, (char)(hex_value(hex[index]) * 16 + hex_value(hex[index + 1])));
+            lisp_buffer_append_byte(&source, (char)(hex_value(hex[index]) * 16 + hex_value(hex[index + 1])));
         }
     } else {
         return failure(result, "no input");
@@ -129,14 +129,14 @@ static Outcome run_read_error(const Json *test_case, CaseResult *result) {
     int64_t expected_column = expected_position->items[1].integer;
 
     Value *datums = nullptr;
-    LmReadError error;
-    bool read_succeeded = lm_read(source.data ? source.data : "", source.length, &datums, &error);
-    lm_buffer_free(&source);
+    LispReadError error;
+    bool read_succeeded = lisp_read(source.data ? source.data : "", source.length, &datums, &error);
+    lisp_buffer_free(&source);
     if (read_succeeded) {
-        lm_release(datums);
+        lisp_release(datums);
         return failure(result, "read succeeded, expected %s", expected_code);
     }
-    const char *actual_code = lm_read_error_name(error.code);
+    const char *actual_code = lisp_read_error_name(error.code);
     if (strcmp(actual_code, expected_code) != 0 || error.position.line != expected_line
         || error.position.column != expected_column) {
         return failure(result, "got %s at %u:%u, expected %s at %lld:%lld", actual_code,
@@ -149,9 +149,9 @@ static Outcome run_read_error(const Json *test_case, CaseResult *result) {
 /* ---- read-positions ------------------------------------------------------------------- */
 
 static const Value *list_element(const Value *list, int64_t index) {
-    if (!lm_is_list(list)) return nullptr;
-    for (int64_t step = 0; step < index && list != LM_EMPTY; step++) list = lm_rest(list);
-    return list == LM_EMPTY ? nullptr : lm_first(list);
+    if (!lisp_is_list(list)) return nullptr;
+    for (int64_t step = 0; step < index && list != LISP_EMPTY; step++) list = lisp_rest(list);
+    return list == LISP_EMPTY ? nullptr : lisp_first(list);
 }
 
 static Outcome run_read_positions(const Json *test_case, CaseResult *result) {
@@ -171,10 +171,10 @@ static Outcome run_read_positions(const Json *test_case, CaseResult *result) {
         for (size_t step = 0; step < path->count && node; step++) {
             node = list_element(node, path->items[step].integer);
         }
-        LmPosition position;
+        LispPosition position;
         if (!node) {
             outcome = failure(result, "path %zu does not exist", entry_index);
-        } else if (!lm_position_lookup(node, &position)) {
+        } else if (!lisp_position_lookup(node, &position)) {
             outcome = failure(result, "path %zu has no position", entry_index);
         } else if (position.line != expected->items[0].integer
                    || position.column != expected->items[1].integer) {
@@ -183,7 +183,7 @@ static Outcome run_read_positions(const Json *test_case, CaseResult *result) {
                               (long long)expected->items[1].integer);
         }
     }
-    lm_release(datums);
+    lisp_release(datums);
     return outcome;
 }
 
@@ -206,9 +206,9 @@ static CaseResult run_case(const Json *test_case) {
         failure(&result, "unknown kind %s", kind);
     }
 
-    if (result.outcome != FAILED && (lm_live_objects() != 0 || lm_position_count() != 0)) {
+    if (result.outcome != FAILED && (lisp_live_objects() != 0 || lisp_position_count() != 0)) {
         failure(&result, "leak: %zu live objects and %zu position entries after the case",
-                lm_live_objects(), lm_position_count());
+                lisp_live_objects(), lisp_position_count());
     }
     return result;
 }
@@ -216,15 +216,15 @@ static CaseResult run_case(const Json *test_case) {
 static char *read_file(const char *path, size_t *length) {
     FILE *file = fopen(path, "rb");
     if (!file) return nullptr;
-    LmBuffer buffer;
-    lm_buffer_init(&buffer);
+    LispBuffer buffer;
+    lisp_buffer_init(&buffer);
     char chunk[65536];
     size_t chunk_length;
     while ((chunk_length = fread(chunk, 1, sizeof chunk, file)) > 0) {
-        lm_buffer_append(&buffer, chunk, chunk_length);
+        lisp_buffer_append(&buffer, chunk, chunk_length);
     }
     fclose(file);
-    return lm_buffer_take(&buffer, length);
+    return lisp_buffer_take(&buffer, length);
 }
 
 typedef struct Totals {
