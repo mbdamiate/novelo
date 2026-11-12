@@ -3,99 +3,98 @@
 
 static bool is_continuation(unsigned char byte) { return (byte & 0xC0) == 0x80; }
 
-bool lm_utf8_next(const unsigned char *s, size_t n, size_t *i, uint32_t *cp) {
-    size_t at = *i;
-    unsigned char lead = s[at];
+bool lm_utf8_next(const unsigned char *bytes, size_t length, size_t *position, uint32_t *code_point) {
+    size_t start = *position;
+    unsigned char lead = bytes[start];
     if (lead < 0x80) {
-        *cp = lead;
-        *i = at + 1;
+        *code_point = lead;
+        *position = start + 1;
         return true;
     }
 
-    size_t length;
+    size_t sequence_length;
     uint32_t value;
-    unsigned char low = 0x80, high = 0xBF; /* allowed range of the 2nd byte */
+    unsigned char second_minimum = 0x80, second_maximum = 0xBF;
     if (lead >= 0xC2 && lead <= 0xDF) {
-        length = 2;
+        sequence_length = 2;
         value = lead & 0x1F;
     } else if (lead >= 0xE0 && lead <= 0xEF) {
-        length = 3;
+        sequence_length = 3;
         value = lead & 0x0F;
-        if (lead == 0xE0) low = 0xA0;  /* no overlongs */
-        if (lead == 0xED) high = 0x9F; /* no surrogates */
+        if (lead == 0xE0) second_minimum = 0xA0; /* no overlongs */
+        if (lead == 0xED) second_maximum = 0x9F; /* no surrogates */
     } else if (lead >= 0xF0 && lead <= 0xF4) {
-        length = 4;
+        sequence_length = 4;
         value = lead & 0x07;
-        if (lead == 0xF0) low = 0x90;  /* no overlongs */
-        if (lead == 0xF4) high = 0x8F; /* nothing above U+10FFFF */
+        if (lead == 0xF0) second_minimum = 0x90; /* no overlongs */
+        if (lead == 0xF4) second_maximum = 0x8F; /* nothing above U+10FFFF */
     } else {
         return false;
     }
 
-    if (n - at < length) return false;
-    unsigned char second = s[at + 1];
-    if (second < low || second > high) return false;
+    if (length - start < sequence_length) return false;
+    unsigned char second = bytes[start + 1];
+    if (second < second_minimum || second > second_maximum) return false;
     value = (value << 6) | (second & 0x3F);
-    for (size_t k = 2; k < length; k++) {
-        if (!is_continuation(s[at + k])) return false;
-        value = (value << 6) | (s[at + k] & 0x3F);
+    for (size_t offset = 2; offset < sequence_length; offset++) {
+        unsigned char continuation = bytes[start + offset];
+        if (!is_continuation(continuation)) return false;
+        value = (value << 6) | (continuation & 0x3F);
     }
-    *cp = value;
-    *i = at + length;
+    *code_point = value;
+    *position = start + sequence_length;
     return true;
 }
 
-bool lm_utf8_valid(const unsigned char *s, size_t n, size_t *bad) {
-    size_t i = 0;
-    uint32_t cp;
-    while (i < n) {
-        if (!lm_utf8_next(s, n, &i, &cp)) {
-            if (bad) *bad = i;
+bool lm_utf8_valid(const unsigned char *bytes, size_t length, size_t *invalid_offset) {
+    size_t position = 0;
+    uint32_t code_point;
+    while (position < length) {
+        if (!lm_utf8_next(bytes, length, &position, &code_point)) {
+            if (invalid_offset) *invalid_offset = position;
             return false;
         }
     }
     return true;
 }
 
-size_t lm_utf8_encode(uint32_t cp, unsigned char out[static 4]) {
-    if (cp < 0x80) {
-        out[0] = (unsigned char)cp;
+size_t lm_utf8_encode(uint32_t code_point, unsigned char output[static 4]) {
+    if (code_point < 0x80) {
+        output[0] = (unsigned char)code_point;
         return 1;
     }
-    if (cp < 0x800) {
-        out[0] = (unsigned char)(0xC0 | (cp >> 6));
-        out[1] = (unsigned char)(0x80 | (cp & 0x3F));
+    if (code_point < 0x800) {
+        output[0] = (unsigned char)(0xC0 | (code_point >> 6));
+        output[1] = (unsigned char)(0x80 | (code_point & 0x3F));
         return 2;
     }
-    if (cp < 0x10000) {
-        out[0] = (unsigned char)(0xE0 | (cp >> 12));
-        out[1] = (unsigned char)(0x80 | ((cp >> 6) & 0x3F));
-        out[2] = (unsigned char)(0x80 | (cp & 0x3F));
+    if (code_point < 0x10000) {
+        output[0] = (unsigned char)(0xE0 | (code_point >> 12));
+        output[1] = (unsigned char)(0x80 | ((code_point >> 6) & 0x3F));
+        output[2] = (unsigned char)(0x80 | (code_point & 0x3F));
         return 3;
     }
-    out[0] = (unsigned char)(0xF0 | (cp >> 18));
-    out[1] = (unsigned char)(0x80 | ((cp >> 12) & 0x3F));
-    out[2] = (unsigned char)(0x80 | ((cp >> 6) & 0x3F));
-    out[3] = (unsigned char)(0x80 | (cp & 0x3F));
+    output[0] = (unsigned char)(0xF0 | (code_point >> 18));
+    output[1] = (unsigned char)(0x80 | ((code_point >> 12) & 0x3F));
+    output[2] = (unsigned char)(0x80 | ((code_point >> 6) & 0x3F));
+    output[3] = (unsigned char)(0x80 | (code_point & 0x3F));
     return 4;
 }
 
-size_t lm_utf8_count(const char *s, size_t n) {
+size_t lm_utf8_count(const char *text, size_t length) {
     size_t count = 0;
-    for (size_t i = 0; i < n; i++) {
-        if (!is_continuation((unsigned char)s[i])) count++;
+    for (size_t position = 0; position < length; position++) {
+        if (!is_continuation((unsigned char)text[position])) count++;
     }
     return count;
 }
 
-size_t lm_utf8_offset(const char *s, size_t n, size_t index) {
-    size_t i = 0;
-    while (i < n) {
-        if (!is_continuation((unsigned char)s[i])) {
-            if (index == 0) return i;
+size_t lm_utf8_offset(const char *text, size_t length, size_t index) {
+    for (size_t position = 0; position < length; position++) {
+        if (!is_continuation((unsigned char)text[position])) {
+            if (index == 0) return position;
             index--;
         }
-        i++;
     }
-    return n;
+    return length;
 }

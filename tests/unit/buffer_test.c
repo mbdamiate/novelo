@@ -5,47 +5,47 @@
 #include <stdlib.h>
 
 static void t_appends(void) {
-    LmBuffer b;
-    lm_buffer_init(&b);
-    lm_buffer_append_string(&b, "ab");
-    lm_buffer_append_byte(&b, 'c');
-    lm_buffer_append(&b, "de", 2);
-    CHECK_STR(b.data, "abcde");
-    CHECK_INT(b.length, 5);
-    lm_buffer_clear(&b);
-    CHECK_STR(b.data, "");
-    lm_buffer_free(&b);
+    LmBuffer buffer;
+    lm_buffer_init(&buffer);
+    lm_buffer_append_string(&buffer, "ab");
+    lm_buffer_append_byte(&buffer, 'c');
+    lm_buffer_append(&buffer, "de", 2);
+    CHECK_STR(buffer.data, "abcde");
+    CHECK_INT(buffer.length, 5);
+    lm_buffer_clear(&buffer);
+    CHECK_STR(buffer.data, "");
+    lm_buffer_free(&buffer);
 }
 
 static void t_grows(void) {
-    LmBuffer b;
-    lm_buffer_init(&b);
-    for (int i = 0; i < 10000; i++) lm_buffer_append_byte(&b, 'x');
-    CHECK_INT(b.length, 10000);
-    CHECK_INT(b.data[9999], 'x');
-    CHECK_INT(b.data[10000], '\0');
-    lm_buffer_free(&b);
+    LmBuffer buffer;
+    lm_buffer_init(&buffer);
+    for (int count = 0; count < 10000; count++) lm_buffer_append_byte(&buffer, 'x');
+    CHECK_INT(buffer.length, 10000);
+    CHECK_INT(buffer.data[9999], 'x');
+    CHECK_INT(buffer.data[10000], '\0');
+    lm_buffer_free(&buffer);
 }
 
 static void t_formats(void) {
-    LmBuffer b;
-    lm_buffer_init(&b);
-    lm_buffer_appendf(&b, "%d-%s", 42, "x");
-    lm_buffer_appendf(&b, "%s", "");
-    CHECK_STR(b.data, "42-x");
-    lm_buffer_free(&b);
+    LmBuffer buffer;
+    lm_buffer_init(&buffer);
+    lm_buffer_appendf(&buffer, "%d-%s", 42, "x");
+    lm_buffer_appendf(&buffer, "%s", "");
+    CHECK_STR(buffer.data, "42-x");
+    lm_buffer_free(&buffer);
 }
 
 static void t_code_points_and_take(void) {
-    LmBuffer b;
-    lm_buffer_init(&b);
-    lm_buffer_append_code_point(&b, 0xE9);
-    lm_buffer_append_code_point(&b, 0x1F600);
+    LmBuffer buffer;
+    lm_buffer_init(&buffer);
+    lm_buffer_append_code_point(&buffer, 0xE9);
+    lm_buffer_append_code_point(&buffer, 0x1F600);
     size_t length = 0;
-    char *bytes = lm_buffer_take(&b, &length);
+    char *bytes = lm_buffer_take(&buffer, &length);
     CHECK_INT(length, 6);
     CHECK_STR(bytes, "\xC3\xA9\xF0\x9F\x98\x80");
-    CHECK(b.data == nullptr);
+    CHECK(buffer.data == nullptr);
     free(bytes);
 }
 

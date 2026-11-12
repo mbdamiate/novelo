@@ -91,19 +91,19 @@ typedef struct LmMap {
 typedef struct LmClosure {
     Value header;
     Value *lambda;  /* expanded lambda node */
-    Value *env;     /* captured environment, or nullptr */
+    Value *environment;     /* captured environment, or nullptr */
     Value *context; /* include context (§8.8), or nullptr */
 } LmClosure;
 
 typedef struct LmState LmState;
-typedef Value *(*LmPrimitiveFn)(LmState *state, size_t argc, Value *const *argv);
+typedef Value *(*LmPrimitiveFunction)(LmState *state, size_t argument_count, Value *const *arguments);
 
 typedef struct LmPrimitive {
     Value header;
     const char *name;
-    int min_args;
-    int max_args;   /* -1: no maximum */
-    LmPrimitiveFn fn;
+    int minimum_arguments;
+    int maximum_arguments;   /* -1: no maximum */
+    LmPrimitiveFunction function;
 } LmPrimitive;
 
 /* Internal objects counted like values. drop() releases the children (with
@@ -127,16 +127,16 @@ extern Value lm_true_object, lm_false_object, lm_void_object, lm_empty_object;
 #define LM_VOID (&lm_void_object)
 #define LM_EMPTY (&lm_empty_object)
 
-static inline Value *lm_bool(bool b) { return b ? LM_TRUE : LM_FALSE; }
+static inline Value *lm_bool(bool condition) { return condition ? LM_TRUE : LM_FALSE; }
 
 /* ---- reference counting --------------------------------------------------- */
 
-static inline Value *lm_retain(Value *v) {
-    if (v && !(v->flags & LM_IMMORTAL)) v->refs++;
-    return v;
+static inline Value *lm_retain(Value *value) {
+    if (value && !(value->flags & LM_IMMORTAL)) value->refs++;
+    return value;
 }
 
-void lm_release(Value *v);
+void lm_release(Value *value);
 
 /* Allocates a counted object of the given size (refs = 1, flags = 0). */
 [[nodiscard]] Value *lm_object_new(LmKind kind, size_t size);
@@ -152,29 +152,29 @@ void lm_values_shutdown(void);
 
 /* ---- types --------------------------------------------------------------- */
 
-static inline bool lm_is_list(const Value *v) {
-    return v->kind == LM_KIND_EMPTY || v->kind == LM_KIND_PAIR;
+static inline bool lm_is_list(const Value *value) {
+    return value->kind == LM_KIND_EMPTY || value->kind == LM_KIND_PAIR;
 }
-static inline bool lm_is_function(const Value *v) {
-    return v->kind == LM_KIND_CLOSURE || v->kind == LM_KIND_PRIMITIVE;
+static inline bool lm_is_function(const Value *value) {
+    return value->kind == LM_KIND_CLOSURE || value->kind == LM_KIND_PRIMITIVE;
 }
 
 /* Type name of §2: "Boolean", "Void", "Integer", …, "Function". */
-const char *lm_type_name(const Value *v);
+const char *lm_type_name(const Value *value);
 
 /* ---- integers ------------------------------------------------------------- */
 
 [[nodiscard]] Value *lm_integer(int64_t value);
-static inline int64_t lm_integer_value(const Value *v) { return ((const LmInteger *)v)->value; }
+static inline int64_t lm_integer_value(const Value *integer) { return ((const LmInteger *)integer)->value; }
 
 /* ---- strings (valid UTF-8 only) ------------------------------------------- */
 
 [[nodiscard]] Value *lm_string(const char *utf8, size_t bytes);
 [[nodiscard]] Value *lm_string_cstr(const char *utf8);
-static inline const LmString *lm_as_string(const Value *v) { return (const LmString *)v; }
+static inline const LmString *lm_as_string(const Value *string) { return (const LmString *)string; }
 
 /* Byte offset of code point `index` (0..length); O(1) for ASCII strings. */
-size_t lm_string_offset(const Value *s, size_t index);
+size_t lm_string_offset(const Value *string, size_t index);
 
 /* ---- symbols and keywords -------------------------------------------------- */
 
@@ -187,7 +187,7 @@ size_t lm_string_offset(const Value *s, size_t index);
 /* A fresh, counted, non-interned symbol (generate-symbol, §9). */
 [[nodiscard]] Value *lm_generate_symbol(void);
 
-static inline const LmName *lm_as_name(const Value *v) { return (const LmName *)v; }
+static inline const LmName *lm_as_name(const Value *name) { return (const LmName *)name; }
 
 /* ---- lists ----------------------------------------------------------------- */
 
@@ -231,21 +231,21 @@ Value *lm_map_get(const Value *map, const Value *key); /* borrowed, or nullptr *
 [[nodiscard]] Value *lm_map_associate(const Value *map, Value *key, Value *value);
 [[nodiscard]] Value *lm_map_dissociate(Value *map, const Value *key);
 
-/* Iteration: for (size_t i = 0; lm_map_next(map, &i, &k, &v);) … (borrowed). */
+/* Iteration: for (size_t cursor = 0; lm_map_next(map, &cursor, &key, &value);) … (borrowed). */
 bool lm_map_next(const Value *map, size_t *cursor, Value **key, Value **value);
 
 /* ---- functions ------------------------------------------------------------- */
 
-/* Retains lambda, env and context (env and context may be nullptr). */
-[[nodiscard]] Value *lm_closure(Value *lambda, Value *env, Value *context);
-[[nodiscard]] Value *lm_primitive(const char *name, int min_args, int max_args, LmPrimitiveFn fn);
+/* Retains lambda, environment and context (environment and context may be nullptr). */
+[[nodiscard]] Value *lm_closure(Value *lambda, Value *environment, Value *context);
+[[nodiscard]] Value *lm_primitive(const char *name, int minimum_arguments, int maximum_arguments, LmPrimitiveFunction function);
 
 /* Wraps a zeroed opaque object of `size` bytes (≥ sizeof(LmOpaque)). */
 [[nodiscard]] Value *lm_opaque_new(const LmClass *class, size_t size);
 
 /* ---- equality and hashing (§2.4) -------------------------------------------- */
 
-bool lm_equal(const Value *a, const Value *b);
+bool lm_equal(const Value *left, const Value *right);
 
 /* Consistent with lm_equal: equal values have equal hashes. */
-uint64_t lm_hash(const Value *v);
+uint64_t lm_hash(const Value *value);

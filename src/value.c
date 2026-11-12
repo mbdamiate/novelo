@@ -29,79 +29,79 @@ void lm_set_position_forget_hook(void (*hook)(const Value *node)) { position_for
 
 Value *lm_object_new(LmKind kind, size_t size) {
     assert(size >= sizeof(Value));
-    Value *v = lm_xmalloc(size);
-    *v = (Value){.refs = 1, .kind = kind};
+    Value *object = lm_xmalloc(size);
+    *object = (Value){.refs = 1, .kind = kind};
     live_objects++;
-    return v;
+    return object;
 }
 
 /* Objects whose count reached zero, waiting to be destroyed. */
-static Value **work;
-static size_t work_length, work_capacity;
+static Value **pending_objects;
+static size_t pending_count, pending_capacity;
 static bool draining;
 
-static void work_push(Value *v) {
-    if (work_length == work_capacity) {
-        work_capacity = work_capacity ? work_capacity * 2 : 256;
-        work = lm_xrealloc(work, work_capacity * sizeof *work);
+static void push_pending(Value *object) {
+    if (pending_count == pending_capacity) {
+        pending_capacity = pending_capacity ? pending_capacity * 2 : 256;
+        pending_objects = lm_xrealloc(pending_objects, pending_capacity * sizeof *pending_objects);
     }
-    work[work_length++] = v;
+    pending_objects[pending_count++] = object;
 }
 
-/* Releases the children (which may push them on the work stack) and frees v. */
-static void destroy(Value *v) {
-    switch ((LmKind)v->kind) {
+/* Releases the children (which may push them as pending) and frees the object. */
+static void destroy(Value *object) {
+    switch ((LmKind)object->kind) {
     case LM_KIND_PAIR: {
-        LmPair *pair = (LmPair *)v;
+        LmPair *pair = (LmPair *)object;
         lm_release(pair->first);
         lm_release(pair->rest);
         break;
     }
     case LM_KIND_MAP: {
-        LmMap *map = (LmMap *)v;
-        for (size_t i = 0; i < map->capacity; i++) {
-            if (map->entries[i].key) {
-                lm_release(map->entries[i].key);
-                lm_release(map->entries[i].value);
+        LmMap *map = (LmMap *)object;
+        for (size_t slot = 0; slot < map->capacity; slot++) {
+            if (map->entries[slot].key) {
+                lm_release(map->entries[slot].key);
+                lm_release(map->entries[slot].value);
             }
         }
         break;
     }
     case LM_KIND_CLOSURE: {
-        LmClosure *closure = (LmClosure *)v;
+        LmClosure *closure = (LmClosure *)object;
         lm_release(closure->lambda);
-        lm_release(closure->env);
+        lm_release(closure->environment);
         lm_release(closure->context);
         break;
     }
     case LM_KIND_OPAQUE: {
-        LmOpaque *opaque = (LmOpaque *)v;
-        if (opaque->class->drop) opaque->class->drop(v);
+        LmOpaque *opaque = (LmOpaque *)object;
+        if (opaque->class->drop) opaque->class->drop(object);
         break;
     }
     default:
         break;
     }
-    if ((v->flags & LM_HAS_POSITION) && position_forget_hook) position_forget_hook(v);
-    free(v);
+    if ((object->flags & LM_HAS_POSITION) && position_forget_hook) position_forget_hook(object);
+    free(object);
     live_objects--;
 }
 
-void lm_release(Value *v) {
-    if (!v || (v->flags & LM_IMMORTAL)) return;
-    assert(v->refs > 0);
-    if (--v->refs) return;
-    work_push(v);
+void lm_release(Value *value) {
+    if (!value || (value->flags & LM_IMMORTAL)) return;
+    assert(value->refs > 0);
+    if (--value->refs) return;
+    push_pending(value);
     if (draining) return; /* an outer lm_release is already emptying the stack */
     draining = true;
-    while (work_length) destroy(work[--work_length]);
+    while (pending_count) destroy(pending_objects[--pending_count]);
     draining = false;
 }
 
 /* ---- types ----------------------------------------------------------------- */
 
-const char *lm_type_name(const Value *v) {
-    switch ((LmKind)v->kind) {
+const char *lm_type_name(const Value *value) {
+    switch ((LmKind)value->kind) {
     case LM_KIND_BOOLEAN: return "Boolean";
     case LM_KIND_VOID: return "Void";
     case LM_KIND_INTEGER: return "Integer";
@@ -113,30 +113,30 @@ const char *lm_type_name(const Value *v) {
     case LM_KIND_MAP: return "Map";
     case LM_KIND_CLOSURE:
     case LM_KIND_PRIMITIVE: return "Function";
-    case LM_KIND_OPAQUE: return ((const LmOpaque *)v)->class->name;
+    case LM_KIND_OPAQUE: return ((const LmOpaque *)value)->class->name;
     }
     return "?";
 }
 
 /* ---- integers -------------------------------------------------------------- */
 
-constexpr int64_t SMALL_MIN = -128;
-constexpr int64_t SMALL_MAX = 1023;
-static LmInteger small_integers[SMALL_MAX - SMALL_MIN + 1];
+constexpr int64_t SMALL_MINIMUM = -128;
+constexpr int64_t SMALL_MAXIMUM = 1023;
+static LmInteger small_integers[SMALL_MAXIMUM - SMALL_MINIMUM + 1];
 static bool small_integers_ready;
 
 Value *lm_integer(int64_t value) {
-    if (value >= SMALL_MIN && value <= SMALL_MAX) {
+    if (value >= SMALL_MINIMUM && value <= SMALL_MAXIMUM) {
         if (!small_integers_ready) {
-            for (int64_t i = SMALL_MIN; i <= SMALL_MAX; i++) {
-                small_integers[i - SMALL_MIN] = (LmInteger){
+            for (int64_t number = SMALL_MINIMUM; number <= SMALL_MAXIMUM; number++) {
+                small_integers[number - SMALL_MINIMUM] = (LmInteger){
                     .header = {.kind = LM_KIND_INTEGER, .flags = LM_IMMORTAL},
-                    .value = i,
+                    .value = number,
                 };
             }
             small_integers_ready = true;
         }
-        return &small_integers[value - SMALL_MIN].header;
+        return &small_integers[value - SMALL_MINIMUM].header;
     }
     LmInteger *integer = (LmInteger *)lm_object_new(LM_KIND_INTEGER, sizeof(LmInteger));
     integer->value = value;
@@ -146,46 +146,46 @@ Value *lm_integer(int64_t value) {
 /* ---- strings ----------------------------------------------------------------- */
 
 Value *lm_string(const char *utf8, size_t bytes) {
-    LmString *s = (LmString *)lm_object_new(LM_KIND_STRING, sizeof(LmString) + bytes + 1);
-    if (bytes) memcpy(s->data, utf8, bytes);
-    s->data[bytes] = '\0';
-    s->bytes = bytes;
-    s->length = lm_utf8_count(utf8, bytes);
-    if (s->length == bytes) s->header.flags |= LM_ASCII;
-    return &s->header;
+    LmString *string = (LmString *)lm_object_new(LM_KIND_STRING, sizeof(LmString) + bytes + 1);
+    if (bytes) memcpy(string->data, utf8, bytes);
+    string->data[bytes] = '\0';
+    string->bytes = bytes;
+    string->length = lm_utf8_count(utf8, bytes);
+    if (string->length == bytes) string->header.flags |= LM_ASCII;
+    return &string->header;
 }
 
 Value *lm_string_cstr(const char *utf8) { return lm_string(utf8, strlen(utf8)); }
 
-size_t lm_string_offset(const Value *v, size_t index) {
-    const LmString *s = lm_as_string(v);
-    if (v->flags & LM_ASCII) return index;
-    return lm_utf8_offset(s->data, s->bytes, index);
+size_t lm_string_offset(const Value *string, size_t index) {
+    if (string->flags & LM_ASCII) return index;
+    const LmString *contents = lm_as_string(string);
+    return lm_utf8_offset(contents->data, contents->bytes, index);
 }
 
 /* ---- hashing helpers ------------------------------------------------------------ */
 
-static uint64_t mix(uint64_t x) { /* splitmix64 finalizer */
-    x ^= x >> 30;
-    x *= 0xBF58476D1CE4E5B9ULL;
-    x ^= x >> 27;
-    x *= 0x94D049BB133111EBULL;
-    x ^= x >> 31;
-    return x;
+static uint64_t mix(uint64_t bits) { /* splitmix64 finalizer */
+    bits ^= bits >> 30;
+    bits *= 0xBF58476D1CE4E5B9ULL;
+    bits ^= bits >> 27;
+    bits *= 0x94D049BB133111EBULL;
+    bits ^= bits >> 31;
+    return bits;
 }
 
 static uint64_t hash_bytes(const char *bytes, size_t length) { /* FNV-1a */
-    uint64_t h = 0xCBF29CE484222325ULL;
-    for (size_t i = 0; i < length; i++) {
-        h ^= (unsigned char)bytes[i];
-        h *= 0x100000001B3ULL;
+    uint64_t hash = 0xCBF29CE484222325ULL;
+    for (size_t position = 0; position < length; position++) {
+        hash ^= (unsigned char)bytes[position];
+        hash *= 0x100000001B3ULL;
     }
-    return h;
+    return hash;
 }
 
 /* ---- symbols and keywords ---------------------------------------------------------- */
 
-static LmName **interned;
+static LmName **interned_names;
 static size_t interned_count, interned_capacity;
 
 static LmName *name_new(LmKind kind, const char *text, size_t bytes, uint64_t hash) {
@@ -198,33 +198,34 @@ static LmName *name_new(LmKind kind, const char *text, size_t bytes, uint64_t ha
     return name;
 }
 
-static void interned_grow(void) {
+static void grow_interned_table(void) {
     size_t capacity = interned_capacity ? interned_capacity * 2 : 256;
     LmName **table = lm_xcalloc(capacity, sizeof *table);
-    for (size_t i = 0; i < interned_capacity; i++) {
-        LmName *name = interned[i];
+    for (size_t old_slot = 0; old_slot < interned_capacity; old_slot++) {
+        LmName *name = interned_names[old_slot];
         if (!name) continue;
         size_t slot = name->hash & (capacity - 1);
         while (table[slot]) slot = (slot + 1) & (capacity - 1);
         table[slot] = name;
     }
-    free(interned);
-    interned = table;
+    free(interned_names);
+    interned_names = table;
     interned_capacity = capacity;
 }
 
 static Value *intern(LmKind kind, const char *text, size_t bytes) {
     uint64_t hash = mix(hash_bytes(text, bytes) ^ (uint64_t)kind);
-    if (2 * (interned_count + 1) > interned_capacity) interned_grow();
-    size_t slot = hash & (interned_capacity - 1);
-    for (LmName *name; (name = interned[slot]); slot = (slot + 1) & (interned_capacity - 1)) {
+    if (2 * (interned_count + 1) > interned_capacity) grow_interned_table();
+    size_t mask = interned_capacity - 1;
+    size_t slot = hash & mask;
+    for (LmName *name; (name = interned_names[slot]); slot = (slot + 1) & mask) {
         if (name->hash == hash && name->header.kind == kind && name->bytes == bytes
             && memcmp(name->text, text, bytes) == 0) {
             return &name->header;
         }
     }
     LmName *name = name_new(kind, text, bytes, hash);
-    interned[slot] = name;
+    interned_names[slot] = name;
     interned_count++;
     return &name->header;
 }
@@ -247,13 +248,13 @@ Value *lm_generate_symbol(void) {
 }
 
 void lm_values_shutdown(void) {
-    for (size_t i = 0; i < interned_capacity; i++) free(interned[i]);
-    free(interned);
-    interned = nullptr;
+    for (size_t slot = 0; slot < interned_capacity; slot++) free(interned_names[slot]);
+    free(interned_names);
+    interned_names = nullptr;
     interned_count = interned_capacity = 0;
-    free(work);
-    work = nullptr;
-    work_length = work_capacity = 0;
+    free(pending_objects);
+    pending_objects = nullptr;
+    pending_count = pending_capacity = 0;
 }
 
 /* ---- lists ------------------------------------------------------------------------ */
@@ -283,7 +284,7 @@ void lm_list_builder_init(LmListBuilder *builder) {
 void lm_list_append_take(LmListBuilder *builder, Value *element) {
     Value *pair = lm_prepend_take(element, LM_EMPTY);
     if (builder->last) {
-        builder->last->rest = pair; /* the pair is still private to the builder */
+        builder->last->rest = pair; /* the last pair is still private to the builder */
     } else {
         builder->head = pair;
     }
@@ -342,44 +343,43 @@ Value *lm_map_new(size_t expected) {
     return &map_alloc(capacity_for(expected))->header;
 }
 
-bool lm_map_insert_take(Value **map_ref, Value *key, Value *value) {
-    LmMap *map = (LmMap *)*map_ref;
+bool lm_map_insert_take(Value **map_reference, Value *key, Value *value) {
+    LmMap *map = (LmMap *)*map_reference;
     assert((map->header.flags & LM_IMMORTAL) || map->header.refs == 1);
-    uint64_t hash = lm_hash(key);
-    if (map->capacity && lm_map_get(&map->header, key)) {
+    if (map->count && lm_map_get(&map->header, key)) {
         lm_release(key);
         lm_release(value);
         return false;
     }
     if (2 * (map->count + 1) > map->capacity) {
         LmMap *bigger = map_alloc(capacity_for(map->count + 1));
-        for (size_t i = 0; i < map->capacity; i++) {
-            LmMapEntry *entry = &map->entries[i];
+        for (size_t slot = 0; slot < map->capacity; slot++) {
+            LmMapEntry *entry = &map->entries[slot];
             if (entry->key) map_place(bigger, entry->key, entry->value, entry->hash);
         }
-        if (!(map->header.flags & LM_IMMORTAL)) { /* entries moved, so free only the table */
+        if (!(map->header.flags & LM_IMMORTAL)) { /* the entries moved, so free only the table */
             free(map);
             live_objects--;
         }
         map = bigger;
-        *map_ref = &map->header;
+        *map_reference = &map->header;
     }
-    map_place(map, key, value, hash);
+    map_place(map, key, value, lm_hash(key));
     return true;
 }
 
-Value *lm_map_get(const Value *v, const Value *key) {
-    const LmMap *map = (const LmMap *)v;
+Value *lm_map_get(const Value *map_value, const Value *key) {
+    const LmMap *map = (const LmMap *)map_value;
     if (map->count == 0) return nullptr;
     const LmMapEntry *entry = &map->entries[map_slot(map, key, lm_hash(key))];
     return entry->key ? entry->value : nullptr;
 }
 
-Value *lm_map_associate(const Value *v, Value *key, Value *value) {
-    const LmMap *map = (const LmMap *)v;
+Value *lm_map_associate(const Value *map_value, Value *key, Value *value) {
+    const LmMap *map = (const LmMap *)map_value;
     LmMap *copy = map_alloc(capacity_for(map->count + 1));
-    for (size_t i = 0; i < map->capacity; i++) {
-        const LmMapEntry *entry = &map->entries[i];
+    for (size_t slot = 0; slot < map->capacity; slot++) {
+        const LmMapEntry *entry = &map->entries[slot];
         if (entry->key) {
             map_place(copy, lm_retain(entry->key), lm_retain(entry->value), entry->hash);
         }
@@ -396,13 +396,13 @@ Value *lm_map_associate(const Value *v, Value *key, Value *value) {
     return &copy->header;
 }
 
-Value *lm_map_dissociate(Value *v, const Value *key) {
-    if (!lm_map_get(v, key)) return lm_retain(v);
-    const LmMap *map = (const LmMap *)v;
+Value *lm_map_dissociate(Value *map_value, const Value *key) {
+    if (!lm_map_get(map_value, key)) return lm_retain(map_value);
+    const LmMap *map = (const LmMap *)map_value;
     if (map->count == 1) return &empty_map.header;
     LmMap *copy = map_alloc(capacity_for(map->count - 1));
-    for (size_t i = 0; i < map->capacity; i++) {
-        const LmMapEntry *entry = &map->entries[i];
+    for (size_t slot = 0; slot < map->capacity; slot++) {
+        const LmMapEntry *entry = &map->entries[slot];
         if (entry->key && !lm_equal(entry->key, key)) {
             map_place(copy, lm_retain(entry->key), lm_retain(entry->value), entry->hash);
         }
@@ -410,13 +410,13 @@ Value *lm_map_dissociate(Value *v, const Value *key) {
     return &copy->header;
 }
 
-bool lm_map_next(const Value *v, size_t *cursor, Value **key, Value **value) {
-    const LmMap *map = (const LmMap *)v;
-    for (size_t i = *cursor; i < map->capacity; i++) {
-        if (map->entries[i].key) {
-            *key = map->entries[i].key;
-            *value = map->entries[i].value;
-            *cursor = i + 1;
+bool lm_map_next(const Value *map_value, size_t *cursor, Value **key, Value **value) {
+    const LmMap *map = (const LmMap *)map_value;
+    for (size_t slot = *cursor; slot < map->capacity; slot++) {
+        if (map->entries[slot].key) {
+            *key = map->entries[slot].key;
+            *value = map->entries[slot].value;
+            *cursor = slot + 1;
             return true;
         }
     }
@@ -426,104 +426,111 @@ bool lm_map_next(const Value *v, size_t *cursor, Value **key, Value **value) {
 
 /* ---- functions and opaque objects ------------------------------------------------------- */
 
-Value *lm_closure(Value *lambda, Value *env, Value *context) {
+Value *lm_closure(Value *lambda, Value *environment, Value *context) {
     LmClosure *closure = (LmClosure *)lm_object_new(LM_KIND_CLOSURE, sizeof(LmClosure));
     closure->lambda = lm_retain(lambda);
-    closure->env = lm_retain(env);
+    closure->environment = lm_retain(environment);
     closure->context = lm_retain(context);
     return &closure->header;
 }
 
-Value *lm_primitive(const char *name, int min_args, int max_args, LmPrimitiveFn fn) {
+Value *lm_primitive(const char *name, int minimum_arguments, int maximum_arguments, LmPrimitiveFunction function) {
     LmPrimitive *primitive = (LmPrimitive *)lm_object_new(LM_KIND_PRIMITIVE, sizeof(LmPrimitive));
     primitive->name = name;
-    primitive->min_args = min_args;
-    primitive->max_args = max_args;
-    primitive->fn = fn;
+    primitive->minimum_arguments = minimum_arguments;
+    primitive->maximum_arguments = maximum_arguments;
+    primitive->function = function;
     return &primitive->header;
 }
 
 Value *lm_opaque_new(const LmClass *class, size_t size) {
     assert(size >= sizeof(LmOpaque));
-    Value *v = lm_object_new(LM_KIND_OPAQUE, size);
-    memset((char *)v + sizeof(Value), 0, size - sizeof(Value));
-    ((LmOpaque *)v)->class = class;
-    return v;
+    Value *object = lm_object_new(LM_KIND_OPAQUE, size);
+    memset((char *)object + sizeof(Value), 0, size - sizeof(Value));
+    ((LmOpaque *)object)->class = class;
+    return object;
 }
 
 /* ---- equal? (§2.4.1) ------------------------------------------------------------------ */
 
 typedef struct Comparison {
-    const Value *a, *b;
+    const Value *left, *right;
 } Comparison;
 
-/* Iterative over list tails and nesting: an explicit stack of pending pairs. */
-bool lm_equal(const Value *a, const Value *b) {
-    Comparison inline_stack[32];
-    Comparison *stack = inline_stack;
-    size_t length = 0, capacity = 32;
-    bool result = true;
+typedef struct ComparisonStack {
+    Comparison *items;
+    size_t count, capacity;
+    Comparison inline_items[32];
+} ComparisonStack;
 
-#define PUSH(x, y)                                                                  \
-    do {                                                                            \
-        if (length == capacity) {                                                   \
-            capacity *= 2;                                                          \
-            if (stack == inline_stack) {                                            \
-                stack = lm_xmalloc(capacity * sizeof *stack);                       \
-                memcpy(stack, inline_stack, sizeof inline_stack);                   \
-            } else {                                                                \
-                stack = lm_xrealloc(stack, capacity * sizeof *stack);               \
-            }                                                                       \
-        }                                                                           \
-        stack[length++] = (Comparison){(x), (y)};                                   \
-    } while (0)
+static void push_comparison(ComparisonStack *stack, const Value *left, const Value *right) {
+    if (stack->count == stack->capacity) {
+        stack->capacity *= 2;
+        if (stack->items == stack->inline_items) {
+            stack->items = lm_xmalloc(stack->capacity * sizeof(Comparison));
+            memcpy(stack->items, stack->inline_items, sizeof stack->inline_items);
+        } else {
+            stack->items = lm_xrealloc(stack->items, stack->capacity * sizeof(Comparison));
+        }
+    }
+    stack->items[stack->count++] = (Comparison){left, right};
+}
 
-    PUSH(a, b);
-    while (result && length) {
-        Comparison c = stack[--length];
-        if (c.a == c.b) continue;
-        if (c.a->kind != c.b->kind) {
-            result = false;
+/* Iterative over list tails and nesting: an explicit stack of pending comparisons. */
+bool lm_equal(const Value *left, const Value *right) {
+    ComparisonStack stack;
+    stack.items = stack.inline_items;
+    stack.count = 0;
+    stack.capacity = sizeof stack.inline_items / sizeof stack.inline_items[0];
+    push_comparison(&stack, left, right);
+
+    bool equal = true;
+    while (equal && stack.count) {
+        Comparison comparison = stack.items[--stack.count];
+        const Value *first = comparison.left, *second = comparison.right;
+        if (first == second) continue;
+        if (first->kind != second->kind) {
+            equal = false;
             break;
         }
-        switch ((LmKind)c.a->kind) {
+        switch ((LmKind)first->kind) {
         case LM_KIND_INTEGER:
-            result = lm_integer_value(c.a) == lm_integer_value(c.b);
+            equal = lm_integer_value(first) == lm_integer_value(second);
             break;
         case LM_KIND_STRING: {
-            const LmString *x = lm_as_string(c.a), *y = lm_as_string(c.b);
-            result = x->bytes == y->bytes && memcmp(x->data, y->data, x->bytes) == 0;
+            const LmString *first_string = lm_as_string(first), *second_string = lm_as_string(second);
+            equal = first_string->bytes == second_string->bytes
+                    && memcmp(first_string->data, second_string->data, first_string->bytes) == 0;
             break;
         }
         case LM_KIND_PAIR:
             /* Rest first, so the first elements are compared before the tail. */
-            PUSH(lm_rest(c.a), lm_rest(c.b));
-            PUSH(lm_first(c.a), lm_first(c.b));
+            push_comparison(&stack, lm_rest(first), lm_rest(second));
+            push_comparison(&stack, lm_first(first), lm_first(second));
             break;
         case LM_KIND_MAP: {
-            if (lm_map_count(c.a) != lm_map_count(c.b)) {
-                result = false;
+            if (lm_map_count(first) != lm_map_count(second)) {
+                equal = false;
                 break;
             }
             Value *key, *value;
-            for (size_t cursor = 0; lm_map_next(c.a, &cursor, &key, &value);) {
-                Value *other = lm_map_get(c.b, key);
-                if (!other) {
-                    result = false;
+            for (size_t cursor = 0; lm_map_next(first, &cursor, &key, &value);) {
+                Value *other_value = lm_map_get(second, key);
+                if (!other_value) {
+                    equal = false;
                     break;
                 }
-                PUSH(value, other);
+                push_comparison(&stack, value, other_value);
             }
             break;
         }
         default: /* Boolean, Void, (), Symbol, Keyword, Function: identity */
-            result = false;
+            equal = false;
             break;
         }
     }
-#undef PUSH
-    if (stack != inline_stack) free(stack);
-    return result;
+    if (stack.items != stack.inline_items) free(stack.items);
+    return equal;
 }
 
 /* ---- hash -------------------------------------------------------------------------------- */
@@ -532,41 +539,41 @@ constexpr int HASH_DEPTH = 8;
 
 /* Below the depth limit, a value hashes to a constant of its type, which keeps
  * the hash consistent with equal? while bounding the recursion. */
-static uint64_t hash_at(const Value *v, int depth) {
-    switch ((LmKind)v->kind) {
-    case LM_KIND_BOOLEAN: return v == LM_TRUE ? 0x1001 : 0x1002;
+static uint64_t hash_at(const Value *value, int depth) {
+    switch ((LmKind)value->kind) {
+    case LM_KIND_BOOLEAN: return value == LM_TRUE ? 0x1001 : 0x1002;
     case LM_KIND_VOID: return 0x1003;
-    case LM_KIND_INTEGER: return mix((uint64_t)lm_integer_value(v) ^ 0x2000);
+    case LM_KIND_INTEGER: return mix((uint64_t)lm_integer_value(value) ^ 0x2000);
     case LM_KIND_STRING: {
-        const LmString *s = lm_as_string(v);
-        return mix(hash_bytes(s->data, s->bytes) ^ 0x3000);
+        const LmString *string = lm_as_string(value);
+        return mix(hash_bytes(string->data, string->bytes) ^ 0x3000);
     }
     case LM_KIND_SYMBOL:
-    case LM_KIND_KEYWORD: return lm_as_name(v)->hash;
+    case LM_KIND_KEYWORD: return lm_as_name(value)->hash;
     case LM_KIND_EMPTY:
     case LM_KIND_PAIR: {
         if (depth == 0) return 0x4000;
-        uint64_t h = 0x4001;
-        for (; v->kind == LM_KIND_PAIR; v = lm_rest(v)) {
-            h = mix(h * 31 + hash_at(lm_first(v), depth - 1));
+        uint64_t hash = 0x4001;
+        for (; value->kind == LM_KIND_PAIR; value = lm_rest(value)) {
+            hash = mix(hash * 31 + hash_at(lm_first(value), depth - 1));
         }
-        return h;
+        return hash;
     }
     case LM_KIND_MAP: {
         if (depth == 0) return 0x5000;
-        uint64_t h = 0x5001 + lm_map_count(v);
-        Value *key, *value;
-        for (size_t cursor = 0; lm_map_next(v, &cursor, &key, &value);) {
+        uint64_t hash = 0x5001 + lm_map_count(value);
+        Value *key, *entry_value;
+        for (size_t cursor = 0; lm_map_next(value, &cursor, &key, &entry_value);) {
             /* Sum: independent of iteration order (§2.3). */
-            h += mix(hash_at(key, depth - 1) ^ (hash_at(value, depth - 1) * 0x9E3779B97F4A7C15ULL));
+            hash += mix(hash_at(key, depth - 1) ^ (hash_at(entry_value, depth - 1) * 0x9E3779B97F4A7C15ULL));
         }
-        return h;
+        return hash;
     }
     case LM_KIND_CLOSURE:
     case LM_KIND_PRIMITIVE:
-    case LM_KIND_OPAQUE: return mix((uint64_t)(uintptr_t)v);
+    case LM_KIND_OPAQUE: return mix((uint64_t)(uintptr_t)value);
     }
     return 0;
 }
 
-uint64_t lm_hash(const Value *v) { return hash_at(v, HASH_DEPTH); }
+uint64_t lm_hash(const Value *value) { return hash_at(value, HASH_DEPTH); }

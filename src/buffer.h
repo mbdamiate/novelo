@@ -21,7 +21,7 @@ void lm_buffer_clear(LmBuffer *buffer);
 void lm_buffer_append(LmBuffer *buffer, const void *bytes, size_t length);
 void lm_buffer_append_byte(LmBuffer *buffer, char byte);
 void lm_buffer_append_string(LmBuffer *buffer, const char *text);
-void lm_buffer_append_code_point(LmBuffer *buffer, uint32_t cp);
+void lm_buffer_append_code_point(LmBuffer *buffer, uint32_t code_point);
 
 [[gnu::format(printf, 2, 3)]]
 void lm_buffer_appendf(LmBuffer *buffer, const char *format, ...);

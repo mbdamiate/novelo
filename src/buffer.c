@@ -15,21 +15,21 @@
 }
 
 void *lm_xmalloc(size_t size) {
-    void *p = malloc(size ? size : 1);
-    if (!p) out_of_memory();
-    return p;
+    void *memory = malloc(size ? size : 1);
+    if (!memory) out_of_memory();
+    return memory;
 }
 
 void *lm_xcalloc(size_t count, size_t size) {
-    void *p = calloc(count ? count : 1, size ? size : 1);
-    if (!p) out_of_memory();
-    return p;
+    void *memory = calloc(count ? count : 1, size ? size : 1);
+    if (!memory) out_of_memory();
+    return memory;
 }
 
 void *lm_xrealloc(void *pointer, size_t size) {
-    void *p = realloc(pointer, size ? size : 1);
-    if (!p) out_of_memory();
-    return p;
+    void *memory = realloc(pointer, size ? size : 1);
+    if (!memory) out_of_memory();
+    return memory;
 }
 
 void lm_buffer_init(LmBuffer *buffer) { *buffer = (LmBuffer){}; }
@@ -69,24 +69,24 @@ void lm_buffer_append_string(LmBuffer *buffer, const char *text) {
     lm_buffer_append(buffer, text, strlen(text));
 }
 
-void lm_buffer_append_code_point(LmBuffer *buffer, uint32_t cp) {
+void lm_buffer_append_code_point(LmBuffer *buffer, uint32_t code_point) {
     unsigned char bytes[4];
-    lm_buffer_append(buffer, bytes, lm_utf8_encode(cp, bytes));
+    lm_buffer_append(buffer, bytes, lm_utf8_encode(code_point, bytes));
 }
 
 void lm_buffer_appendf(LmBuffer *buffer, const char *format, ...) {
-    va_list args;
-    va_start(args, format);
+    va_list arguments;
+    va_start(arguments, format);
     va_list copy;
-    va_copy(copy, args);
+    va_copy(copy, arguments);
     int length = vsnprintf(nullptr, 0, format, copy);
     va_end(copy);
     if (length > 0) {
         reserve(buffer, (size_t)length);
-        vsnprintf(buffer->data + buffer->length, (size_t)length + 1, format, args);
+        vsnprintf(buffer->data + buffer->length, (size_t)length + 1, format, arguments);
         buffer->length += (size_t)length;
     }
-    va_end(args);
+    va_end(arguments);
 }
 
 char *lm_buffer_take(LmBuffer *buffer, size_t *length) {

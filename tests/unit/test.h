@@ -9,11 +9,11 @@
 #include <stdint.h>
 #include <string.h>
 
-typedef void (*TestFn)(void);
+typedef void (*TestFunction)(void);
 
 typedef struct TestCase {
     const char *name;
-    TestFn fn;
+    TestFunction function;
 } TestCase;
 
 typedef struct TestSuite {
@@ -24,25 +24,40 @@ typedef struct TestSuite {
 [[gnu::format(printf, 3, 4)]]
 void test_fail(const char *file, int line, const char *format, ...);
 
-#define CHECK(cond)                                                          \
-    do {                                                                     \
-        if (!(cond)) test_fail(__FILE__, __LINE__, "CHECK(%s)", #cond);      \
+typedef struct Value Value;
+void test_check_equal(const char *file, int line, const Value *value, const char *expected_text);
+void test_check_read_error(const char *file, int line, const char *source, const char *code,
+                           int expected_line, int expected_column);
+
+#define CHECK(condition)                                                              \
+    do {                                                                              \
+        if (!(condition)) test_fail(__FILE__, __LINE__, "CHECK(%s)", #condition);     \
     } while (0)
 
-#define CHECK_INT(a, b)                                                      \
-    do {                                                                     \
-        long long check_a_ = (long long)(a), check_b_ = (long long)(b);      \
-        if (check_a_ != check_b_)                                            \
-            test_fail(__FILE__, __LINE__, "CHECK_INT(%s, %s): %lld != %lld", \
-                      #a, #b, check_a_, check_b_);                           \
+#define CHECK_INT(left, right)                                                        \
+    do {                                                                              \
+        long long check_left_ = (long long)(left);                                    \
+        long long check_right_ = (long long)(right);                                  \
+        if (check_left_ != check_right_)                                              \
+            test_fail(__FILE__, __LINE__, "CHECK_INT(%s, %s): %lld != %lld",          \
+                      #left, #right, check_left_, check_right_);                      \
     } while (0)
 
-#define CHECK_STR(a, b)                                                      \
-    do {                                                                     \
-        const char *check_a_ = (a), *check_b_ = (b);                         \
-        if (check_a_ == nullptr || check_b_ == nullptr                       \
-            || strcmp(check_a_, check_b_) != 0)                              \
-            test_fail(__FILE__, __LINE__, "CHECK_STR(%s, %s): \"%s\" != \"%s\"", \
-                      #a, #b, check_a_ ? check_a_ : "(null)",                \
-                      check_b_ ? check_b_ : "(null)");                       \
+#define CHECK_STR(left, right)                                                        \
+    do {                                                                              \
+        const char *check_left_ = (left);                                             \
+        const char *check_right_ = (right);                                           \
+        if (check_left_ == nullptr || check_right_ == nullptr                         \
+            || strcmp(check_left_, check_right_) != 0)                                \
+            test_fail(__FILE__, __LINE__, "CHECK_STR(%s, %s): \"%s\" != \"%s\"",      \
+                      #left, #right, check_left_ ? check_left_ : "(null)",            \
+                      check_right_ ? check_right_ : "(null)");                        \
     } while (0)
+
+/* The value is equal? to the single datum read from expected_text. */
+#define CHECK_EQUAL(value, expected_text) \
+    test_check_equal(__FILE__, __LINE__, (value), (expected_text))
+
+/* Reading source fails with this code (e.g. "unclosed-delimiter") at line:column. */
+#define CHECK_READ_ERROR(source, code, line, column) \
+    test_check_read_error(__FILE__, __LINE__, (source), (code), (line), (column))

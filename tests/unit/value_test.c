@@ -4,21 +4,33 @@
 #include "value.h"
 
 /* Builds the list of the given integers. */
-static Value *ints(size_t n, const int64_t *items) {
-    LmListBuilder b;
-    lm_list_builder_init(&b);
-    for (size_t i = 0; i < n; i++) lm_list_append_take(&b, lm_integer(items[i]));
-    return lm_list_builder_finish(&b);
+static Value *integer_list(size_t count, const int64_t *items) {
+    LmListBuilder builder;
+    lm_list_builder_init(&builder);
+    for (size_t index = 0; index < count; index++) {
+        lm_list_append_take(&builder, lm_integer(items[index]));
+    }
+    return lm_list_builder_finish(&builder);
 }
-#define INTS(...) ints(sizeof((int64_t[]){__VA_ARGS__}) / sizeof(int64_t), (int64_t[]){__VA_ARGS__})
+#define INTEGERS(...)                                                        \
+    integer_list(sizeof((int64_t[]){__VA_ARGS__}) / sizeof(int64_t),         \
+                 (int64_t[]){__VA_ARGS__})
 
-static Value *map_of(size_t n, Value *const *pairs) { /* borrows keys and values */
-    Value *map = lm_map_new(n);
-    for (size_t i = 0; i < n; i++) {
-        CHECK(lm_map_insert_take(&map, lm_retain(pairs[2 * i]), lm_retain(pairs[2 * i + 1])));
+/* Builds a map from alternating keys and values (borrowed). */
+static Value *map_of(size_t pair_count, Value *const *keys_and_values) {
+    Value *map = lm_map_new(pair_count);
+    for (size_t index = 0; index < pair_count; index++) {
+        CHECK(lm_map_insert_take(&map, lm_retain(keys_and_values[2 * index]),
+                                 lm_retain(keys_and_values[2 * index + 1])));
     }
     return map;
 }
+
+static void release_all(size_t count, Value *const *values) {
+    for (size_t index = 0; index < count; index++) lm_release(values[index]);
+}
+#define RELEASE_ALL(...) \
+    release_all(sizeof((Value *[]){__VA_ARGS__}) / sizeof(Value *), (Value *[]){__VA_ARGS__})
 
 static void t_singletons(void) {
     CHECK(LM_TRUE->flags & LM_IMMORTAL);
@@ -37,24 +49,24 @@ static void t_integers(void) {
     Value *small = lm_integer(7);
     CHECK(small == lm_integer(7)); /* cached and immortal */
     CHECK_INT(lm_live_objects(), live);
-    Value *big = lm_integer(INT64_MIN);
+    Value *large = lm_integer(INT64_MIN);
     CHECK_INT(lm_live_objects(), live + 1);
-    CHECK_INT(lm_integer_value(big), INT64_MIN);
-    CHECK_STR(lm_type_name(big), "Integer");
-    lm_release(big);
+    CHECK_INT(lm_integer_value(large), INT64_MIN);
+    CHECK_STR(lm_type_name(large), "Integer");
+    lm_release(large);
     CHECK_INT(lm_live_objects(), live);
 }
 
-static void t_refcounting(void) {
+static void t_reference_counting(void) {
     size_t live = lm_live_objects();
-    Value *s = lm_string_cstr("hello");
-    CHECK_INT(s->refs, 1);
-    lm_retain(s);
-    CHECK_INT(s->refs, 2);
-    Value *list = lm_prepend(s, LM_EMPTY);
-    CHECK_INT(s->refs, 3);
-    lm_release(s);
-    lm_release(s);
+    Value *string = lm_string_cstr("hello");
+    CHECK_INT(string->refs, 1);
+    lm_retain(string);
+    CHECK_INT(string->refs, 2);
+    Value *list = lm_prepend(string, LM_EMPTY);
+    CHECK_INT(string->refs, 3);
+    lm_release(string);
+    lm_release(string);
     CHECK_INT(lm_live_objects(), live + 2);
     lm_release(list); /* frees the pair and then the string */
     CHECK_INT(lm_live_objects(), live);
@@ -72,20 +84,18 @@ static void t_strings(void) {
     Value *with_nul = lm_string("a\0b", 3);
     CHECK_INT(lm_as_string(with_nul)->length, 3);
     CHECK_STR(lm_type_name(with_nul), "String");
-    lm_release(ascii);
-    lm_release(mixed);
-    lm_release(with_nul);
+    RELEASE_ALL(ascii, mixed, with_nul);
 }
 
 static void t_interning(void) {
     size_t live = lm_live_objects();
-    Value *foo = lm_symbol_cstr("foo");
-    CHECK(foo == lm_symbol("foo", 3));
+    Value *symbol = lm_symbol_cstr("foo");
+    CHECK(symbol == lm_symbol("foo", 3));
     Value *keyword = lm_keyword_cstr("foo");
     CHECK(keyword == lm_keyword_cstr("foo"));
-    CHECK(keyword != foo);
-    CHECK(!lm_equal(foo, keyword));
-    CHECK_STR(lm_type_name(foo), "Symbol");
+    CHECK(keyword != symbol);
+    CHECK(!lm_equal(symbol, keyword));
+    CHECK_STR(lm_type_name(symbol), "Symbol");
     CHECK_STR(lm_type_name(keyword), "Keyword");
     CHECK_STR(lm_as_name(keyword)->text, "foo");
     CHECK_INT(lm_live_objects(), live); /* interned names are immortal */
@@ -93,19 +103,18 @@ static void t_interning(void) {
 
 static void t_generated_symbols(void) {
     size_t live = lm_live_objects();
-    Value *a = lm_generate_symbol();
-    Value *b = lm_generate_symbol();
-    CHECK(a != b);
-    CHECK(!lm_equal(a, b));
-    CHECK(lm_equal(a, a));
-    CHECK(a != lm_symbol(lm_as_name(a)->text, lm_as_name(a)->bytes));
+    Value *first = lm_generate_symbol();
+    Value *second = lm_generate_symbol();
+    CHECK(first != second);
+    CHECK(!lm_equal(first, second));
+    CHECK(lm_equal(first, first));
+    CHECK(first != lm_symbol(lm_as_name(first)->text, lm_as_name(first)->bytes));
     CHECK_INT(lm_live_objects(), live + 2);
-    lm_release(a);
-    lm_release(b);
+    RELEASE_ALL(first, second);
 }
 
 static void t_lists(void) {
-    Value *list = INTS(1, 2, 3);
+    Value *list = INTEGERS(1, 2, 3);
     CHECK_INT(lm_list_length(list), 3);
     CHECK_INT(lm_integer_value(lm_first(list)), 1);
     CHECK_INT(lm_integer_value(lm_first(lm_rest(lm_rest(list)))), 3);
@@ -113,16 +122,18 @@ static void t_lists(void) {
     CHECK_INT(lm_list_length(LM_EMPTY), 0);
     lm_release(list);
 
-    LmListBuilder b;
-    lm_list_builder_init(&b);
-    lm_list_append_take(&b, lm_string_cstr("x"));
-    lm_list_builder_discard(&b);
+    LmListBuilder builder;
+    lm_list_builder_init(&builder);
+    lm_list_append_take(&builder, lm_string_cstr("x"));
+    lm_list_builder_discard(&builder);
 }
 
 static void t_releases_long_list(void) {
     size_t live = lm_live_objects();
     Value *list = LM_EMPTY;
-    for (int64_t i = 0; i < 1000000; i++) list = lm_prepend_take(lm_integer(i + 5000), list);
+    for (int64_t number = 0; number < 1000000; number++) {
+        list = lm_prepend_take(lm_integer(number + 5000), list);
+    }
     CHECK_INT(lm_list_length(list), 1000000);
     lm_release(list); /* would overflow the C stack if release recursed */
     CHECK_INT(lm_live_objects(), live);
@@ -131,161 +142,155 @@ static void t_releases_long_list(void) {
 static void t_releases_deep_nesting(void) {
     size_t live = lm_live_objects();
     Value *nested = LM_EMPTY;
-    for (int i = 0; i < 1000000; i++) nested = lm_prepend_take(nested, LM_EMPTY);
+    for (int level = 0; level < 1000000; level++) nested = lm_prepend_take(nested, LM_EMPTY);
     Value *copy = LM_EMPTY;
-    for (int i = 0; i < 1000000; i++) copy = lm_prepend_take(copy, LM_EMPTY);
+    for (int level = 0; level < 1000000; level++) copy = lm_prepend_take(copy, LM_EMPTY);
     CHECK(lm_equal(nested, copy)); /* equal? does not recurse either */
-    lm_release(nested);
-    lm_release(copy);
+    RELEASE_ALL(nested, copy);
     CHECK_INT(lm_live_objects(), live);
 }
 
 static void t_equal(void) {
-    Value *s1 = lm_string_cstr("1"), *s2 = lm_string_cstr("1");
-    Value *one = lm_integer(1);
-    CHECK(lm_equal(s1, s2));
-    CHECK(!lm_equal(s1, one));
+    Value *string_one = lm_string_cstr("1"), *other_string_one = lm_string_cstr("1");
+    CHECK(lm_equal(string_one, other_string_one));
+    CHECK(!lm_equal(string_one, lm_integer(1)));
     CHECK(lm_equal(lm_integer(5), lm_integer(5)));
-    Value *b1 = lm_integer(1LL << 40), *b2 = lm_integer(1LL << 40);
-    CHECK(lm_equal(b1, b2));
+    Value *large = lm_integer(1LL << 40), *other_large = lm_integer(1LL << 40);
+    CHECK(lm_equal(large, other_large));
     CHECK(!lm_equal(LM_TRUE, LM_FALSE));
     CHECK(!lm_equal(LM_EMPTY, LM_FALSE));
     CHECK(!lm_equal(LM_EMPTY, LM_VOID));
-    Value *l1 = INTS(1, 2), *l2 = INTS(1, 2), *l3 = INTS(1, 2, 3), *l4 = INTS(2, 1);
-    CHECK(lm_equal(l1, l2));
-    CHECK(!lm_equal(l1, l3));
-    CHECK(!lm_equal(l3, l1));
-    CHECK(!lm_equal(l1, l4));
-    CHECK(!lm_equal(l1, LM_EMPTY));
-    Value *nested1 = lm_prepend(l1, LM_EMPTY), *nested2 = lm_prepend(l2, LM_EMPTY);
-    CHECK(lm_equal(nested1, nested2));
-    Value *a = lm_string_cstr("\xC3\xA9"), *e = lm_string_cstr("e");
-    CHECK(!lm_equal(a, e));
-    Value *all[] = {s1, s2, b1, b2, l1, l2, l3, l4, nested1, nested2, a, e};
-    for (size_t i = 0; i < sizeof all / sizeof all[0]; i++) lm_release(all[i]);
+    Value *one_two = INTEGERS(1, 2), *other_one_two = INTEGERS(1, 2);
+    Value *one_two_three = INTEGERS(1, 2, 3), *two_one = INTEGERS(2, 1);
+    CHECK(lm_equal(one_two, other_one_two));
+    CHECK(!lm_equal(one_two, one_two_three));
+    CHECK(!lm_equal(one_two_three, one_two));
+    CHECK(!lm_equal(one_two, two_one));
+    CHECK(!lm_equal(one_two, LM_EMPTY));
+    Value *nested = lm_prepend(one_two, LM_EMPTY);
+    Value *other_nested = lm_prepend(other_one_two, LM_EMPTY);
+    CHECK(lm_equal(nested, other_nested));
+    Value *accented = lm_string_cstr("\xC3\xA9"), *plain = lm_string_cstr("e");
+    CHECK(!lm_equal(accented, plain));
+    RELEASE_ALL(string_one, other_string_one, large, other_large, one_two, other_one_two,
+                one_two_three, two_one, nested, other_nested, accented, plain);
 }
 
 static Value *dummy_primitive(LmState *, size_t, Value *const *) { return LM_VOID; }
 
 static void t_functions(void) {
-    Value *p = lm_primitive("dummy", 0, 0, dummy_primitive);
-    Value *q = lm_primitive("dummy", 0, 0, dummy_primitive);
-    CHECK(lm_equal(p, p));
-    CHECK(!lm_equal(p, q));
-    CHECK(lm_is_function(p));
-    CHECK_STR(lm_type_name(p), "Function");
-    Value *closure = lm_closure(p, nullptr, nullptr);
+    Value *primitive = lm_primitive("dummy", 0, 0, dummy_primitive);
+    Value *other_primitive = lm_primitive("dummy", 0, 0, dummy_primitive);
+    CHECK(lm_equal(primitive, primitive));
+    CHECK(!lm_equal(primitive, other_primitive));
+    CHECK(lm_is_function(primitive));
+    CHECK_STR(lm_type_name(primitive), "Function");
+    Value *closure = lm_closure(primitive, nullptr, nullptr);
     CHECK_STR(lm_type_name(closure), "Function");
-    CHECK_INT(p->refs, 2);
+    CHECK_INT(primitive->refs, 2);
     lm_release(closure);
-    CHECK_INT(p->refs, 1);
-    lm_release(p);
-    lm_release(q);
+    CHECK_INT(primitive->refs, 1);
+    RELEASE_ALL(primitive, other_primitive);
 }
 
-static int drops;
-static void count_drop(Value *) { drops++; }
+static int drop_count;
+static void count_drop(Value *) { drop_count++; }
 static const LmClass counted_class = {"Counted", count_drop};
 
 static void t_opaque(void) {
-    drops = 0;
-    Value *o = lm_opaque_new(&counted_class, sizeof(LmOpaque));
-    CHECK_STR(lm_type_name(o), "Counted");
-    Value *list = lm_prepend(o, LM_EMPTY);
-    lm_release(o);
-    CHECK_INT(drops, 0);
+    drop_count = 0;
+    Value *object = lm_opaque_new(&counted_class, sizeof(LmOpaque));
+    CHECK_STR(lm_type_name(object), "Counted");
+    Value *list = lm_prepend(object, LM_EMPTY);
+    lm_release(object);
+    CHECK_INT(drop_count, 0);
     lm_release(list);
-    CHECK_INT(drops, 1);
+    CHECK_INT(drop_count, 1);
 }
 
 static void t_maps(void) {
-    Value *ka = lm_keyword_cstr("a"), *kb = lm_keyword_cstr("b");
+    Value *key_a = lm_keyword_cstr("a"), *key_b = lm_keyword_cstr("b");
     Value *one = lm_integer(1), *two = lm_integer(2);
-    Value *m = map_of(2, (Value *[]){ka, one, kb, two});
-    CHECK_INT(lm_map_count(m), 2);
-    CHECK(lm_map_get(m, ka) == one);
-    CHECK(lm_map_get(m, lm_keyword_cstr("c")) == nullptr);
-    CHECK_STR(lm_type_name(m), "Map");
+    Value *map = map_of(2, (Value *[]){key_a, one, key_b, two});
+    CHECK_INT(lm_map_count(map), 2);
+    CHECK(lm_map_get(map, key_a) == one);
+    CHECK(lm_map_get(map, lm_keyword_cstr("c")) == nullptr);
+    CHECK_STR(lm_type_name(map), "Map");
 
-    /* duplicate keys are refused by the builder */
-    Value *dup = lm_map_new(2);
-    CHECK(lm_map_insert_take(&dup, lm_string_cstr("k"), lm_integer(1)));
-    CHECK(!lm_map_insert_take(&dup, lm_string_cstr("k"), lm_integer(2)));
-    CHECK_INT(lm_map_count(dup), 1);
-    lm_release(dup);
+    /* the builder refuses duplicate keys */
+    Value *duplicates = lm_map_new(2);
+    CHECK(lm_map_insert_take(&duplicates, lm_string_cstr("k"), lm_integer(1)));
+    CHECK(!lm_map_insert_take(&duplicates, lm_string_cstr("k"), lm_integer(2)));
+    CHECK_INT(lm_map_count(duplicates), 1);
+    lm_release(duplicates);
 
     /* associate and dissociate are persistent */
-    Value *m2 = lm_map_associate(m, ka, two);
-    CHECK(lm_map_get(m, ka) == one);
-    CHECK(lm_map_get(m2, ka) == two);
-    CHECK_INT(lm_map_count(m2), 2);
-    Value *m3 = lm_map_dissociate(m2, kb);
-    CHECK_INT(lm_map_count(m3), 1);
-    CHECK_INT(lm_map_count(m2), 2);
-    Value *same = lm_map_dissociate(m3, kb); /* missing key: unchanged */
-    CHECK(same == m3);
-    Value *empty = lm_map_dissociate(m3, ka);
+    Value *associated = lm_map_associate(map, key_a, two);
+    CHECK(lm_map_get(map, key_a) == one);
+    CHECK(lm_map_get(associated, key_a) == two);
+    CHECK_INT(lm_map_count(associated), 2);
+    Value *without_b = lm_map_dissociate(associated, key_b);
+    CHECK_INT(lm_map_count(without_b), 1);
+    CHECK_INT(lm_map_count(associated), 2);
+    Value *unchanged = lm_map_dissociate(without_b, key_b); /* missing key */
+    CHECK(unchanged == without_b);
+    Value *empty = lm_map_dissociate(without_b, key_a);
     CHECK_INT(lm_map_count(empty), 0);
     CHECK(lm_equal(empty, lm_map_new(0)));
 
     /* iteration visits each key once */
     int seen = 0;
     Value *key, *value;
-    for (size_t cursor = 0; lm_map_next(m, &cursor, &key, &value);) seen++;
+    for (size_t cursor = 0; lm_map_next(map, &cursor, &key, &value);) seen++;
     CHECK_INT(seen, 2);
 
-    Value *all[] = {m, m2, m3, same, empty};
-    for (size_t i = 0; i < sizeof all / sizeof all[0]; i++) lm_release(all[i]);
+    RELEASE_ALL(map, associated, without_b, unchanged, empty);
 }
 
 static void t_map_growth_and_structural_keys(void) {
-    Value *m = lm_map_new(0);
-    for (int64_t i = 0; i < 2000; i++) {
-        CHECK(lm_map_insert_take(&m, INTS(i, i + 1), lm_integer(i)));
+    Value *map = lm_map_new(0);
+    for (int64_t number = 0; number < 2000; number++) {
+        CHECK(lm_map_insert_take(&map, INTEGERS(number, number + 1), lm_integer(number)));
     }
-    CHECK_INT(lm_map_count(m), 2000);
-    Value *key = INTS(1500, 1501);
-    Value *found = lm_map_get(m, key);
+    CHECK_INT(lm_map_count(map), 2000);
+    Value *key = INTEGERS(1500, 1501);
+    Value *found = lm_map_get(map, key);
     CHECK(found && lm_integer_value(found) == 1500);
-    lm_release(key);
-    lm_release(m);
+    RELEASE_ALL(key, map);
 }
 
 static void t_map_equality_ignores_order(void) {
-    Value *ka = lm_keyword_cstr("a"), *kb = lm_keyword_cstr("b"), *kc = lm_keyword_cstr("c");
+    Value *key_a = lm_keyword_cstr("a"), *key_b = lm_keyword_cstr("b"), *key_c = lm_keyword_cstr("c");
     Value *one = lm_integer(1), *two = lm_integer(2);
-    Value *m1 = map_of(2, (Value *[]){ka, one, kb, two});
-    Value *m2 = map_of(2, (Value *[]){kb, two, ka, one});
-    Value *m3 = map_of(2, (Value *[]){ka, one, kb, one});
-    Value *m4 = map_of(2, (Value *[]){ka, one, kc, two});
-    CHECK(lm_equal(m1, m2));
-    CHECK(lm_hash(m1) == lm_hash(m2));
-    CHECK(!lm_equal(m1, m3));
-    CHECK(!lm_equal(m1, m4));
+    Value *a_then_b = map_of(2, (Value *[]){key_a, one, key_b, two});
+    Value *b_then_a = map_of(2, (Value *[]){key_b, two, key_a, one});
+    Value *other_values = map_of(2, (Value *[]){key_a, one, key_b, one});
+    Value *other_keys = map_of(2, (Value *[]){key_a, one, key_c, two});
+    CHECK(lm_equal(a_then_b, b_then_a));
+    CHECK(lm_hash(a_then_b) == lm_hash(b_then_a));
+    CHECK(!lm_equal(a_then_b, other_values));
+    CHECK(!lm_equal(a_then_b, other_keys));
 
     /* maps as keys of maps */
-    Value *outer1 = map_of(1, (Value *[]){m1, one});
-    Value *found = lm_map_get(outer1, m2);
-    CHECK(found == one);
-    Value *all[] = {m1, m2, m3, m4, outer1};
-    for (size_t i = 0; i < sizeof all / sizeof all[0]; i++) lm_release(all[i]);
+    Value *outer = map_of(1, (Value *[]){a_then_b, one});
+    CHECK(lm_map_get(outer, b_then_a) == one);
+    RELEASE_ALL(a_then_b, b_then_a, other_values, other_keys, outer);
 }
 
 static void t_hash_consistent(void) {
-    Value *a = INTS(1, 2, 3), *b = INTS(1, 2, 3);
-    CHECK(lm_hash(a) == lm_hash(b));
-    Value *s1 = lm_string_cstr("x"), *s2 = lm_string_cstr("x");
-    CHECK(lm_hash(s1) == lm_hash(s2));
-    Value *i1 = lm_integer(1LL << 50), *i2 = lm_integer(1LL << 50);
-    CHECK(lm_hash(i1) == lm_hash(i2));
-    Value *all[] = {a, b, s1, s2, i1, i2};
-    for (size_t i = 0; i < sizeof all / sizeof all[0]; i++) lm_release(all[i]);
+    Value *list = INTEGERS(1, 2, 3), *other_list = INTEGERS(1, 2, 3);
+    CHECK(lm_hash(list) == lm_hash(other_list));
+    Value *string = lm_string_cstr("x"), *other_string = lm_string_cstr("x");
+    CHECK(lm_hash(string) == lm_hash(other_string));
+    Value *large = lm_integer(1LL << 50), *other_large = lm_integer(1LL << 50);
+    CHECK(lm_hash(large) == lm_hash(other_large));
+    RELEASE_ALL(list, other_list, string, other_string, large, other_large);
 }
 
 const TestSuite value_suite = {"value", (const TestCase[]){
     {"singletons", t_singletons},
     {"integers", t_integers},
-    {"reference counting", t_refcounting},
+    {"reference counting", t_reference_counting},
     {"strings count code points", t_strings},
     {"symbols and keywords are interned", t_interning},
     {"generated symbols are fresh and counted", t_generated_symbols},

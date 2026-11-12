@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-This repository specifies **lisp-min**, an immutable Lisp (core + standard library v0.1.0), and plans an interpreter for it in **C23**. Right now it holds only the spec and the plan. No source code, Makefile or README exists yet. Build the implementation by following `IMPLEMENTATION-PLAN.md` phase by phase. Each phase ends with its tests passing.
+This repository specifies **lisp-min**, an immutable Lisp (core + standard library v0.1.0), and implements an interpreter for it in **C23**, following `IMPLEMENTATION-PLAN.md` phase by phase. Each phase ends with its tests passing and one commit. Phases 1 (values, buffer, utf8) and 2 (reader, positions, printer, conformance runner) are done. Evaluation (phase 3) is not written yet, so the conformance runner reports `eval` cases as skipped.
 
 | File | Role |
 | --- | --- |
@@ -17,17 +17,26 @@ This repository specifies **lisp-min**, an immutable Lisp (core + standard libra
 
 The specs and the conformance files are the only source of truth. When the prose and a conformance case disagree, or the prose is silent, the case wins. Core §12.4 lists behaviors that only the tests fix, such as `first`/`rest` of `()` → `:wrong-type`.
 
-## Commands (planned, per IMPLEMENTATION-PLAN.md)
+## Commands
 
 ```bash
 make               # build (C23, -Wall -Wextra -Wpedantic -Werror)
 make test          # unit tests + both conformance suites; must pass with zero leaks
 make unit          # unit tests only
 make conformance   # both conformance suites
-make asan          # build with ASan + UBSan, then run `make test`
+make asan          # rebuild in build/asan with ASan + UBSan and run `make test` there
+./build/unit-tests -k reader/strings --no-fork   # one unit test, in-process for a debugger
+./build/conformance -v -k read-error conformance.json
 ```
 
-Both test runners take `-k TEXT` to filter tests or cases by name or id, and `-v` to list each one. The unit runner forks one process per test; pass `--no-fork` to debug a single test. CLI: `lisp-min file.lisp` runs a file, `lisp-min` alone starts the REPL, and `--no-stdlib` skips the stdlib. Exit codes are 0 for success, 1 for a read error or uncaught error, and 2 for bad arguments.
+Both test runners take `-k TEXT` to filter tests or cases by name or id (substring match), and `-v` to list each one. The unit runner forks one process per test; pass `--no-fork` to debug a single test. To add a unit suite, export a `TestSuite` from `tests/unit/<module>_test.c` and list it by hand in `tests/unit/test.c`. Make decides what to rebuild from timestamps, so after reverting a file within the same second, run `make clean` first.
+
+## Code style
+
+- Variable, parameter and field names are full words (`index`, `code_point`, `builder`, `environment`), never abbreviations (`i`, `cp`, `b`, `env`). The user asked for this.
+- Comments, messages and docs are in English.
+
+The planned CLI: `lisp-min file.lisp` runs a file, `lisp-min` alone starts the REPL, and `--no-stdlib` skips the stdlib. Exit codes are 0 for success, 1 for a read error or uncaught error, and 2 for bad arguments.
 
 ## Constraints that shape the code
 

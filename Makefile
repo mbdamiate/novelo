@@ -23,6 +23,9 @@ LIB_OBJ  := $(LIB_SRC:src/%.c=$(BUILD)/src/%.o)
 UNIT_SRC := $(wildcard tests/unit/*.c)
 UNIT_OBJ := $(UNIT_SRC:tests/unit/%.c=$(BUILD)/tests/unit/%.o)
 UNIT_BIN := $(BUILD)/unit-tests
+CONFORMANCE_SRC := $(wildcard tests/conformance/*.c)
+CONFORMANCE_OBJ := $(CONFORMANCE_SRC:tests/conformance/%.c=$(BUILD)/tests/conformance/%.o)
+CONFORMANCE_BIN := $(BUILD)/conformance
 
 .PHONY: all test unit conformance asan clean
 
@@ -33,9 +36,9 @@ test: unit conformance
 unit: $(UNIT_BIN)
 	./$(UNIT_BIN)
 
-# The conformance runner arrives in phase 2.
-conformance:
-	@echo "conformance: not built yet (phase 2)"
+conformance: $(CONFORMANCE_BIN)
+	./$(CONFORMANCE_BIN) conformance.json
+	./$(CONFORMANCE_BIN) --stdlib stdlib-conformance.json
 
 asan:
 	$(MAKE) test BUILD=build/asan SANITIZE=1
@@ -46,6 +49,9 @@ clean:
 $(UNIT_BIN): $(UNIT_OBJ) $(LIB_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
+$(CONFORMANCE_BIN): $(CONFORMANCE_OBJ) $(LIB_OBJ)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
 $(BUILD)/src/%.o: src/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -54,4 +60,8 @@ $(BUILD)/tests/unit/%.o: tests/unit/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -Isrc -c -o $@ $<
 
--include $(LIB_OBJ:.o=.d) $(UNIT_OBJ:.o=.d)
+$(BUILD)/tests/conformance/%.o: tests/conformance/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -Isrc -c -o $@ $<
+
+-include $(LIB_OBJ:.o=.d) $(UNIT_OBJ:.o=.d) $(CONFORMANCE_OBJ:.o=.d)
