@@ -1,0 +1,2070 @@
+{
+  "spec": "Core Specification — Immutable Lisp, version 0.1.0",
+  "format": {
+    "read": "Read 'input' (UTF-8). With 'equivalent': also read that text and compare the two datum sequences with equal?. With 'types': the sequence read has exactly these types, in order.",
+    "read-error": "Read 'input' (or the bytes of 'input_hex'). Reading MUST fail with the code 'error' at position [line, column].",
+    "read-positions": "Read 'input'. For each entry, 'path' indexes the sequence read and then list elements (0-based); the node found MUST be in the position table with 'position'.",
+    "eval": "Evaluate 'program' as a file (section 8.7), WITHOUT the standard library, with 'input' as standard input (empty if absent). Standard output MUST be exactly 'output'. With 'value': the program terminates normally, and the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
+  },
+  "cases": [
+    {
+      "id": "read-001",
+      "kind": "read",
+      "section": "4.1",
+      "input": "007",
+      "equivalent": "7"
+    },
+    {
+      "id": "read-002",
+      "kind": "read",
+      "section": "4.1",
+      "input": "9223372036854775807",
+      "types": [
+        "Integer"
+      ]
+    },
+    {
+      "id": "read-003",
+      "kind": "read",
+      "section": "4.1",
+      "input": "-9223372036854775808",
+      "types": [
+        "Integer"
+      ]
+    },
+    {
+      "id": "read-004",
+      "kind": "read",
+      "section": "4.6",
+      "input": "42 -7",
+      "types": [
+        "Integer",
+        "Integer"
+      ]
+    },
+    {
+      "id": "read-005",
+      "kind": "read",
+      "section": "4.6",
+      "input": "-x - ... &rest λ",
+      "types": [
+        "Symbol",
+        "Symbol",
+        "Symbol",
+        "Symbol",
+        "Symbol"
+      ]
+    },
+    {
+      "id": "read-006",
+      "kind": "read",
+      "section": "4.5",
+      "input": ":1 :a:b",
+      "types": [
+        "Keyword",
+        "Keyword"
+      ]
+    },
+    {
+      "id": "read-007",
+      "kind": "read",
+      "section": "4.4",
+      "input": "#true #false #void",
+      "types": [
+        "Boolean",
+        "Boolean",
+        "Void"
+      ]
+    },
+    {
+      "id": "read-008",
+      "kind": "read",
+      "section": "5.4",
+      "input": "' x",
+      "equivalent": "(quote x)"
+    },
+    {
+      "id": "read-009",
+      "kind": "read",
+      "section": "5.4",
+      "input": "`(a ,b ,@c)",
+      "equivalent": "(quasiquote (a (unquote b) (unquote-splicing c)))"
+    },
+    {
+      "id": "read-010",
+      "kind": "read",
+      "section": "3.3",
+      "input": "a,b",
+      "equivalent": "a (unquote b)"
+    },
+    {
+      "id": "read-011",
+      "kind": "read",
+      "section": "3.4",
+      "input": "(a ; comment\n b)",
+      "equivalent": "(a b)"
+    },
+    {
+      "id": "read-012",
+      "kind": "read",
+      "section": "5.1",
+      "input": "(1 (2) ())",
+      "types": [
+        "List"
+      ]
+    },
+    {
+      "id": "read-013",
+      "kind": "read",
+      "section": "2.3",
+      "input": "{:b 2 :a 1}",
+      "equivalent": "{:a 1 :b 2}"
+    },
+    {
+      "id": "read-014",
+      "kind": "read",
+      "section": "4.3",
+      "input": "\"a\nb\"",
+      "equivalent": "\"a\\nb\""
+    },
+    {
+      "id": "read-020",
+      "kind": "read",
+      "section": "4.3",
+      "input": "\"\\r\\u{41}\\u{000042}\\u{1f600}\\u{1F600}\\u{0}\"",
+      "equivalent": "\"\rAB😀😀\u0000\""
+    },
+    {
+      "id": "read-015",
+      "kind": "read",
+      "section": "4.3",
+      "input": "\"😀 é\"",
+      "types": [
+        "String"
+      ]
+    },
+    {
+      "id": "read-016",
+      "kind": "read",
+      "section": "3.1",
+      "input": "",
+      "equivalent": ""
+    },
+    {
+      "id": "read-017",
+      "kind": "read",
+      "section": "3.4",
+      "input": "  ; just a comment",
+      "equivalent": ""
+    },
+    {
+      "id": "read-018",
+      "kind": "read",
+      "section": "3.2",
+      "input": "﻿(a)",
+      "types": [
+        "Symbol",
+        "List"
+      ]
+    },
+    {
+      "id": "read-019",
+      "kind": "read",
+      "section": "5.6",
+      "input": "(((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((())))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+      "types": [
+        "List"
+      ]
+    },
+    {
+      "id": "read-error-001",
+      "kind": "read-error",
+      "section": "5.1",
+      "error": "unclosed-delimiter",
+      "position": [
+        1,
+        1
+      ],
+      "input": "(1 2"
+    },
+    {
+      "id": "read-error-002",
+      "kind": "read-error",
+      "section": "7.3",
+      "error": "unclosed-delimiter",
+      "position": [
+        1,
+        4
+      ],
+      "input": "(a (b"
+    },
+    {
+      "id": "read-error-003",
+      "kind": "read-error",
+      "section": "6.1",
+      "error": "unclosed-delimiter",
+      "position": [
+        2,
+        3
+      ],
+      "input": "(a\n  (b"
+    },
+    {
+      "id": "read-error-004",
+      "kind": "read-error",
+      "section": "5.1",
+      "error": "unexpected-delimiter",
+      "position": [
+        1,
+        1
+      ],
+      "input": ")"
+    },
+    {
+      "id": "read-error-005",
+      "kind": "read-error",
+      "section": "5.4",
+      "error": "unexpected-delimiter",
+      "position": [
+        1,
+        5
+      ],
+      "input": "(a ')"
+    },
+    {
+      "id": "read-error-006",
+      "kind": "read-error",
+      "section": "5.1",
+      "error": "mismatched-delimiter",
+      "position": [
+        1,
+        5
+      ],
+      "input": "(1 2}"
+    },
+    {
+      "id": "read-error-007",
+      "kind": "read-error",
+      "section": "6.1",
+      "error": "reserved-character",
+      "position": [
+        1,
+        4
+      ],
+      "input": "(λ ]"
+    },
+    {
+      "id": "read-error-008",
+      "kind": "read-error",
+      "section": "5.3",
+      "error": "reserved-character",
+      "position": [
+        1,
+        1
+      ],
+      "input": "[1 2]"
+    },
+    {
+      "id": "read-error-009",
+      "kind": "read-error",
+      "section": "5.4",
+      "error": "unexpected-eof",
+      "position": [
+        1,
+        2
+      ],
+      "input": "'"
+    },
+    {
+      "id": "read-error-010",
+      "kind": "read-error",
+      "section": "3.4",
+      "error": "unknown-dispatch",
+      "position": [
+        1,
+        1
+      ],
+      "input": "#;"
+    },
+    {
+      "id": "read-error-011",
+      "kind": "read-error",
+      "section": "3.4",
+      "error": "unknown-dispatch",
+      "position": [
+        1,
+        1
+      ],
+      "input": "#|"
+    },
+    {
+      "id": "read-error-012",
+      "kind": "read-error",
+      "section": "5.3",
+      "error": "unknown-dispatch",
+      "position": [
+        1,
+        1
+      ],
+      "input": "#{1}"
+    },
+    {
+      "id": "read-error-013",
+      "kind": "read-error",
+      "section": "4.3",
+      "error": "unterminated-string",
+      "position": [
+        1,
+        1
+      ],
+      "input": "\"abc"
+    },
+    {
+      "id": "read-error-014",
+      "kind": "read-error",
+      "section": "7.3",
+      "error": "unterminated-string",
+      "position": [
+        1,
+        10
+      ],
+      "input": "{:a 1 :a \"x}"
+    },
+    {
+      "id": "read-error-015",
+      "kind": "read-error",
+      "section": "4.3",
+      "error": "invalid-escape",
+      "position": [
+        1,
+        2
+      ],
+      "input": "\"\\q\""
+    },
+    {
+      "id": "read-error-016",
+      "kind": "read-error",
+      "section": "4.3",
+      "error": "invalid-escape",
+      "position": [
+        1,
+        2
+      ],
+      "input": "\"\\u{D800}\""
+    },
+    {
+      "id": "read-error-032",
+      "kind": "read-error",
+      "section": "4.3",
+      "error": "invalid-escape",
+      "position": [
+        1,
+        2
+      ],
+      "input": "\"\\u{110000}\""
+    },
+    {
+      "id": "read-error-033",
+      "kind": "read-error",
+      "section": "4.3",
+      "error": "invalid-escape",
+      "position": [
+        1,
+        2
+      ],
+      "input": "\"\\u{}\""
+    },
+    {
+      "id": "read-error-034",
+      "kind": "read-error",
+      "section": "4.3",
+      "error": "invalid-escape",
+      "position": [
+        1,
+        2
+      ],
+      "input": "\"\\u{1234567}\""
+    },
+    {
+      "id": "read-error-035",
+      "kind": "read-error",
+      "section": "4.3",
+      "error": "invalid-escape",
+      "position": [
+        1,
+        2
+      ],
+      "input": "\"\\u41\""
+    },
+    {
+      "id": "read-error-036",
+      "kind": "read-error",
+      "section": "4.3",
+      "error": "invalid-escape",
+      "position": [
+        1,
+        4
+      ],
+      "input": "\"a \\u{4G}\""
+    },
+    {
+      "id": "read-error-037",
+      "kind": "read-error",
+      "section": "4.3",
+      "error": "unterminated-string",
+      "position": [
+        1,
+        1
+      ],
+      "input": "\"\\u{41"
+    },
+    {
+      "id": "read-error-017",
+      "kind": "read-error",
+      "section": "4.1",
+      "error": "integer-overflow",
+      "position": [
+        1,
+        1
+      ],
+      "input": "9223372036854775808"
+    },
+    {
+      "id": "read-error-018",
+      "kind": "read-error",
+      "section": "4.1",
+      "error": "integer-overflow",
+      "position": [
+        1,
+        1
+      ],
+      "input": "-9223372036854775809"
+    },
+    {
+      "id": "read-error-019",
+      "kind": "read-error",
+      "section": "4.2",
+      "error": "invalid-number",
+      "position": [
+        1,
+        1
+      ],
+      "input": "3.14"
+    },
+    {
+      "id": "read-error-020",
+      "kind": "read-error",
+      "section": "4.2",
+      "error": "invalid-number",
+      "position": [
+        1,
+        4
+      ],
+      "input": "(x 1e3)"
+    },
+    {
+      "id": "read-error-021",
+      "kind": "read-error",
+      "section": "4.6",
+      "error": "invalid-number",
+      "position": [
+        1,
+        4
+      ],
+      "input": "(x 1+)"
+    },
+    {
+      "id": "read-error-022",
+      "kind": "read-error",
+      "section": "4.6",
+      "error": "invalid-number",
+      "position": [
+        1,
+        1
+      ],
+      "input": "+5"
+    },
+    {
+      "id": "read-error-023",
+      "kind": "read-error",
+      "section": "4.6",
+      "error": "dotted-pair",
+      "position": [
+        1,
+        4
+      ],
+      "input": "(a . b)"
+    },
+    {
+      "id": "read-error-024",
+      "kind": "read-error",
+      "section": "4.5",
+      "error": "empty-keyword",
+      "position": [
+        1,
+        1
+      ],
+      "input": ":"
+    },
+    {
+      "id": "read-error-025",
+      "kind": "read-error",
+      "section": "4.4",
+      "error": "unknown-dispatch",
+      "position": [
+        1,
+        1
+      ],
+      "input": "#t"
+    },
+    {
+      "id": "read-error-026",
+      "kind": "read-error",
+      "section": "10",
+      "error": "unknown-dispatch",
+      "position": [
+        1,
+        1
+      ],
+      "input": "#<function>"
+    },
+    {
+      "id": "read-error-027",
+      "kind": "read-error",
+      "section": "5.2",
+      "error": "odd-map",
+      "position": [
+        1,
+        1
+      ],
+      "input": "{:a 1 :b}"
+    },
+    {
+      "id": "read-error-028",
+      "kind": "read-error",
+      "section": "5.2",
+      "error": "duplicate-key",
+      "position": [
+        1,
+        1
+      ],
+      "input": "{:a 1 :a 2}"
+    },
+    {
+      "id": "read-error-029",
+      "kind": "read-error",
+      "section": "5.6",
+      "error": "nesting-too-deep",
+      "position": [
+        1,
+        1001
+      ],
+      "input": "((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((("
+    },
+    {
+      "id": "read-error-030",
+      "kind": "read-error",
+      "section": "3.2",
+      "error": "invalid-utf8",
+      "position": [
+        1,
+        1
+      ],
+      "input_hex": "ff"
+    },
+    {
+      "id": "read-error-031",
+      "kind": "read-error",
+      "section": "3.2",
+      "error": "invalid-utf8",
+      "position": [
+        1,
+        2
+      ],
+      "input_hex": "61c3"
+    },
+    {
+      "id": "read-position-001",
+      "kind": "read-positions",
+      "section": "6.2",
+      "input": "(define x\n  {:a 1})",
+      "positions": [
+        {
+          "path": [
+            0
+          ],
+          "position": [
+            1,
+            1
+          ]
+        },
+        {
+          "path": [
+            0,
+            2
+          ],
+          "position": [
+            2,
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "id": "read-position-002",
+      "kind": "read-positions",
+      "section": "6.2",
+      "input": "(a 'b)",
+      "positions": [
+        {
+          "path": [
+            0,
+            1
+          ],
+          "position": [
+            1,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "eval-001",
+      "kind": "eval",
+      "section": "8.1",
+      "program": "42",
+      "value": "42",
+      "output": ""
+    },
+    {
+      "id": "eval-002",
+      "kind": "eval",
+      "section": "8.1",
+      "program": ":k",
+      "value": ":k",
+      "output": ""
+    },
+    {
+      "id": "eval-003",
+      "kind": "eval",
+      "section": "8.1",
+      "program": "()",
+      "value": "()",
+      "output": ""
+    },
+    {
+      "id": "eval-004",
+      "kind": "eval",
+      "section": "8.1",
+      "program": "(define x 2) {:a x :b (+ x 1)}",
+      "value": "{:a 2 :b 3}",
+      "output": ""
+    },
+    {
+      "id": "eval-005",
+      "kind": "eval",
+      "section": "8.1",
+      "program": "(define k :a) {k 1}",
+      "value": "{:a 1}",
+      "output": ""
+    },
+    {
+      "id": "eval-006",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(define a :x) (define b :x) {a 1 b 2}",
+      "error": ":duplicate-key",
+      "output": ""
+    },
+    {
+      "id": "eval-007",
+      "kind": "eval",
+      "section": "8.1",
+      "program": "undefined-name",
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "eval-008",
+      "kind": "eval",
+      "section": "8.1",
+      "program": "(1 2)",
+      "error": ":not-a-function",
+      "output": ""
+    },
+    {
+      "id": "eval-009",
+      "kind": "eval",
+      "section": "8.1",
+      "program": "((lambda (x) x))",
+      "error": ":wrong-arguments",
+      "output": ""
+    },
+    {
+      "id": "eval-010",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "'(1 2)",
+      "value": "(1 2)",
+      "output": ""
+    },
+    {
+      "id": "eval-011",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(quote {:a x})",
+      "value": "{:a x}",
+      "output": ""
+    },
+    {
+      "id": "eval-020",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(if #true 1 otherwise 2)",
+      "value": "1",
+      "output": ""
+    },
+    {
+      "id": "eval-021",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(if #false 1 otherwise 2)",
+      "value": "2",
+      "output": ""
+    },
+    {
+      "id": "eval-022",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(list (if () 1 otherwise 2) (if 0 1 otherwise 2) (if \"\" 1 otherwise 2) (if #void 1 otherwise 2))",
+      "value": "(1 1 1 1)",
+      "output": ""
+    },
+    {
+      "id": "eval-023",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(if #false 1)",
+      "value": "#void",
+      "output": ""
+    },
+    {
+      "id": "eval-024",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(if #true 1 2)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-025",
+      "kind": "eval",
+      "section": "11",
+      "program": "(define otherwise 5) otherwise",
+      "value": "5",
+      "output": ""
+    },
+    {
+      "id": "eval-030",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "((lambda (x y) (+ x y)) 1 2)",
+      "value": "3",
+      "output": ""
+    },
+    {
+      "id": "eval-031",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "((lambda (x &rest more) more) 1 2 3)",
+      "value": "(2 3)",
+      "output": ""
+    },
+    {
+      "id": "eval-032",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "((lambda (&rest all) all))",
+      "value": "()",
+      "output": ""
+    },
+    {
+      "id": "eval-033",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "((lambda () 1 2 3))",
+      "value": "3",
+      "output": ""
+    },
+    {
+      "id": "eval-034",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(define fact (lambda (n) (if (= n 0) 1 otherwise (* n (fact (- n 1)))))) (fact 10)",
+      "value": "3628800",
+      "output": ""
+    },
+    {
+      "id": "eval-035",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(lambda f (x) x)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-036",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(define make-adder (lambda (n) (lambda (x) (+ x n)))) ((make-adder 10) 5)",
+      "value": "15",
+      "output": ""
+    },
+    {
+      "id": "eval-221",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(define x :global) (define g (lambda () x)) (define f (lambda (x) (g))) (define h (lambda (x) (lambda () x))) (list (f :caller) ((h :captured)))",
+      "value": "(:global :captured)",
+      "output": ""
+    },
+    {
+      "id": "eval-222",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(define g (lambda () y)) (define f (lambda (y) (g))) (f 1)",
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "eval-223",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(define x :global) (list ((lambda (x) ((lambda (x) x) :inner)) :outer) ((lambda (x) ((lambda (y) x) :inner)) :outer) ((lambda (y) x) :param) (let ((x :let)) ((lambda () x))))",
+      "value": "(:inner :outer :global :let)",
+      "output": ""
+    },
+    {
+      "id": "eval-037",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(lambda (x x) x)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-040",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(define x 1) (define x 2) x",
+      "value": "2",
+      "output": ""
+    },
+    {
+      "id": "eval-041",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(define x 1)",
+      "value": "#void",
+      "output": ""
+    },
+    {
+      "id": "eval-042",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(define f (lambda () (g))) (define g (lambda () 7)) (f)",
+      "value": "7",
+      "output": ""
+    },
+    {
+      "id": "eval-043",
+      "kind": "eval",
+      "section": "8.7",
+      "program": "((lambda () (define y 1) y))",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-044",
+      "kind": "eval",
+      "section": "8.7",
+      "program": "(sequence (define a 1) (define b 2)) (+ a b)",
+      "value": "3",
+      "output": ""
+    },
+    {
+      "id": "eval-050",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(define-macro swap-args (lambda (f a b) (list f b a))) (swap-args - 1 10)",
+      "value": "9",
+      "output": ""
+    },
+    {
+      "id": "eval-051",
+      "kind": "eval",
+      "section": "8.7",
+      "program": "(m) (define-macro m (lambda () 1))",
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "eval-052",
+      "kind": "eval",
+      "section": "9",
+      "program": "(equal? (generate-symbol) (generate-symbol))",
+      "value": "#false",
+      "output": ""
+    },
+    {
+      "id": "eval-053",
+      "kind": "eval",
+      "section": "8.7",
+      "program": "(define-macro two-defs (lambda () `(sequence (define p 1) (define q 2)))) (two-defs) (+ p q)",
+      "value": "3",
+      "output": ""
+    },
+    {
+      "id": "eval-054",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(define-macro one (lambda () 1)) (define-macro also-one (lambda () '(one))) (also-one)",
+      "value": "1",
+      "output": ""
+    },
+    {
+      "id": "eval-060",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "((lambda (x) (declare (x Integer)) x) 5)",
+      "value": "5",
+      "output": ""
+    },
+    {
+      "id": "eval-061",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(declare-type f (Function Integer Integer)) 1",
+      "value": "1",
+      "output": ""
+    },
+    {
+      "id": "eval-070",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(let ((x 1) (y (+ x 1))) (* x y))",
+      "value": "2",
+      "output": ""
+    },
+    {
+      "id": "eval-071",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(let ((x 1) (x 2)) x)",
+      "value": "2",
+      "output": ""
+    },
+    {
+      "id": "eval-072",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(let () 5)",
+      "value": "5",
+      "output": ""
+    },
+    {
+      "id": "eval-073",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(define x 10) (let ((x 1)) x) x",
+      "value": "10",
+      "output": ""
+    },
+    {
+      "id": "eval-080",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(sequence 1 2 3)",
+      "value": "3",
+      "output": ""
+    },
+    {
+      "id": "eval-081",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(sequence (display! \"a\") (display! \"b\"))",
+      "value": "#void",
+      "output": "ab"
+    },
+    {
+      "id": "eval-090",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(list (and) (or))",
+      "value": "(#true #false)",
+      "output": ""
+    },
+    {
+      "id": "eval-091",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(and 1 2 3)",
+      "value": "3",
+      "output": ""
+    },
+    {
+      "id": "eval-092",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(and 1 #false (error \"not evaluated\"))",
+      "value": "#false",
+      "output": ""
+    },
+    {
+      "id": "eval-093",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(or #false 2 (error \"not evaluated\"))",
+      "value": "2",
+      "output": ""
+    },
+    {
+      "id": "eval-094",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(or #false #false)",
+      "value": "#false",
+      "output": ""
+    },
+    {
+      "id": "eval-095",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(and () 0)",
+      "value": "0",
+      "output": ""
+    },
+    {
+      "id": "eval-096",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(define t 5) (or #false t)",
+      "value": "5",
+      "output": ""
+    },
+    {
+      "id": "eval-100",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(let ((x 1) (xs (list 2 3))) `(a ,x ,@xs))",
+      "value": "(a 1 2 3)",
+      "output": ""
+    },
+    {
+      "id": "eval-101",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "`(a `(b ,(c ,(+ 1 2))))",
+      "value": "(a (quasiquote (b (unquote (c 3)))))",
+      "output": ""
+    },
+    {
+      "id": "eval-102",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(unquote x)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-103",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "`(1 ,@2)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "eval-104",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(let ((k :a)) `{,k 1})",
+      "value": "{:a 1}",
+      "output": ""
+    },
+    {
+      "id": "eval-110",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(define loop (lambda (n) (if (= n 0) :done otherwise (loop (- n 1))))) (loop 1000000)",
+      "value": ":done",
+      "output": ""
+    },
+    {
+      "id": "eval-111",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(define f (lambda (n) (let ((m (- n 1))) (sequence (and #true (or #false (if (= m 0) :ok otherwise (f m)))))))) (f 1000000)",
+      "value": ":ok",
+      "output": ""
+    },
+    {
+      "id": "eval-112",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(define count-to (lambda (n acc) (if (= n 0) acc otherwise (count-to (- n 1) (+ acc 1))))) (count-to 1000000 0)",
+      "value": "1000000",
+      "output": ""
+    },
+    {
+      "id": "eval-113",
+      "kind": "eval",
+      "section": "8.6",
+      "program": "(define build (lambda (n acc) (if (= n 0) acc otherwise (build (- n 1) (prepend n acc))))) (count (build 1000000 ()))",
+      "value": "1000000",
+      "output": ""
+    },
+    {
+      "id": "eval-120",
+      "kind": "eval",
+      "section": "2.4",
+      "program": "(equal? 'foo 'foo)",
+      "value": "#true",
+      "output": ""
+    },
+    {
+      "id": "eval-121",
+      "kind": "eval",
+      "section": "2.4",
+      "program": "(equal? 'foo :foo)",
+      "value": "#false",
+      "output": ""
+    },
+    {
+      "id": "eval-122",
+      "kind": "eval",
+      "section": "2.4",
+      "program": "(equal? {:a (list 1 2) :b 2} {:b 2 :a (list 1 2)})",
+      "value": "#true",
+      "output": ""
+    },
+    {
+      "id": "eval-123",
+      "kind": "eval",
+      "section": "2.4",
+      "program": "(list (equal? \"a\" \"a\") (equal? (list 1) (list 1)) (equal? () ()))",
+      "value": "(#true #true #true)",
+      "output": ""
+    },
+    {
+      "id": "eval-124",
+      "kind": "eval",
+      "section": "2.4",
+      "program": "(= 1 :a)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "eval-125",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (= 1 1 1) (< 1 2 3) (< 1 3 2))",
+      "value": "(#true #true #false)",
+      "output": ""
+    },
+    {
+      "id": "eval-126",
+      "kind": "eval",
+      "section": "2.4",
+      "program": "(let ((f (lambda (x) x))) (equal? f f))",
+      "value": "#true",
+      "output": ""
+    },
+    {
+      "id": "eval-127",
+      "kind": "eval",
+      "section": "2.4",
+      "program": "(equal? (lambda (x) x) (lambda (x) x))",
+      "value": "#false",
+      "output": ""
+    },
+    {
+      "id": "eval-128",
+      "kind": "eval",
+      "section": "2.4",
+      "program": "(same? 1 1)",
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "eval-140",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (+) (*) (- 5) (* 2 3) (- 10 3 2))",
+      "value": "(0 1 -5 6 5)",
+      "output": ""
+    },
+    {
+      "id": "eval-141",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (quotient 7 2) (quotient -7 2) (remainder -7 2))",
+      "value": "(3 -3 -1)",
+      "output": ""
+    },
+    {
+      "id": "eval-142",
+      "kind": "eval",
+      "section": "9",
+      "program": "(quotient 1 0)",
+      "error": ":division-by-zero",
+      "output": ""
+    },
+    {
+      "id": "eval-143",
+      "kind": "eval",
+      "section": "9",
+      "program": "(remainder 1 0)",
+      "error": ":division-by-zero",
+      "output": ""
+    },
+    {
+      "id": "eval-144",
+      "kind": "eval",
+      "section": "9",
+      "program": "(+ 9223372036854775807 1)",
+      "error": ":integer-overflow",
+      "output": ""
+    },
+    {
+      "id": "eval-145",
+      "kind": "eval",
+      "section": "9",
+      "program": "(- -9223372036854775808 1)",
+      "error": ":integer-overflow",
+      "output": ""
+    },
+    {
+      "id": "eval-146",
+      "kind": "eval",
+      "section": "9",
+      "program": "(* 4611686018427387904 2)",
+      "error": ":integer-overflow",
+      "output": ""
+    },
+    {
+      "id": "eval-147",
+      "kind": "eval",
+      "section": "9",
+      "program": "(- -9223372036854775808)",
+      "error": ":integer-overflow",
+      "output": ""
+    },
+    {
+      "id": "eval-148",
+      "kind": "eval",
+      "section": "9",
+      "program": "(/ 4 2)",
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "eval-149",
+      "kind": "eval",
+      "section": "9",
+      "program": "(+ 1 \"a\")",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "eval-160",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (integer? 1) (string? \"a\") (symbol? 'a) (keyword? :a) (list? ()) (map? {}) (boolean? #false) (void? #void))",
+      "value": "(#true #true #true #true #true #true #true #true)",
+      "output": ""
+    },
+    {
+      "id": "eval-161",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (function? +) (function? (lambda () 1)) (function? :a))",
+      "value": "(#true #true #false)",
+      "output": ""
+    },
+    {
+      "id": "eval-170",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (list 1 2 3) (list))",
+      "value": "((1 2 3) ())",
+      "output": ""
+    },
+    {
+      "id": "eval-171",
+      "kind": "eval",
+      "section": "9",
+      "program": "(prepend 0 (list 1 2))",
+      "value": "(0 1 2)",
+      "output": ""
+    },
+    {
+      "id": "eval-172",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (first (list 1 2)) (rest (list 1 2)) (rest (list 1)))",
+      "value": "(1 (2) ())",
+      "output": ""
+    },
+    {
+      "id": "eval-173",
+      "kind": "eval",
+      "section": "9",
+      "program": "(first ())",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "eval-174",
+      "kind": "eval",
+      "section": "9",
+      "program": "(rest ())",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "eval-175",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (count (list 1 2 3)) (count \"λx\") (count {:a 1}) (empty? \"\") (empty? (list 1)) (empty? {}))",
+      "value": "(3 2 1 #true #false #true)",
+      "output": ""
+    },
+    {
+      "id": "eval-176",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (get {:a 1} :a) (get {:a 1} :b 0))",
+      "value": "(1 0)",
+      "output": ""
+    },
+    {
+      "id": "eval-177",
+      "kind": "eval",
+      "section": "9",
+      "program": "(get {:a 1} :b)",
+      "error": ":missing-key",
+      "output": ""
+    },
+    {
+      "id": "eval-178",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (contains? {:a 1} :a) (contains? {:a 1} :b))",
+      "value": "(#true #false)",
+      "output": ""
+    },
+    {
+      "id": "eval-225",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (keys {}) (keys {:a 1}) (count (keys {:a 1 :b 2 :c 3})) (let ((ks (keys {:a 1 :b 2}))) (or (equal? ks (list :a :b)) (equal? ks (list :b :a)))) (keys {(list 1 2) :x}))",
+      "value": "(() (:a) 3 #true ((1 2)))",
+      "output": ""
+    },
+    {
+      "id": "eval-226",
+      "kind": "eval",
+      "section": "9",
+      "program": "(define copy (lambda (m ks acc) (if (empty? ks) acc otherwise (copy m (rest ks) (associate acc (first ks) (get m (first ks))))))) (define m {:a 1 \"b\" (list 2) 3 {:c 4}}) (equal? (copy m (keys m) {}) m)",
+      "value": "#true",
+      "output": ""
+    },
+    {
+      "id": "eval-227",
+      "kind": "eval",
+      "section": "9",
+      "program": "(keys (list :a 1))",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "eval-179",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (associate {:a 1} :b 2) (associate {:a 1} :a 5) (dissociate {:a 1 :b 2} :a) (dissociate {:a 1} :z))",
+      "value": "({:a 1 :b 2} {:a 5} {:b 2} {:a 1})",
+      "output": ""
+    },
+    {
+      "id": "eval-180",
+      "kind": "eval",
+      "section": "2",
+      "program": "(define m {:a 1}) (associate m :b 2) m",
+      "value": "{:a 1}",
+      "output": ""
+    },
+    {
+      "id": "eval-190",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (concatenate \"a\" \"b\" \"c\") (concatenate))",
+      "value": "(\"abc\" \"\")",
+      "output": ""
+    },
+    {
+      "id": "eval-191",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (string-at \"abc\" 1) (string-at \"λé\" 1))",
+      "value": "(\"b\" \"é\")",
+      "output": ""
+    },
+    {
+      "id": "eval-192",
+      "kind": "eval",
+      "section": "9",
+      "program": "(string-at \"a\" 1)",
+      "error": ":index-out-of-range",
+      "output": ""
+    },
+    {
+      "id": "eval-193",
+      "kind": "eval",
+      "section": "9",
+      "program": "(substring \"hello\" 1 3)",
+      "value": "\"el\"",
+      "output": ""
+    },
+    {
+      "id": "eval-194",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (to-string 42) (to-string \"a\") (to-string :k))",
+      "value": "(\"42\" \"a\" \":k\")",
+      "output": ""
+    },
+    {
+      "id": "eval-195",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (string-to-symbol \"abc\") (equal? (string-to-symbol \"abc\") 'abc) (symbol-to-string 'abc))",
+      "value": "(abc #true \"abc\")",
+      "output": ""
+    },
+    {
+      "id": "eval-196",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (string-to-number \"42\") (string-to-number \"-7\") (string-to-number \"3.14\") (string-to-number \"abc\") (string-to-number \" 42\"))",
+      "value": "(42 -7 #void #void #void)",
+      "output": ""
+    },
+    {
+      "id": "eval-197",
+      "kind": "eval",
+      "section": "9",
+      "program": "(string-to-number \"99999999999999999999\")",
+      "error": ":integer-overflow",
+      "output": ""
+    },
+    {
+      "id": "eval-198",
+      "kind": "eval",
+      "section": "9",
+      "program": "(symbol? (generate-symbol))",
+      "value": "#true",
+      "output": ""
+    },
+    {
+      "id": "eval-199",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (apply + 1 2 (list 3 4)) (apply list (list)))",
+      "value": "(10 ())",
+      "output": ""
+    },
+    {
+      "id": "eval-210",
+      "kind": "eval",
+      "section": "10",
+      "program": "(display! \"olá\")",
+      "value": "#void",
+      "output": "olá"
+    },
+    {
+      "id": "eval-211",
+      "kind": "eval",
+      "section": "10",
+      "program": "(write! \"olá\")",
+      "value": "#void",
+      "output": "\"olá\""
+    },
+    {
+      "id": "eval-212",
+      "kind": "eval",
+      "section": "10",
+      "program": "(display! 42) (display! \" \") (write! :k) (display! \"\\n\")",
+      "value": "#void",
+      "output": "42 :k\n"
+    },
+    {
+      "id": "eval-213",
+      "kind": "eval",
+      "section": "10",
+      "program": "(write! (list 1 \"a\" :k {:b 2}))",
+      "value": "#void",
+      "output": "(1 \"a\" :k {:b 2})"
+    },
+    {
+      "id": "eval-214",
+      "kind": "eval",
+      "section": "10",
+      "program": "(write! \"a\\nb\\t\\\"c\\\"\\\\\")",
+      "value": "#void",
+      "output": "\"a\\nb\\t\\\"c\\\"\\\\\""
+    },
+    {
+      "id": "eval-215",
+      "kind": "eval",
+      "section": "10",
+      "program": "(write! \"\u0001\")",
+      "value": "#void",
+      "output": "\"\\u{1}\""
+    },
+    {
+      "id": "eval-228",
+      "kind": "eval",
+      "section": "10",
+      "program": "(write! \"\\r\\u{0}\\u{1F}\\u{7F}\\u{80}é\") (display! \"\\r\\u{1B}\")",
+      "value": "#void",
+      "output": "\"\\r\\u{0}\\u{1F}\\u{7F}é\"\r\u001b"
+    },
+    {
+      "id": "eval-216",
+      "kind": "eval",
+      "section": "10",
+      "program": "(write! (list (lambda (x) x) +))",
+      "value": "#void",
+      "output": "(#<function> #<function>)"
+    },
+    {
+      "id": "eval-217",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (read-line!) (read-line!) (read-line!))",
+      "value": "(\"line 1\" \"line 2\" #void)",
+      "output": "",
+      "input": "line 1\nline 2\n"
+    },
+    {
+      "id": "eval-218",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (read-line!) (read-line!))",
+      "value": "(\"a\" #void)",
+      "output": "",
+      "input": "a"
+    },
+    {
+      "id": "eval-224",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (read-line!) (read-line!) (read-line!) (read-line!))",
+      "input": "a\r\nb\rc\n\r",
+      "value": "(\"a\\r\" \"b\\rc\" \"\\r\" #void)",
+      "output": ""
+    },
+    {
+      "id": "eval-219",
+      "kind": "eval",
+      "section": "9",
+      "program": "(define r (display! \"x\")) (void? r)",
+      "value": "#true",
+      "output": "x"
+    },
+    {
+      "id": "eval-220",
+      "kind": "eval",
+      "section": "8.7",
+      "program": "(display! \"a\") (error \"x\") (display! \"b\")",
+      "error": ":error",
+      "output": "a"
+    },
+    {
+      "id": "catch-001",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(catch (lambda () (quotient 1 0)) (lambda (problem) (get problem :kind)))",
+      "value": ":division-by-zero",
+      "output": ""
+    },
+    {
+      "id": "catch-002",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(catch (lambda () 42) (lambda (problem) 0))",
+      "value": "42",
+      "output": ""
+    },
+    {
+      "id": "catch-003",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(catch (lambda () (error \"boom\" 1 2)) (lambda (p) (list (get p :kind) (get p :message) (get p :values))))",
+      "value": "(:error \"boom\" (1 2))",
+      "output": ""
+    },
+    {
+      "id": "catch-004",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(catch (lambda () (catch (lambda () (error \"x\")) (lambda (p) (raise p)))) (lambda (p) :outer))",
+      "value": ":outer",
+      "output": ""
+    },
+    {
+      "id": "catch-005",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(catch (lambda () (error \"a\")) (lambda (p) (error \"b\")))",
+      "error": ":error",
+      "output": ""
+    },
+    {
+      "id": "catch-006",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(catch (lambda () (catch (lambda () (error \"a\")) (lambda (p) (error \"b\")))) (lambda (p) (get p :message)))",
+      "value": "\"b\"",
+      "output": ""
+    },
+    {
+      "id": "catch-007",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(catch (lambda () (sequence (display! \"a\") (error \"x\") (display! \"b\"))) (lambda (p) :caught))",
+      "value": ":caught",
+      "output": "a"
+    },
+    {
+      "id": "catch-008",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(catch (lambda () undefined-thing) (lambda (p) (get p :kind)))",
+      "value": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "catch-009",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(catch (lambda () (+ 9223372036854775807 1)) (lambda (p) (get p :kind)))",
+      "value": ":integer-overflow",
+      "output": ""
+    },
+    {
+      "id": "catch-010",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(raise 5)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "catch-011",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(raise {:message \"no kind\"})",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "catch-012",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(raise {:kind :custom :message \"m\" :values ()})",
+      "error": ":custom",
+      "output": ""
+    },
+    {
+      "id": "catch-013",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(catch 1 (lambda (p) p))",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "catch-014",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(catch (lambda () (get {} :x)) (lambda (p) (get p :kind)))",
+      "value": ":missing-key",
+      "output": ""
+    },
+    {
+      "id": "catch-015",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define catch-kind (lambda (kind default thunk) (catch thunk (lambda (problem) (if (equal? (get problem :kind) kind) default otherwise (raise problem)))))) (list (catch-kind :division-by-zero 0 (lambda () (quotient 1 0))) (catch (lambda () (catch-kind :division-by-zero 0 (lambda () (first ())))) (lambda (p) (get p :kind))))",
+      "value": "(0 :wrong-type)",
+      "output": ""
+    },
+    {
+      "id": "callback-001",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define greet-user (lambda (io) ((get io :tell) \"Name? \") ((get io :tell) (concatenate \"Hello, \" ((get io :ask)) \"!\\n\")))) (greet-user {:ask (lambda () \"Ana\") :tell (lambda (text) text)})",
+      "value": "\"Hello, Ana!\\n\"",
+      "output": ""
+    },
+    {
+      "id": "callback-002",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define greet-user (lambda (io) ((get io :tell) (concatenate \"Hello, \" ((get io :ask)) \"!\\n\")))) (greet-user {:ask read-line! :tell display!})",
+      "value": "#void",
+      "output": "Hello, Ana!\n",
+      "input": "Ana\n"
+    },
+    {
+      "id": "callback-003",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define each-leaf (lambda (tree on-leaf after) (if (list? tree) (each-child tree on-leaf after) otherwise (on-leaf tree after)))) (define each-child (lambda (children on-leaf after) (if (empty? children) (after) otherwise (each-leaf (first children) on-leaf (lambda () (each-child (rest children) on-leaf after)))))) (each-leaf '(1 (2 (3 4)) 5) (lambda (leaf next) (if (> leaf 2) leaf otherwise (next))) (lambda () #void))",
+      "value": "3",
+      "output": ""
+    },
+    {
+      "id": "callback-004",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(define count-up (lambda (n limit done) (if (= n limit) (done n) otherwise (count-up (+ n 1) limit done)))) (count-up 0 1000000 (lambda (x) x))",
+      "value": "1000000",
+      "output": ""
+    },
+    {
+      "id": "naming-001",
+      "kind": "eval",
+      "section": "11",
+      "program": "(display \"x\")",
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "naming-002",
+      "kind": "eval",
+      "section": "11",
+      "program": "(read-line)",
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "naming-003",
+      "kind": "eval",
+      "section": "9",
+      "program": "(map (lambda (x) x) (list 1))",
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "include-001",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(include \"geo.lisp\") (area 2 3)",
+      "files": {
+        "geo.lisp": "(define area (lambda (w h) (* w h)))"
+      },
+      "value": "6",
+      "output": ""
+    },
+    {
+      "id": "include-002",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(display! \"1\") (include \"a.lisp\")",
+      "files": {
+        "a.lisp": "(display! \"a\")"
+      },
+      "value": "#void",
+      "output": "1a"
+    },
+    {
+      "id": "include-003",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(define area :mine) (include \"geo.lisp\" geo) (list area (geo/square-area 3) (geo/area 2 5))",
+      "files": {
+        "geo.lisp": "(define area (lambda (w h) (* w h)))\n(define square-area (lambda (s) (area s s)))"
+      },
+      "value": "(:mine 9 10)",
+      "output": ""
+    },
+    {
+      "id": "include-004",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(include \"geo.lisp\" geo) (area 2 3)",
+      "files": {
+        "geo.lisp": "(define area (lambda (w h) (* w h)))\n(define square-area (lambda (s) (area s s)))"
+      },
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "include-005",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(include \"parity.lisp\" p) (list (p/my-even? 10) (p/my-odd? 7) (p/my-even? 7))",
+      "files": {
+        "parity.lisp": "(define my-even? (lambda (n) (if (= n 0) #true otherwise (my-odd? (- n 1)))))\n(define my-odd? (lambda (n) (if (= n 0) #false otherwise (my-even? (- n 1)))))"
+      },
+      "value": "(#true #true #false)",
+      "output": ""
+    },
+    {
+      "id": "include-006",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(define factor 3) (include \"lib.lisp\" l) (list (l/scaled 2) (l/echo 5) l/x)",
+      "files": {
+        "lib.lisp": "(define scaled (lambda (x) (* x factor)))\n(define x 100)\n(define echo (lambda (x) x))"
+      },
+      "value": "(6 5 100)",
+      "output": ""
+    },
+    {
+      "id": "include-007",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(define base :main) (include \"lib.lisp\" l) (list base l/base)",
+      "files": {
+        "lib.lisp": "(define base (list base :lib))"
+      },
+      "value": "(:main (:main :lib))",
+      "output": ""
+    },
+    {
+      "id": "include-008",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(include \"lib.lisp\" g) (g/names)",
+      "files": {
+        "lib.lisp": "(define area 1)\n(define names (lambda () (list 'area (string-to-symbol \"area\"))))"
+      },
+      "value": "(area area)",
+      "output": ""
+    },
+    {
+      "id": "include-009",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(include \"lib.lisp\" m) (list m/four (m/twice 3))",
+      "files": {
+        "lib.lisp": "(define-macro twice (lambda (x) (list '+ x x)))\n(define four (twice 2))"
+      },
+      "value": "(4 6)",
+      "output": ""
+    },
+    {
+      "id": "include-010",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(include \"lib.lisp\" m) (m/sq 3)",
+      "files": {
+        "lib.lisp": "(define square (lambda (x) (* x x)))\n(define-macro sq (lambda (x) (list 'square x)))"
+      },
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "include-011",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(include \"lib.lisp\" m) (m/sq 3)",
+      "files": {
+        "lib.lisp": "(define square (lambda (x) (* x x)))\n(define-macro sq (lambda (x) (list 'm/square x)))"
+      },
+      "value": "9",
+      "output": ""
+    },
+    {
+      "id": "include-012",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(include \"lib.lisp\" m) (m/quoted (a b))",
+      "files": {
+        "lib.lisp": "(define wrap (lambda (x) (list 'quote x)))\n(define-macro quoted (lambda (x) (wrap x)))"
+      },
+      "value": "(a b)",
+      "output": ""
+    },
+    {
+      "id": "include-013",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(include \"lib/a.lisp\") (list (a) top)",
+      "files": {
+        "lib/a.lisp": "(include \"b.lisp\")\n(include \"../top.lisp\")\n(define a (lambda () (b)))",
+        "lib/b.lisp": "(define b (lambda () :lib))",
+        "b.lisp": "(define b (lambda () :root))",
+        "top.lisp": "(define top :top)"
+      },
+      "value": "(:lib :top)",
+      "output": ""
+    },
+    {
+      "id": "include-014",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(include \"geo.lisp\" geo) (list (geo/tidy) (geo/u/clean))",
+      "files": {
+        "util.lisp": "(define clean (lambda () :clean))",
+        "geo.lisp": "(include \"util.lisp\" u)\n(define tidy (lambda () (u/clean)))"
+      },
+      "value": "(:clean :clean)",
+      "output": ""
+    },
+    {
+      "id": "include-015",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(include \"geo.lisp\" geo) (list (geo/tidy) (geo/clean))",
+      "files": {
+        "util.lisp": "(define clean (lambda () :clean))",
+        "geo.lisp": "(include \"util.lisp\")\n(define tidy (lambda () (clean)))"
+      },
+      "value": "(:clean :clean)",
+      "output": ""
+    },
+    {
+      "id": "include-016",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(include \"u.lisp\") (include \"./u.lisp\") (include \"lib/../u.lisp\") (include \"u.lisp\" p) (include \"u.lisp\" p)",
+      "files": {
+        "u.lisp": "(display! \"u\")"
+      },
+      "value": "#void",
+      "output": "uu"
+    },
+    {
+      "id": "include-017",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(include \"util.lisp\" u) (include \"geo.lisp\" geo) (list (u/clean) (geo/u/clean))",
+      "files": {
+        "util.lisp": "(display! \"u\")\n(define clean (lambda () :clean))",
+        "geo.lisp": "(include \"util.lisp\" u)"
+      },
+      "value": "(:clean :clean)",
+      "output": "uu"
+    },
+    {
+      "id": "include-018",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(include \"a.lisp\" a)",
+      "files": {
+        "a.lisp": "(include \"b.lisp\" b)",
+        "b.lisp": "(include \"a.lisp\" a)"
+      },
+      "error": ":include-error",
+      "output": ""
+    },
+    {
+      "id": "include-019",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(display! \"x\") (include \"main.lisp\")",
+      "error": ":include-error",
+      "output": "x"
+    },
+    {
+      "id": "include-020",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(display! \"a\") (include \"missing.lisp\")",
+      "error": ":include-error",
+      "output": "a"
+    },
+    {
+      "id": "include-021",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(display! \"a\") (include \"bad.lisp\")",
+      "files": {
+        "bad.lisp": "(define x 1)\n(define y"
+      },
+      "error": ":include-error",
+      "output": "a"
+    },
+    {
+      "id": "include-022",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(include \"bad.lisp\")",
+      "files": {
+        "bad.lisp": "(first ())"
+      },
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "include-023",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(define f (lambda () (include \"a.lisp\")))",
+      "files": {
+        "a.lisp": "(define a 1)"
+      },
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "include-024",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(include geo.lisp)",
+      "files": {
+        "geo.lisp": "(define area (lambda (w h) (* w h)))\n(define square-area (lambda (s) (area s s)))"
+      },
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "include-025",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(include \"geo.lisp\" :geo)",
+      "files": {
+        "geo.lisp": "(define area (lambda (w h) (* w h)))\n(define square-area (lambda (s) (area s s)))"
+      },
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "include-026",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(define-macro use (lambda (p) (list 'sequence (list 'include \"geo.lisp\" p)))) (use g) (g/area 2 2)",
+      "files": {
+        "geo.lisp": "(define area (lambda (w h) (* w h)))\n(define square-area (lambda (s) (area s s)))"
+      },
+      "value": "4",
+      "output": ""
+    },
+    {
+      "id": "include-027",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(define-macro swap (lambda (a b) (list b a))) (include \"lib.lisp\" l) l/v",
+      "files": {
+        "lib.lisp": "(define v (swap 1 -))"
+      },
+      "value": "-1",
+      "output": ""
+    }
+  ]
+}

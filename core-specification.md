@@ -1,0 +1,694 @@
+# Core Specification — Immutable Lisp
+
+Nov 10, 2026 · @Matheus Damiate
+
+## 1. Overview
+
+This specification defines the **minimal core** of a useful, immutable Lisp: reader, evaluator, primitives and printing. For the same input, every implementation, in any language, MUST produce the same datums, the same values and the same errors.
+
+A **datum** is a complete expression already converted into a value of the language itself, before it is evaluated. The text `(if (> x 0) x otherwise 0)` becomes an ordinary list of symbols and integers. There is no separate syntax tree: code is data.
+
+The core is a three-stage pipeline:
+
+1. Reader: text to datums (sections 2 to 7).
+2. Expansion: macros and derived forms rewritten into the five special forms (section 8).
+3. Evaluation: special forms, primitives and printing (sections 8 to 10).
+
+**Out of scope.** The standard library, with functions such as `map`, `filter` and `sort`, has its own specification. The extensions already planned, such as multi-pair `if`, sum types and gradual typing, belong to the full specification. The core only reserves the names they use (section 8.2).
+
+**Normative terms.** MUST indicates a mandatory requirement. MUST NOT indicates a prohibition. MAY indicates implementation freedom that does not affect observable behavior.
+
+**Version:** core 0.1.0, draft.
+
+## 2. Data model
+
+The reader produces values of eight types, and evaluation adds a ninth, Function, for closures and primitives, which the reader never produces. All of them are immutable: no operation of the language changes a value after it is created.
+
+| Type | Written example | Content |
+| --- | --- | --- |
+| Boolean | `#true`, `#false` | one of two values |
+| Void | `#void` | single value, result of side effects |
+| Integer | `42`, `-7` | signed 64-bit integer |
+| String | `"hello"` | sequence of Unicode code points; there is no character type (2.5) |
+| Symbol | `define`, `&rest` | interned name |
+| Keyword | `:name` | interned name, a type distinct from Symbol |
+| List | `(a b)`, `()` | proper linked list; `()` is the empty list |
+| Map | `{:a 1}` | key-value pairs, unique keys |
+| Function | no written form | closure created by `lambda`, or a primitive |
+
+### 2.1 Proper lists
+
+Every list is proper: the rest of a non-empty list is always a list. Dotted pairs do not exist. The empty list `()` is a value of type List and MUST NOT be confused with `#false` or with `#void`.
+
+### 2.2 Interning
+
+Two symbols with the same name MUST be the same object, comparable by identity. The same holds for keywords. A symbol and a keyword with the same name are different values. The implementation MAY share the storage of the name between them. The only exception is symbols created by `generate-symbol` (section 9), which are not interned.
+
+### 2.3 Order in maps
+
+List preserves reading order. The iteration order of Map, which `keys` (section 9) exposes, is unspecified: the implementation MAY use hash-based persistent structures. For this reason, the conformance tests compare maps by equality, not by printed text.
+
+### 2.4 Equality
+
+The language has two equality predicates. Maps and the conformance tests use `equal?`.
+
+| Predicate | Question | `(… 1 1)` | `(… (list 1) (list 1))` |
+| --- | --- | --- | --- |
+| `equal?` | same type and same content? | `#true` | `#true` |
+| `=` | integers with the same value? | `#true` | error: not integers |
+
+### 2.4.1 `equal?`
+
+`equal?` requires the same type: values of different types are never equal, so `foo` and `:foo`, or `"1"` and `1`, are different. Within each type:
+
+- **Boolean, Void, Integer:** the same value.
+- **String:** the same sequence of code points.
+- **Symbol, Keyword:** identity (because of interning).
+- **List:** same length and `equal?` elements, in order.
+- **Map:** same number of pairs and, for each key of one, an `equal?` key in the other with an `equal?` value, regardless of order.
+- **Function:** identity: a function is only `equal?` to itself.
+
+### 2.4.2 `=`
+
+`=` accepts only Integer, with two or more arguments: `(= a b c)` is true when all of them are equal. An argument that is not an Integer is an error. Compared to `equal?`, `=` is meant for chained numeric comparisons and catches accidental use with other types.
+
+### 2.5 Text and numbers
+
+**There is no character type.** A character is a String of length 1: `(string-at "abc" 0)` returns `"a"`. String lengths and indices count code points.
+
+**There are only integers.** The core has no floating-point numbers. A literal such as `3.14` is a read error (`invalid-number`, 4.2), and division is done with `quotient` and `remainder`.
+
+## 3. Lexical syntax
+
+Source text is a sequence of datums separated by "atmosphere": whitespace and comments. The grammar below uses ISO 14977 EBNF; sections 4 and 5 detail each production.
+
+### 3.1 Grammar
+
+```
+program       = atmosphere , { datum , atmosphere } ;
+
+atmosphere    = { whitespace | line-comment } ;
+whitespace    = U+0020 | U+0009 | U+000A | U+000D | U+000C ;
+line-comment  = ";" , { any code point except U+000A } ;
+
+datum         = list | map | prefixed | string | hash-literal | keyword | token ;
+
+list          = "(" , atmosphere , { datum , atmosphere } , ")" ;
+map           = "{" , atmosphere , { datum , atmosphere } , "}" ;  (* even count *)
+prefixed      = ( "'" | "`" | ",@" | "," ) , atmosphere , datum ;
+
+hash-literal  = ( "#true" | "#false" | "#void" ) ;  (* followed by a delimiter *)
+keyword       = ":" , constituent , { constituent } ;
+token         = constituent , { constituent } ;      (* integer or symbol: 4.6 *)
+
+string        = '"' , { string-char | escape } , '"' ;
+string-char   = any code point except '"' and "\" ;
+escape        = "\n" | "\t" | '\"' | "\\" ;
+
+delimiter     = whitespace | "(" | ")" | "{" | "}" | reserved
+              | '"' | ";" | "'" | "`" | "," | end of input ;
+reserved      = "[" | "]" ;                           (* always an error: 5.3 *)
+constituent   = any code point that is not a delimiter ;
+```
+
+### 3.2 Encoding
+
+The input MUST be valid UTF-8. An invalid byte sequence MUST produce the `invalid-utf8` error at the position of the first invalid byte. U+FEFF (BOM) has no special treatment: it is a constituent like any other.
+
+### 3.3 Whitespace
+
+Only the five ASCII code points of the `whitespace` production are whitespace. Other Unicode spaces, such as U+00A0, are constituents and may be part of symbols. The comma is NOT whitespace: it is the `unquote` prefix, so `a,b` is two datums, `a` and `(unquote b)`.
+
+### 3.4 Comments
+
+`;` comments until the end of the line. It is the only comment form in the core: `#|` and `#;` have no meaning and produce `unknown-dispatch` (5.5). This leaves room to add block or datum comments in the future without breaking existing programs.
+
+### 3.5 Delimiters
+
+A token ends at the first delimiter. `#` and `:` are NOT delimiters: `a#b` and `a:b` are valid symbols. At the **start** of a datum, however, a `#` begins a `hash-literal`, and a `:` begins a `keyword`.
+
+## 4. Literals
+
+A token becomes a number, a symbol or an error according to the classification in section 4.6. Strings, keywords and `#` literals have their own syntax.
+
+### 4.1 Integers
+
+```
+integer = [ "-" ] , digit , { digit } ;
+```
+
+The valid range is −2^63 to 2^63 − 1. A literal outside it MUST produce the `integer-overflow` error at the position of the start of the token, including `-9223372036854775809`. Leading zeros are allowed: `007` is `7`. There is no `+` sign.
+
+### 4.2 Non-integer numbers
+
+The core has no floating-point numbers. Tokens such as `3.14`, `1e3` and `.5` are numeric under the rule in section 4.6 and, since they do not match `integer`, produce `invalid-number`. This reserves the syntax for a possible future extension.
+
+### 4.3 Strings
+
+A string runs from `"` to the next unescaped `"`. Line breaks and any Unicode character may be written directly inside it. The valid escapes are:
+
+| Escape | Result |
+| --- | --- |
+| `\n` | U+000A |
+| `\t` | U+0009 |
+| `\r` | U+000D |
+| `\"` | double quote |
+| `\\` | backslash |
+| `\u{H…}` | the code point with the hexadecimal value `H…` |
+
+In `\u{H…}`, the escape runs from the backslash to the first `}`. Between the braces there MUST be from 1 to 6 hexadecimal digits, upper or lower case, so `\u{41}`, `\u{000041}` and `\u{1f600}` are valid. The value MUST be a Unicode scalar value: at most U+10FFFF and outside the surrogates U+D800 to U+DFFF. A `\u` not followed by `{`, a character other than a hexadecimal digit before the `}`, no digits, more than 6 digits or a value that is not a scalar value MUST produce `invalid-escape`.
+
+Any other character after `\` MUST produce `invalid-escape`. Every `invalid-escape` is reported at the position of the backslash. End of input before the closing `"`, including in the middle of an escape, produces `unterminated-string`, at the position of the opening quote.
+
+### 4.4 Booleans and void
+
+`#true`, `#false` and `#void` are read exactly like this, followed by a delimiter. Short forms such as `#t` and `#f` are NOT accepted and produce `unknown-dispatch`.
+
+### 4.5 Keywords
+
+A keyword is `:` followed by one or more constituents, which form the name: `:name`, `:a:b` and `:1` are valid. `:` alone MUST produce `empty-keyword`.
+
+### 4.6 Token classification
+
+A token is **numeric** if, after removing a leading `+` or `-`, it starts with a digit or with `.` followed by a digit. Classification follows this order:
+
+1. Matches `integer`: Integer.
+2. Is numeric but does not match `integer`: `invalid-number` error.
+3. Is exactly `.`: `dotted-pair` error.
+4. Any other case: Symbol.
+
+Rule 2 exists so that typos in numbers do not silently become symbols, and to reserve the syntax for non-integer numbers (4.2).
+
+| Token | Result |
+| --- | --- |
+| `42`, `-7`, `007` | Integer |
+| `-`, `-x`, `...`, `&rest`, `empty?`, `λ` | Symbol |
+| `3.14`, `1e3`, `1+`, `5.`, `.5`, `+5`, `-.5`, `12abc` | `invalid-number` error |
+| `.` | `dotted-pair` error |
+
+## 5. Collections and shorthands
+
+Two collections have their own delimiters, four prefixes expand into two-element lists, and square brackets are reserved.
+
+### 5.1 Collection delimiters
+
+| Collection | Opens | Closes |
+| --- | --- | --- |
+| List | `(` | `)` |
+| Map | `{` | `}` |
+
+Three errors apply to all of them:
+
+- End of input before the closer: `unclosed-delimiter`, at the position of the opener.
+- A closer of another kind, as in `(1 2}`: `mismatched-delimiter`, at the position of the wrong closer.
+- A closer with no matching opener, such as `)` at top level: `unexpected-delimiter`, at its position.
+
+### 5.2 Maps
+
+A map contains an even number of datums, read as key, value, key, value. An odd number MUST produce `odd-map`. Two keys equal under `equal?` (section 2.4) MUST produce `duplicate-key`. Both errors are reported at the position of the `{`, because atoms have no position of their own (section 6). The message MAY include the index of the repeated pair.
+
+### 5.3 Reserved characters
+
+`[` and `]` neither open nor close any collection in the core. Outside strings and comments, each one MUST produce `reserved-character` at its own position. `#{` also has no meaning and produces `unknown-dispatch` (5.5). This reserves the syntax for future collections, such as vectors and sets.
+
+### 5.4 Prefixes
+
+| Written | Read as |
+| --- | --- |
+| `'x` | `(quote x)` |
+| `` `x `` | `(quasiquote x)` |
+| `,x` | `(unquote x)` |
+| `,@x` | `(unquote-splicing x)` |
+
+The expansion is purely syntactic. The reader does NOT check whether an `unquote` is inside a `quasiquote`; that is the job of the `quasiquote` expansion (section 8.3). A prefix requires a datum after it, with optional atmosphere in between. If end of input comes instead, the error is `unexpected-eof`. If a closer comes, as in `(a ')`, the error is `unexpected-delimiter`.
+
+### 5.5 `#` dispatch
+
+A `#` at the start of a datum can only begin one of these forms:
+
+| Form | Meaning |
+| --- | --- |
+| `#true`, `#false` | Boolean |
+| `#void` | Void |
+
+Any other continuation, including `#` alone, MUST produce `unknown-dispatch` at the position of the `#`. This reserves room for future extensions without breaking existing code.
+
+### 5.6 Nesting limit
+
+At most 1000 collections or prefixes may be open at the same time. The 1001st opener MUST produce `nesting-too-deep` at its position. The limit protects recursive implementations against stack overflow and makes behavior identical across languages.
+
+## 6. Source positions
+
+Positions live in a **side table** that maps the identity of each compound node to the position of its opener. Datums remain ordinary values, with no position field.
+
+### 6.1 Coordinates
+
+A position is the pair (line, column), both starting at 1. The line advances after each U+000A, and the column resets to 1. The column counts code points, not bytes: in `(λ ]`, the `]` is at column 4. Tab and U+000D count as one column each. Errors use the same coordinates.
+
+### 6.2 What is recorded
+
+- Every non-empty List, including those generated by prefixes, with the position of the `(` or of the prefix character.
+- Every Map, with the position of the `{`. The empty map MAY have no position, if the implementation does not allocate it as a distinct object.
+
+Example: in `(define x↵  {:a 1})`, the list is at 1:1 and the map at 2:3.
+
+### 6.3 Known limitations
+
+**Atoms have no position of their own.** Symbols and keywords are interned, so all occurrences of `x` are the same object. Numbers, booleans and `()` have no identity. The position of an atom is deduced from the collection that contains it and its index within it.
+
+**Macro-generated code has no position.** Lists created during expansion are not in the table. The expander MAY copy the position of the original form to the expansion.
+
+### 6.4 Validity of entries
+
+An entry always gives the position where its node was read. It MUST NOT give a position for a node that was not read, or the position of another node.
+
+## 7. Read errors
+
+The reader stops at the first error, without trying to recover. Each error has a fixed code and a position, which are normative, and a free-form message.
+
+### 7.1 Interface
+
+The read operation takes the complete source text and returns one of two things: the sequence of top-level datums, with the position table, or the first error. The implementation MAY offer incremental reading, one datum at a time, as long as the results are identical.
+
+### 7.2 Error structure
+
+- **Code:** one of the identifiers in the catalog below.
+- **Position:** line and column, as in section 6.1.
+- **Message:** free text for humans. It is not compared in tests.
+
+### 7.3 Detection order
+
+The error reported is the first one detected in a left-to-right read. The `odd-map` and `duplicate-key` checks happen when the map is closed, after all of its contents have been read. Therefore, in `{:a 1 :a "x}`, the error is `unterminated-string`. Inner errors come before outer ones: in `(a (b`, the error is `unclosed-delimiter` at the second `(`.
+
+### 7.4 Catalog
+
+| Code | When it occurs | Reported position | Section |
+| --- | --- | --- | --- |
+| `invalid-utf8` | invalid UTF-8 byte sequence | first invalid byte | 3.2 |
+| `unexpected-eof` | end of input right after a prefix | end of input | 5.4 |
+| `unclosed-delimiter` | end of input before the closer | opener | 5.1 |
+| `mismatched-delimiter` | closer of another kind | wrong closer | 5.1 |
+| `unexpected-delimiter` | closer without opener, or after a prefix | the closer | 5.1 |
+| `reserved-character` | `[` or `]` outside a string or comment | the character | 5.3 |
+| `unterminated-string` | end of input before the closing `"` | opening quote | 4.3 |
+| `invalid-escape` | unknown escape | backslash | 4.3 |
+| `integer-overflow` | integer outside 64 bits | start of token | 4.1 |
+| `invalid-number` | numeric token that is not a valid integer | start of token | 4.2, 4.6 |
+| `dotted-pair` | token `.` | the `.` | 4.6 |
+| `empty-keyword` | `:` with no name | the `:` | 4.5 |
+| `unknown-dispatch` | `#` with no valid continuation | the `#` | 5.5 |
+| `odd-map` | map with an odd number of datums | the `{` | 5.2 |
+| `duplicate-key` | repeated key in a map | the `{` | 5.2 |
+| `nesting-too-deep` | the 1001st opener | that opener | 5.6 |
+
+## 8. Evaluation
+
+The evaluator knows five special forms. Everything else is function application or a derived form, rewritten into the special forms before evaluation.
+
+### 8.1 How each datum is evaluated
+
+| Datum | Result |
+| --- | --- |
+| Integer, String, Boolean, Void, Keyword | the value itself |
+| Symbol | the value bound to the name: first in the local environment, from the innermost `lambda` outward, then in the global one (8.2, lexical scope); unbound is an error |
+| `()` | the empty list itself |
+| Map | a new map with evaluated keys and values, left to right (8.4) |
+| Non-empty List | special form, macro or application, depending on the first element |
+
+In an **application** `(f a b …)`, the operator is evaluated first and the arguments next, left to right. If the operator is not a function, or if the number of arguments does not fit, the result is an error.
+
+### 8.2 Special forms
+
+| Form | Syntax | Meaning |
+| --- | --- | --- |
+| `quote` | `(quote datum)` | returns the datum without evaluating it |
+| `if` | `(if c a otherwise b)` or `(if c a)` | evaluates `c`; if it is not `#false`, evaluates `a`; otherwise evaluates `b`, or returns `#void` if there is no `otherwise` |
+| `lambda` | `(lambda (parameters …) body …)` | creates a closure; the value of a call is that of the last body expression |
+| `define` | `(define name value)` | binds a global name and returns `#void`; top level only |
+| `define-macro` | `(define-macro name (lambda (parameters …) body …))` | binds a name to a code transformer; top level only |
+
+**`if`.** `if` has exactly one of the two forms in the table; `otherwise` is a marker, not a variable. Other forms are an expansion error. This leaves room for a future multi-pair extension compatible with these two forms.
+
+**`lambda`.** Parameters are distinct symbols. `&rest`, if present, comes before the last parameter, which receives the extra arguments as a list. The body has one or more expressions. Every function is anonymous: recursion uses a global name, defined with `define`.
+
+**Scope is lexical.** A closure keeps the local environment in which its `lambda` was evaluated, and its body runs in that environment extended with the parameters; the environment of the caller is never consulted. A symbol resolves to the nearest binding in the text: the parameters of the innermost `lambda` that contains it, then those of each enclosing `lambda`, outward, and finally the global name, looked up at the moment of evaluation. Because `let` is rewritten into `lambda` (8.3), its names follow the same rule.
+
+**`define`.** Global functions are written as `(define sum (lambda (x y) (+ x y)))`. Redefining a name replaces the global binding; values remain immutable. A global function calls itself through the global name, resolved at call time.
+
+**`define-macro`.** The transformer receives the argument datums unevaluated and returns a datum, which is expanded again until no macro remains. Macros are non-hygienic; `generate-symbol` (section 9) avoids name capture. A macro MUST be defined before its first use, in text order.
+
+**Reserved names.** A `(declare …)` form at the start of a body and a `(declare-type …)` form at top level MUST be ignored. They are reserved for a future typing extension, so annotated code runs unchanged on the core.
+
+### 8.3 Derived forms
+
+Every implementation MUST provide `let`, `sequence`, `and`, `or` and `quasiquote`. They are defined by rewriting into the special forms; the implementation MAY implement them differently, as long as the behavior is the same.
+
+**`let`** has the form `(let ((name value) …) body …)`. Bindings are sequential: each value sees the previous names, and a repeated name shadows the previous one. The rewrite is:
+
+```lisp
+(let () body …)                   ; ≡ ((lambda () body …))
+(let ((x v) more …) body …)       ; ≡ ((lambda (x) (let (more …) body …)) v)
+```
+
+**`sequence`** evaluates one or more expressions, in order, and returns the value of the last one. It is used to run several effects where only one expression fits, such as in an `if` branch.
+
+```lisp
+(sequence e …)                    ; ≡ ((lambda () e …))
+```
+
+**`and`** and **`or`** evaluate left to right and stop as soon as the result is decided. `and` returns `#false` at the first false argument, or the value of the last one if all are true. `or` returns the first true value, or `#false` if there is none. With no arguments, `(and)` is `#true` and `(or)` is `#false`.
+
+```lisp
+(and e)                           ; ≡ e
+(and e more …)                    ; ≡ (if e (and more …) otherwise #false)
+(or e)                            ; ≡ e
+(or e more …)                     ; ≡ (let ((t e)) (if t t otherwise (or more …)))
+```
+
+In the `or` rewrite, `t` is a symbol created by `generate-symbol`, so that it does not capture names from user code.
+
+**`quasiquote`** builds a datum like `quote`, but evaluates the marked parts. `(unquote e)` is replaced by the value of `e`. `(unquote-splicing e)` must evaluate to a list, whose elements are inserted in its place; it is only valid inside lists. A `quasiquote` inside another raises the level, and only the markers of the outermost level are evaluated, as in R7RS. `unquote` outside `quasiquote` is an expansion error.
+
+```lisp
+(let ((x 1) (xs (list 2 3)))
+  `(a ,x ,@xs))                   ; → (a 1 2 3)
+```
+
+### 8.4 General rules
+
+**Falsity.** Only `#false` is false. `()`, `0`, `""` and `#void` are true; the empty list is tested with `empty?`.
+
+**Map literals** evaluate keys and values, left to right: `{:sum (+ 1 2)}` is a map with the value `3` at key `:sum`. For the literal datum, use `quote`. Keys that only repeat after evaluation, as in `{a 1 b 2}` with `a` and `b` equal, MUST produce an error.
+
+**Tail calls are guaranteed.** A call in tail position MUST NOT use more space than the call it replaces, so that tail recursion runs in constant memory. It is the only looping mechanism. The tail positions are the last expression of a `lambda` body and both branches of an `if` that is itself in tail position. Through rewriting, the following inherit the position of the form that contains them: the body of a `let`, the last expression of a `sequence`, and the last argument of an `and` or an `or`.
+
+```lisp
+(define numbers-from
+  (lambda (n acc)
+    (if (= n 0) acc
+        otherwise (numbers-from (- n 1) (prepend n acc)))))
+
+(define numbers-up-to
+  (lambda (limit) (numbers-from limit ())))
+
+(numbers-up-to 3)   ; → (1 2 3), in constant memory for any limit
+```
+
+**Errors.** `error`, `raise`, integer overflow, unbound symbols and invalid applications interrupt evaluation. An error can be caught with `catch` (8.5). If it is not caught, the program terminates, or the REPL shows the message and reads the next input.
+
+### 8.5 Side effects and errors
+
+**Side effects are implicit.** Any function can perform input and output by calling the primitives `display!`, `write!` and `read-line!`. Since evaluation order is defined (8.1), effects happen in a predictable order. There is no mechanism to intercept or redirect these effects; for code that needs that, the recommended style is callbacks, described below.
+
+**The `!` convention.** The name of a function that interacts with the world outside the program ends in `!`. The rule applies to the input and output primitives and, by convention, to every function that directly calls a function ending in `!`. A function that only calls callbacks received as arguments does not need the mark, because whoever passes the callback decides the effect. The core does not check the convention; a future typing extension MAY check it. Errors (`error`, `raise`) and `generate-symbol` are not marked, because they do not interact with the outside world.
+
+```lisp
+(define greet!
+  (lambda (name)
+    (display! (concatenate "Hello, " name "\n"))))
+```
+
+**Error descriptor.** Every error carries a descriptor: a Map with `:kind` (Keyword), `:message` (String) and `:values` (List). `(error message value …)` creates a descriptor with `:kind :error`. The `:kind`s of core errors are `:unbound-symbol`, `:not-a-function`, `:wrong-arguments`, `:wrong-type`, `:index-out-of-range`, `:missing-key`, `:integer-overflow`, `:division-by-zero`, `:duplicate-key`, `:expansion-error` and `:include-error` (8.8).
+
+**Catching.** `(catch body handler)` calls `body`, a function with no arguments. If `body` finishes normally, `catch` returns its value. If an error occurs during `body`, evaluation of `body` is abandoned, and `handler` is called with the descriptor; the result of `handler` becomes the result of `catch`. Catching is exit-only: there is no way to return to the point of the error. An error inside `handler` goes to the next enclosing `catch`.
+
+**Re-raising.** `(raise descriptor)` interrupts evaluation with an existing descriptor. An argument that is not a Map with a Keyword `:kind` produces `:wrong-type`.
+
+```lisp
+(define catch-kind
+  (lambda (kind default thunk)
+    (catch thunk
+      (lambda (problem)
+        (if (equal? (get problem :kind) kind) default
+            otherwise (raise problem))))))
+
+(catch-kind :division-by-zero 0 (lambda () (quotient 10 0)))   ; → 0
+```
+
+**Callbacks.** When code needs to be tested without a terminal, or stopped halfway, the recommended style is to pass functions as arguments. It is not a language mechanism, just the use of functions as values, in two patterns.
+
+In **injection**, the function receives the functions that perform the effect, instead of calling them directly. A map holding all of them avoids passing many parameters around:
+
+```lisp
+(define greet-user
+  (lambda (io)
+    ((get io :tell) "Name? ")
+    ((get io :tell) (concatenate "Hello, " ((get io :ask)) "!\n"))))
+
+(greet-user {:ask read-line! :tell display!})                       ; real program: reads stdin
+(greet-user {:ask (lambda () "Ana") :tell (lambda (text) text)})   ; test: → "Hello, Ana!\n"
+```
+
+In **continuation**, the function receives the rest of the work as an argument, and the caller decides whether to continue. Since tail calls are guaranteed (8.4), long callback chains run in constant memory:
+
+```lisp
+(define each-leaf
+  (lambda (tree on-leaf after)
+    (if (list? tree) (each-child tree on-leaf after)
+        otherwise (on-leaf tree after))))
+
+(define each-child
+  (lambda (children on-leaf after)
+    (if (empty? children) (after)
+        otherwise (each-leaf (first children) on-leaf
+                    (lambda () (each-child (rest children) on-leaf after))))))
+
+;; Stops at the first leaf greater than 2, without visiting the rest
+(each-leaf '(1 (2 (3 4)) 5)
+  (lambda (leaf next) (if (> leaf 2) leaf otherwise (next)))
+  (lambda () #void))                                               ; → 3
+```
+
+### 8.6 Large data
+
+Lists of at least 1,000,000 elements MUST be built, traversed and discarded without error. Memory management is otherwise left to the implementation and has no observable effect. Non-normative advice for implementers is in `implementation-notes.md`.
+
+### 8.7 Programs and REPL
+
+**Loading a program.** The file is read in full by the reader before any evaluation; a read error prevents any form from being evaluated. The implementation MAY load the standard library before the program, but the core and its tests do not depend on it. Then, the top-level forms are processed **one at a time, in order**: each one is expanded and evaluated before the next. Therefore, a macro defined earlier in the file already applies to the following forms. A file included with `include` is read only when that form's turn comes (8.8).
+
+**Top level.** `define`, `define-macro` and `include` are only valid at top level; elsewhere, they are an expansion error. A `sequence` at top level is treated as if its forms were loose in the file, in the same order, and each of them is also at top level. This applies recursively and lets a macro generate several definitions at once. Outside the top level, `sequence` follows the rewrite in section 8.3.
+
+**Termination.**
+
+| Situation | Output | Exit code |
+| --- | --- | --- |
+| all forms evaluated | none beyond the program's own | 0 |
+| uncaught error | message on standard error | 1 |
+| read error | error code, position and message on standard error | 1 |
+
+**REPL.** The REPL repeats four steps:
+
+1. Read an input: a complete datum, which may span several lines. If the line ends with a collection or string still open, the REPL reads one more line instead of reporting an error.
+2. Expand and evaluate the input as a top-level form.
+3. Print the result with `write!`, followed by a newline. If the result is `#void`, print nothing.
+4. On a read error or an uncaught error, show the message, discard the input and go back to step 1.
+
+Redefining a name with `define` replaces the previous binding (8.2). The REPL ends at the end of standard input.
+
+### 8.8 Including files
+
+**Form.** `(include "path")` and `(include "path" prefix)` load the forms of another file. The arguments are not evaluated: the path MUST be a String literal and the prefix, when present, a Symbol. Any other shape, including a third argument, is an expansion error, and so is an `include` outside the top level (8.7). The value of an `include` is `#void`.
+
+**Loading.** An `include` is processed in its turn, like any other top-level form: the forms before it have already been evaluated. The file is read in full by the reader, and then its top-level forms are processed one at a time, in order, as if they stood at top level in place of the `include`, with the differences of prefix below. A macro defined before the `include`, in any file, applies to the included forms, and a macro defined in the included file applies to the forms after the `include`.
+
+**Paths.** A relative path is resolved against the directory of the file that contains the `include`; in the REPL, against the current working directory. An absolute path is used as it is. The separator is `/`. Two paths name the same file when they are equal after being made absolute and having their `.` and `..` segments removed; symbolic links are not resolved.
+
+**Context.** Every top-level form is processed in a context, a sequence of prefixes. The program, the REPL and the standard library run in the empty context. `(include "path" p)` processes the file in the context of the `include` followed by `p`, and `(include "path")` in the same context as the `include`. The **full prefix** of a context joins its prefixes with `/`: the context `geo`, `u` has the full prefix `geo/u`. Two contexts with the same full prefix are the same context.
+
+**Definitions in a context.** In the empty context, `define` and `define-macro` bind the global name, as in 8.2. In a context that ends with the prefix `p`, `(define x value)` evaluates `value`, records `x` as a name of that context, and then defines `p/x` in the context before `p`, by the same rule; `define-macro` does the same. The global that ends up bound is the full prefix, `/` and the name: in a file included with `geo` that includes another with `u`, `(define clean …)` in the second file binds `geo/u/clean`, records `clean` in the context `geo/u` and records `u/clean` in the context `geo`.
+
+**Resolving names in a context.** A symbol `x` in code from a non-empty context that is not bound locally (8.2) names the global `F/x`, where `F` is the full prefix of the context, if `x` is at that moment a name of the context; otherwise it names the global `x`. The test happens when the symbol is evaluated, like every global lookup, so a function may call another one defined further down in the same file. The head of a form is a macro under the same rule, tested when the form is expanded. Names the file does not define resolve as usual: the primitives, the standard library and whatever the including program defined are all visible. The rule applies only to symbols evaluated as variables and to macro heads: quoted data, symbols built with `string-to-symbol` and the names of special forms, derived forms and `include` are never prefixed.
+
+```lisp
+;; geo.lisp
+(define area (lambda (w h) (* w h)))
+(define square-area (lambda (s) (area s s)))   ; area resolves to geo/area
+
+;; main.lisp
+(define area :mine)
+(include "geo.lisp" geo)
+(list area (geo/square-area 3))                ; → (:mine 9)
+```
+
+**Macros across files.** The datum a macro returns is expanded in the context of the form that uses it, not in the context where the macro was defined. Macros are not hygienic (8.2), so the symbols of a template resolve in the caller: a macro of `geo.lisp`, included with `geo`, whose template mentions `area` produces a reference to `area`, not to `geo/area`. A macro meant for use outside its file MUST write those names with the full prefix, as `geo/area`, or not refer to them. The transformer itself is an ordinary function of its file, and the names in its body resolve in that file's context.
+
+**Repetition.** A file is loaded at most once per context: an `include` of a file that was already included in the same resulting context is ignored. The same file in another context is loaded again, with its own names, and the effects of its top-level forms, such as `display!`, happen again. An `include` of a file that is still being loaded, either the program itself or a file whose `include` has not finished, is an error in any context; this rules out cycles.
+
+**Errors.** These situations end with `:include-error`. Its `:values` start with the path as written in the `include`:
+
+| Situation | `:values` |
+| --- | --- |
+| the file cannot be opened | `(path :cannot-open)` |
+| the file has a read error (7) | `(path code line column)`, with the code as a Keyword, such as `:odd-map`, and the position in that file |
+| the file is still being loaded | `(path :cycle)` |
+
+An `include` is never inside a `catch`, because it is only valid at top level. So an `:include-error` terminates the program with exit code 1 (8.7). In the REPL, the message is shown, and the definitions already made by the file before the error remain. An error raised while evaluating an included form keeps its own `:kind`.
+
+## 9. Primitives
+
+Primitives are native functions bound in the global environment. An argument of the wrong type, an index out of range or an invalid number of arguments is an error (8.4).
+
+| Group | Functions | Rules |
+| --- | --- | --- |
+| Arithmetic | `+`, `*`, `-` | `+` and `*` accept zero or more arguments: `(+)` is `0`, `(*)` is `1`. `-` accepts one or more: `(- x)` negates. Overflow is an error |
+| Integer division | `quotient`, `remainder` | truncating toward zero; a zero divisor is an error |
+| Comparison | `<`, `>`, `<=`, `>=`, `=` | Integer only, two or more arguments, chained: `(< a b c)` |
+| Equality | `equal?` | section 2.4 |
+| Types | `boolean?`, `void?`, `integer?`, `string?`, `symbol?`, `keyword?`, `list?`, `map?`, `function?` | one predicate per type; `function?` holds for closures and primitives |
+| Lists | `list`, `prepend`, `first`, `rest` | `(prepend x xs)` puts `x` in front of `xs`; `first` and `rest` of `()` are errors |
+| Maps and sizes | `count`, `empty?`, `get`, `contains?`, `associate`, `dissociate`, `keys` | `count` and `empty?` work on List, Map and String. `(get m k default)` returns `default` if `k` does not exist; without a default, it is an error. `contains?` tests whether the map has the key. `keys` returns a new list with each key of the map exactly once, in the iteration order of 2.3, and `(keys {})` is `()`; together with `get`, it is how a program traverses a map |
+| Strings | `concatenate`, `string-at`, `substring`, `to-string` | indices count code points; `(substring s start end)` excludes `end`; `to-string` returns the text `display!` would print; `concatenate` accepts zero or more strings, and `(concatenate)` returns `""` |
+| Number parsing | `string-to-number` | reads the whole text under the rules of section 4 and returns an Integer; if the text is not an integer, returns `#void`; if it is out of range, it is an error (`:integer-overflow`) |
+| Symbols | `string-to-symbol`, `symbol-to-string`, `generate-symbol` | `generate-symbol` creates a new symbol, different from all others and not interned, so macros can avoid capture |
+| Functions | `apply` | `(apply f a … list)` calls `f` with `a …` followed by the elements of `list` |
+| Logic | `not` | returns `#true` if the argument is `#false`, and `#false` in any other case; `and` and `or` are derived forms (8.3) |
+| Input and output | `write!`, `display!`, `read-line!` | `write!` and `display!` write a value to standard output, in the form of section 10, and return `#void`. `read-line!` reads a line from standard input and returns it without the line terminator, or `#void` at end of input. The only line terminator is U+000A, as in 6.1: a U+000D before it stays in the returned string, and a U+000D alone does not end a line. A last line without U+000A is returned as it is |
+| Errors | `error`, `raise`, `catch` | `(error message value …)` interrupts with `{:kind :error :message message :values (value …)}`; `(raise descriptor)` interrupts with an existing descriptor; `(catch body handler)` catches errors (8.5) |
+
+## 10. Printing
+
+**`write!`** prints in a form that reads back: reading the printed text MUST produce a value `equal?` to the original, with the three exceptions below. The REPL uses `write!`. **`display!`** prints for humans: strings come out without quotes and without escapes, and everything else comes out as with `write!`.
+
+| Type | Form printed by `write!` |
+| --- | --- |
+| Boolean, Void | `#true`, `#false`, `#void` |
+| Integer | decimal, with `-` if negative |
+| String | in double quotes, with `\n`, `\t`, `\r`, `\"` and `\\` escaped; every other character from U+0000 to U+001F, and U+007F, comes out as `\u{H…}` with uppercase hexadecimal digits and no leading zeros, such as `\u{0}` and `\u{1B}`; all other characters come out as they are |
+| Symbol, Keyword | the name, preceded by `:` for keywords |
+| List, Map | delimiters of section 5.1, elements separated by one space; Map order unspecified |
+| Function | `#<function>` |
+
+The exceptions to reading back are:
+
+- **Functions.** The form `#<function>` is deliberately unreadable: the reader rejects it with `unknown-dispatch`, so that it is never read as some other value.
+- **Symbols from `generate-symbol`.** They are not interned, so the printed name, when read, produces a different symbol.
+- **Symbols from `string-to-symbol` with names the reader does not read as a symbol**, such as `"a b"` or `"42"`. They are printed by name, with no guarantee of reading back.
+
+## 11. Names and conventions
+
+Every abbreviation becomes a full word; what is already a word, such as `if`, `let`, `quote` and `lambda`, stays as it is. To the reader, all these names are ordinary symbols. Only the evaluator gives them meaning.
+
+- Predicates end in `?`: `integer?`, `empty?`.
+- Functions that interact with the world outside the program end in `!`: `display!`, `read-line!` (8.5).
+- Definition forms start with `define`: `define`, `define-macro`.
+- Conversions use `-to-`: `string-to-symbol`, `symbol-to-string`.
+- Variadic parameters use the `&rest` marker: `(lambda (x y &rest others) …)`.
+- `otherwise` is only special inside an `if`; elsewhere, it is an ordinary symbol.
+
+Correspondences with names from other Lisps, for those coming from them:
+
+| Name | Replaces |
+| --- | --- |
+| `define` | `def`, `defun` |
+| `lambda` | `fn` |
+| `define-macro` | `defmacro` |
+| `sequence` | `begin`, `progn`, `do` |
+| `first`, `rest` | `car`, `cdr` |
+| `prepend` | `cons` |
+| `associate`, `dissociate` | `assoc`, `dissoc` |
+| `concatenate` | `str`, `string-append` |
+| `string-at` | `string-ref` |
+| `generate-symbol` | `gensym` |
+| `display!`, `write!`, `read-line!` | `display`, `write`, `read-line` |
+
+## 12. Conformance
+
+An implementation is conformant when it passes all the cases below. Results are compared by `equal?` (section 2.4) between datums, not by printed text, so no print format is required in these tests. The cases MUST also live in a shared data file, such as JSON, used by the tests of every implementation. In the tables, `↵` represents a line break. The tables below show the reader cases. The conformance file contains these plus the evaluation and primitive cases (12.4).
+
+### 12.1 Valid reads
+
+"≡ B" means the input produces the same sequence of datums as the text B.
+
+| Input | Expected result |
+| --- | --- |
+| `007` | ≡ `7` |
+| `9223372036854775807` | maximum Integer |
+| `-9223372036854775808` | minimum Integer |
+| `42 -7` | Integer, Integer |
+| `-x`, `-`, `...`, `&rest`, `λ` | Symbol |
+| `:1`, `:a:b` | Keyword |
+| `#true #false #void` | Boolean, Boolean, Void |
+| `' x` | ≡ `(quote x)` |
+| `` `(a ,b ,@c) `` | ≡ `(quasiquote (a (unquote b) (unquote-splicing c)))` |
+| `a,b` | ≡ `a (unquote b)` (two datums) |
+| `(a ; comment↵ b)` | ≡ `(a b)` |
+| `(1 (2) ())` | List |
+| `{:b 2 :a 1}` | ≡ `{:a 1 :b 2}` |
+| `"a↵b"` | ≡ `"a\nb"` |
+| `"\r\u{41}\u{000042}\u{1f600}\u{1F600}\u{0}"` | ≡ the string U+000D, `A`, `B`, two `😀`, U+0000 |
+| `"😀 é"` | String |
+| U+FEFF followed by `(a)` | Symbol, List |
+| empty, or `   ; just a comment ` | zero datums |
+
+### 12.2 Errors
+
+| Input | Code | Position |
+| --- | --- | --- |
+| `(1 2` | `unclosed-delimiter` | 1:1 |
+| `(a (b` | `unclosed-delimiter` | 1:4 |
+| `(a↵  (b` | `unclosed-delimiter` | 2:3 |
+| `)` | `unexpected-delimiter` | 1:1 |
+| `(a ')` | `unexpected-delimiter` | 1:5 |
+| `(1 2}` | `mismatched-delimiter` | 1:5 |
+| `(λ ]` | `reserved-character` | 1:4 |
+| `[1 2]` | `reserved-character` | 1:1 |
+| `'` | `unexpected-eof` | 1:2 |
+| `#;` | `unknown-dispatch` | 1:1 |
+| `#\|` | `unknown-dispatch` | 1:1 |
+| `#{1}` | `unknown-dispatch` | 1:1 |
+| `"abc` | `unterminated-string` | 1:1 |
+| `{:a 1 :a "x}` | `unterminated-string` | 1:10 |
+| `"\q"` | `invalid-escape` | 1:2 |
+| `"\u{D800}"` | `invalid-escape` | 1:2 |
+| `"\u{110000}"` | `invalid-escape` | 1:2 |
+| `"\u{}"` | `invalid-escape` | 1:2 |
+| `"\u{1234567}"` | `invalid-escape` | 1:2 |
+| `"\u41"` | `invalid-escape` | 1:2 |
+| `"a \u{4G}"` | `invalid-escape` | 1:4 |
+| `"\u{41` | `unterminated-string` | 1:1 |
+| `9223372036854775808` | `integer-overflow` | 1:1 |
+| `-9223372036854775809` | `integer-overflow` | 1:1 |
+| `3.14` | `invalid-number` | 1:1 |
+| `(x 1e3)` | `invalid-number` | 1:4 |
+| `(x 1+)` | `invalid-number` | 1:4 |
+| `+5` | `invalid-number` | 1:1 |
+| `(a . b)` | `dotted-pair` | 1:4 |
+| `:` | `empty-keyword` | 1:1 |
+| `#t` | `unknown-dispatch` | 1:1 |
+| `#<function>` | `unknown-dispatch` | 1:1 |
+| `{:a 1 :b}` | `odd-map` | 1:1 |
+| `{:a 1 :a 2}` | `duplicate-key` | 1:1 |
+| 1001 times `(` | `nesting-too-deep` | 1:1001 |
+| the byte FF | `invalid-utf8` | 1:1 |
+| `a` followed by a lone C3 byte | `invalid-utf8` | 1:2 |
+
+### 12.3 Additional checks
+
+- **Interning:** in `(foo foo :foo)`, the two `foo` are the same object, and `:foo` is different from `foo`.
+- **Positions:** in `(define x↵  {:a 1})`, the list is at 1:1 and the map at 2:3. In `(a 'b)`, the list `(quote b)` is at 1:4.
+- **Nesting limit:** 1000 times `(` followed by 1000 times `)` read without error.
+
+### 12.4 Conformance file
+
+The file `conformance.json` has 228 cases, each with an `id`, the section it tests and a kind:
+
+| Kind | Cases | What it checks |
+| --- | --- | --- |
+| `read` | 20 | `input` produces the same sequence of datums as `equivalent`, or datums with the types in `types` |
+| `read-error` | 37 | reading `input`, or the bytes of `input_hex`, fails with the code `error` at `position` |
+| `read-positions` | 2 | the node indicated by each `path` is in the position table with the expected `position` |
+| `eval` | 169 | `program` runs as a file, without the standard library and with `input` on standard input; the output is exactly `output`, and the program ends with the value `value` or with an uncaught error of the `:kind` given in `error` |
+
+An `eval` case that tests `include` (8.8) also has `files`, an object that maps each relative path, with `/` as separator, to the text of that file. The program is the file `main.lisp`, and the paths are relative to its directory. A path missing from `files` cannot be opened.
+
+The `eval` cases cover the special and derived forms, tail calls with one million iterations, equality, arithmetic and overflows, primitives, printing, `catch` and `raise`, both callback patterns, and `include` with and without prefixes. Some cases check that what was removed from the core does not exist: `/`, `same?`, named `lambda`, the names without `!` and the standard library functions. The library has its own cases, in the file `stdlib-conformance.json`.
+
+**Behaviors fixed by the tests.** While writing the cases, these points needed an answer that the text above does not give yet:
+
+- `first` and `rest` of `()` produce `:wrong-type`.
+- Repeated parameters in a `lambda` produce `:expansion-error`.
+- `dissociate` of a missing key returns the map unchanged.
+- A `raise` with a valid descriptor and a custom `:kind`, such as `:custom`, terminates the program with that `:kind`.
+
+**Not yet tested, because of ambiguity in the text:** how `display!` prints strings inside lists and maps.
