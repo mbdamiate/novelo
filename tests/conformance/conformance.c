@@ -111,21 +111,27 @@ static int hex_value(char character) {
     return -1;
 }
 
-static Outcome run_read_error(const Json *test_case, CaseResult *result) {
-    LispBuffer source;
-    lisp_buffer_init(&source);
+/* The bytes of `input`, or of `input_hex`; false if the case has neither. */
+static bool case_input(const Json *test_case, LispBuffer *bytes) {
     const char *input;
     size_t input_length;
     const char *hex = string_member(test_case, "input_hex");
     if (source_member(test_case, "input", &input, &input_length)) {
-        lisp_buffer_append(&source, input, input_length);
+        lisp_buffer_append(bytes, input, input_length);
     } else if (hex) {
         for (size_t index = 0; hex[index] && hex[index + 1]; index += 2) {
-            lisp_buffer_append_byte(&source, (char)(hex_value(hex[index]) * 16 + hex_value(hex[index + 1])));
+            lisp_buffer_append_byte(bytes, (char)(hex_value(hex[index]) * 16 + hex_value(hex[index + 1])));
         }
     } else {
-        return failure(result, "no input");
+        return false;
     }
+    return true;
+}
+
+static Outcome run_read_error(const Json *test_case, CaseResult *result) {
+    LispBuffer source;
+    lisp_buffer_init(&source);
+    if (!case_input(test_case, &source)) return failure(result, "no input");
 
     const char *expected_code = string_member(test_case, "error");
     const Json *expected_position = json_member(test_case, "position");
@@ -214,9 +220,9 @@ static void run_eval_on_thread(void *argument) {
         failure(result, "no program");
         return;
     }
-    const char *input = "";
-    size_t input_length = 0;
-    source_member(test_case, "input", &input, &input_length);
+    LispBuffer input; /* standard input: `input` or `input_hex`, empty if absent */
+    lisp_buffer_init(&input);
+    case_input(test_case, &input);
 
     /* §12.4: the program is main.lisp and the files are relative to its
      * directory, here the root of an in-memory file system. A path missing
@@ -240,7 +246,7 @@ static void run_eval_on_thread(void *argument) {
 
     LispBuffer output;
     lisp_buffer_init(&output);
-    LispTextInput text_input = {.text = input, .length = input_length};
+    LispTextInput text_input = {.text = input.data ? input.data : "", .length = input.length};
     LispStateOptions options = {
         .output = lisp_output_to_buffer(&output),
         .input = lisp_input_from_text(&text_input),
@@ -300,6 +306,7 @@ static void run_eval_on_thread(void *argument) {
     lisp_release(last_value);
     lisp_state_free(state);
     lisp_buffer_free(&output);
+    lisp_buffer_free(&input);
     for (size_t index = 0; index < file_count; index++) free(paths[index]);
     free(paths);
     free(memory_files);

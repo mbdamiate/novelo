@@ -1,7 +1,7 @@
 # Implementation plan: lisp-min in C23
 
 ## Goal
-An interpreter for the lisp-min core and standard library (v0.2.0), written in C23. Its only inputs are the specification and the conformance suites:
+An interpreter for the lisp-min core (v0.2.1) and standard library (v0.2.0), written in C23. Its only inputs are the specification and the conformance suites:
 
 - `core-specification.md`
 - `standard-library.md`

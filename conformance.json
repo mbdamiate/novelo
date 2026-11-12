@@ -1,10 +1,10 @@
 {
-  "spec": "Core Specification — Immutable Lisp, version 0.2.0",
+  "spec": "Core Specification — Immutable Lisp, version 0.2.1",
   "format": {
     "read": "Read 'input' (UTF-8). With 'equivalent': also read that text and compare the two datum sequences with equal?. With 'types': the sequence read has exactly these types, in order.",
     "read-error": "Read 'input' (or the bytes of 'input_hex'). Reading MUST fail with the code 'error' at position [line, column].",
     "read-positions": "Read 'input'. For each entry, 'path' indexes the sequence read and then list elements (0-based); the node found MUST be in the position table with 'position'.",
-    "eval": "Evaluate 'program' as a file (section 8.7), with only the library io available to import (section 8.9), with 'input' as standard input (empty if absent). Standard output MUST be exactly 'output'. With 'value': the program terminates normally, and the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
+    "eval": "Evaluate 'program' as a file (section 8.7), with only the library io available to import (section 8.9), with 'input' (or the bytes of 'input_hex') as standard input (empty if absent). Standard output MUST be exactly 'output'. With 'value': the program terminates normally, and the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
   },
   "cases": [
     {
@@ -582,6 +582,39 @@
         2
       ],
       "input_hex": "61c3"
+    },
+    {
+      "id": "read-error-038",
+      "kind": "read-error",
+      "section": "4.3",
+      "error": "invalid-escape",
+      "position": [
+        1,
+        2
+      ],
+      "input": "\"\\u{zz"
+    },
+    {
+      "id": "read-error-039",
+      "kind": "read-error",
+      "section": "4.3",
+      "error": "invalid-escape",
+      "position": [
+        1,
+        2
+      ],
+      "input": "\"\\u{1234567"
+    },
+    {
+      "id": "read-error-040",
+      "kind": "read-error",
+      "section": "4.3",
+      "error": "unterminated-string",
+      "position": [
+        1,
+        1
+      ],
+      "input": "\"\\u{D800"
     },
     {
       "id": "read-position-001",
@@ -1590,6 +1623,79 @@
       "program": "(import io)\n(display! \"a\") (error \"x\") (display! \"b\")",
       "error": ":error",
       "output": "a"
+    },
+    {
+      "id": "eval-229",
+      "kind": "eval",
+      "section": "10",
+      "program": "(import io)\n(display! (list \"a b\" \"c\"))",
+      "value": "#void",
+      "output": "(\"a b\" \"c\")"
+    },
+    {
+      "id": "eval-230",
+      "kind": "eval",
+      "section": "10",
+      "program": "(import io)\n(display! {:k \"x\\ny\"})",
+      "value": "#void",
+      "output": "{:k \"x\\ny\"}"
+    },
+    {
+      "id": "eval-231",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(define-macro m 5)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "eval-232",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(define-macro m (lambda () 1))\nm",
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "eval-233",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(define f (lambda () m))\n(define-macro m (lambda () 1))\n(f)",
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "eval-234",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(define depth\n  (lambda (n) (if (= n 0) 0 otherwise (+ 1 (depth (- n 1))))))\n(depth 10000)",
+      "value": "10000",
+      "output": ""
+    },
+    {
+      "id": "eval-235",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(define down (lambda (n) (+ 1 (down n))))\n(catch (lambda () (down 0)) (lambda (problem) (get problem :kind)))",
+      "value": ":stack-overflow",
+      "output": ""
+    },
+    {
+      "id": "eval-236",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(define down (lambda (n) (+ 1 (down n))))\n(down 0)",
+      "error": ":stack-overflow",
+      "output": ""
+    },
+    {
+      "id": "eval-237",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(list (catch read-line! (lambda (problem) (list (get problem :kind) (get problem :values))))\n      (read-line!))",
+      "value": "((:io-error (:invalid-utf8)) \"b\")",
+      "output": "",
+      "input_hex": "61ff0a620a"
     },
     {
       "id": "catch-001",

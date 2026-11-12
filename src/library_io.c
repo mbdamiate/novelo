@@ -28,8 +28,8 @@ static Value *read_line(LispState *state, size_t, Value *const *) {
     const char *bytes = state->line.data ? state->line.data : "";
     size_t invalid_offset;
     if (!lisp_utf8_valid((const unsigned char *)bytes, state->line.length, &invalid_offset)) {
-        return lisp_error(state, "io-error", LISP_EMPTY, "read-line!: invalid UTF-8 at byte %zu of the line",
-                          invalid_offset);
+        return lisp_error(state, "io-error", LISP_LIST(lisp_keyword_cstr("invalid-utf8")),
+                          "read-line!: invalid UTF-8 at byte %zu of the line", invalid_offset);
     }
     return lisp_string(bytes, state->line.length);
 }

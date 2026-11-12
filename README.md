@@ -1,12 +1,12 @@
 # lisp-min
 
-An interpreter, written in C23, for **lisp-min**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.2.0) and the standard library (`standard-library.md`, v0.2.0). The language has no other name yet.
+An interpreter, written in C23, for **lisp-min**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.2.1) and the standard library (`standard-library.md`, v0.2.0). The language has no other name yet.
 
 Every case of both conformance suites passes:
 
 | Suite | Cases |
 | --- | --- |
-| core | 241 |
+| core | 253 |
 | stdlib | 29 |
 
 Those runs report no leaks, and they also pass under AddressSanitizer and UndefinedBehaviorSanitizer.
@@ -138,15 +138,9 @@ make conformance
 
 **Positions** live in a side table keyed by node address. Freeing a node removes its entry, so a reused address never inherits a stale position (core §6.4).
 
-## Choices where the specification is silent
+## Implementation-defined behavior
 
-These follow the conformance cases where they exist. Where neither the text nor the cases decide, the interpreter does the following:
+Core 0.2.1 settled the points that versions up to 0.2.0 left open, such as `display!` of strings inside collections, `:stack-overflow` and `:io-error`. They are now in the specification and in the conformance cases. What the specification still leaves to the implementation, this interpreter does as follows:
 
-- `display!` removes quotes only from a top-level string. Strings inside a list or map keep their quotes.
-- An invalid `\u{…}` escape is a read error as soon as the first character that cannot belong to it is met.
-- `define-macro` with a transformer that is not a function gives `:wrong-type`.
-- Using a macro's name as a value gives `:unbound-symbol`.
-- Invalid UTF-8 read by `read-line!` gives `:io-error`.
-- `:stack-overflow` can be caught.
-- A file is marked as included, and a library as imported, only after it was read. So in the REPL, a failed `include` or `import` can be retried.
-- If the standard library document cannot be read, `import` gives `:import-error` with `:values` `(name :cannot-open)`.
+- **Call depth.** The specification requires at least 10,000 nested non-tail calls. Here the limit is the 512 MB stack of the CLI and the conformance runner, minus a 16 MB margin, which allows well over 100,000 nested calls. Beyond it, `:stack-overflow` is raised.
+- **Libraries that cannot be loaded.** When the standard library document cannot be read, or has no code for the library, `import` gives `:import-error` with `:values` `(name :cannot-open)`. A read error in the document gives `(name code line column)`, with the line and column in the document.

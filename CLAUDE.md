@@ -4,16 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-This repository specifies **lisp-min**, an immutable Lisp (core + standard library v0.2.0), and implements an interpreter for it in **C23**, following `IMPLEMENTATION-PLAN.md` phase by phase. Each phase ends with its tests passing and one commit. All six phases are done: all 241 core and 29 stdlib cases and the unit tests pass, also under `make asan`. `README.md` covers building, running, the source map, the design and the choices made where the spec is silent; keep that last list current when such a choice changes.
+This repository specifies **lisp-min**, an immutable Lisp (core v0.2.1, standard library v0.2.0), and implements an interpreter for it in **C23**, following `IMPLEMENTATION-PLAN.md` phase by phase. Each phase ends with its tests passing and one commit. All six phases are done: all 253 core and 29 stdlib cases and the unit tests pass, also under `make asan`. `README.md` covers building, running, the source map, the design and the behavior the spec leaves to the implementation. Core 0.2.1 settled the points 0.2.0 left open; when a new gap appears, decide it with the user, write it into the spec and add conformance cases rather than only documenting the choice.
 
 | File | Role |
 | --- | --- |
 | `core-specification.md` | Normative core: reader (§2–7), positions (§6), read errors (§7), evaluation (§8), primitives (§9), printing (§10), conformance (§12) |
 | `standard-library.md` | Normative stdlib: the libraries `list`, `text`, `function`, whose sources are the `lisp` code blocks of §4.1–4.3 |
-| `conformance.json` | 241 core cases (`read`, `read-error`, `read-positions`, `eval`); programs import at most `io` |
+| `conformance.json` | 253 core cases (`read`, `read-error`, `read-positions`, `eval`); programs import at most `io` |
 | `stdlib-conformance.json` | 29 stdlib `eval` cases; programs import `list`, `text` or `function` |
 | `IMPLEMENTATION-PLAN.md` | Architecture, decisions, file layout, phases, test runners |
-| `README.md` | Building, running, source map, design, choices where the spec is silent |
+| `README.md` | Building, running, source map, design, implementation-defined behavior |
 | `implementation-notes.md` | Non-normative advice (refcounting, position-table address reuse) |
 
 The specs and the conformance files are the only source of truth. When the prose and a conformance case disagree, or the prose is silent, the case wins. Core §12.4 lists behaviors that only the tests fix, such as `first`/`rest` of `()` → `:wrong-type`.
