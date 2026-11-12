@@ -6,11 +6,13 @@ Nov 10, 2026 · @Matheus Damiate
 
 The standard library is a set of functions written in the language itself, on top of the core primitives. It is not part of the core: an implementation conformant to the core does not need to provide it, and the core tests do not depend on it.
 
-When the implementation provides the library, it MUST load it before the program, as if its definitions were at the start of the file. The names are ordinary globals, and a program may redefine them.
+The standard library is made of three libraries, in the sense of core section 8.9: `list`, `text` and `function`. Nothing is loaded before the program: a file imports the libraries it uses, such as `(import list)`, and only then sees their names. Imported with no prefix, the names are ordinary globals, and a program may redefine them. Imported with a prefix, as in `(import list l)`, they are bound as `l/map` and so on.
 
-The reference definitions in section 4 are normative. The implementation MAY replace any of them with a native version, as long as the observable behavior is identical, including errors.
+The reference definitions in section 4 are normative. The implementation MAY replace any of them with a native version, as long as the observable behavior is identical, including errors and the names each library binds.
 
-**Version:** 0.1.0, draft, on top of core 0.1.0.
+**Version:** 0.2.0, draft, on top of core 0.2.0.
+
+**Changes since 0.1.0.** The library is split into `list`, `text` and `function`, each imported explicitly with `import`, instead of being loaded before every program.
 
 ## 2. General rules
 
@@ -18,32 +20,35 @@ The reference definitions in section 4 are normative. The implementation MAY rep
 - **The function comes first and the list last**, as in `(map f xs)`. This makes partial application with `partial` easier.
 - **Evaluation is eager.** Every function traverses the whole list and returns the finished result.
 - **Constant memory.** Every function that traverses a list does so by tail recursion, so lists of any size are traversed in constant memory.
-- **Global helpers.** Since the core has neither modules nor local recursion, some functions use helpers defined as ordinary globals: `take-step`, `range-step`, `merge-sorted` and `split-step`. They are part of the library, but not of its interface: a program should not rely on them, and a native implementation MAY omit them.
+- **Helpers.** Since the core has no local recursion, some functions use helpers defined at the top level of their library: `take-step`, `range-step`, `merge-sorted` and `split-step`. They are bound by `import` like the other names, but they are not part of the interface: a program should not rely on them, and a native implementation MAY omit them.
+- **Dependencies.** `text` and `function` import `list` (core 8.9). Importing either of them therefore also binds the names of `list` in the same context.
 
 ## 3. Functions
 
-| Function | Usage | Result |
-| --- | --- | --- |
-| `reverse` | `(reverse xs)` | the elements in reverse order |
-| `map` | `(map f xs)` | `f` applied to each element |
-| `filter` | `(filter keep? xs)` | the elements for which `keep?` is true |
-| `fold` | `(fold f initial xs)` | combines from first to last, calling `(f accumulator element)` |
-| `append` | `(append xs ys)` | the elements of `xs` followed by those of `ys` |
-| `take`, `drop` | `(take n xs)`, `(drop n xs)` | the first `n` elements, or what remains without them; negative `n` is an error |
-| `range` | `(range start end)` | the integers from `start` up to before `end`; `()` if `start` is not less than `end` |
-| `any?`, `every?` | `(any? matches? xs)` | `#true` if any, or all, satisfy it; they stop as soon as the answer is decided |
-| `sort` | `(sort less? xs)` | the elements ordered by `less?`, stably |
-| `partial` | `(partial f a …)` | the function that calls `f` with `a …` before the arguments it receives |
-| `split` | `(split separator text)` | List of the parts of `text`; an empty separator is an error |
-| `join` | `(join separator parts)` | the strings in `parts` joined by `separator` |
+| Library | Function | Usage | Result |
+| --- | --- | --- | --- |
+| `list` | `reverse` | `(reverse xs)` | the elements in reverse order |
+| `list` | `map` | `(map f xs)` | `f` applied to each element |
+| `list` | `filter` | `(filter keep? xs)` | the elements for which `keep?` is true |
+| `list` | `fold` | `(fold f initial xs)` | combines from first to last, calling `(f accumulator element)` |
+| `list` | `append` | `(append xs ys)` | the elements of `xs` followed by those of `ys` |
+| `list` | `take`, `drop` | `(take n xs)`, `(drop n xs)` | the first `n` elements, or what remains without them; negative `n` is an error |
+| `list` | `range` | `(range start end)` | the integers from `start` up to before `end`; `()` if `start` is not less than `end` |
+| `list` | `any?`, `every?` | `(any? matches? xs)` | `#true` if any, or all, satisfy it; they stop as soon as the answer is decided |
+| `list` | `sort` | `(sort less? xs)` | the elements ordered by `less?`, stably |
+| `text` | `split` | `(split separator text)` | List of the parts of `text`; an empty separator is an error |
+| `text` | `join` | `(join separator parts)` | the strings in `parts` joined by `separator` |
+| `function` | `partial` | `(partial f a …)` | the function that calls `f` with `a …` before the arguments it receives |
 
 There is no `find`. To get the first element that satisfies a predicate, take `first` of the `filter` result after checking that it is not empty; to only ask whether such an element exists, use `any?`. To combine from last to first, `fold` the `reverse` of the list.
 
 ## 4. Reference definitions
 
-The definitions use only the core. Parameter names avoid those of the primitives, such as `rest` and `count`, because a parameter with the same name would shadow the primitive inside the function. The order of the definitions does not matter: global names are resolved at call time.
+The source of each library is the concatenation, in order, of the `lisp` code blocks in its section (4.1 for `list`, 4.2 for `text`, 4.3 for `function`). The definitions use only the core and the libraries they import. Parameter names avoid those of the primitives, such as `rest` and `count`, because a parameter with the same name would shadow the primitive inside the function. The order of the definitions does not matter: global names are resolved at call time.
 
-### 4.1 Reduction and transformation
+### 4.1 `list`
+
+#### Reduction and transformation
 
 ```lisp
 (define fold
@@ -65,7 +70,7 @@ The definitions use only the core. Parameter names avoid those of the primitives
                    () xs))))
 ```
 
-### 4.2 Lists
+#### Lists
 
 ```lisp
 (define append
@@ -98,7 +103,7 @@ The definitions use only the core. Parameter names avoid those of the primitives
         otherwise (range-step start (- n 1) (prepend (- n 1) acc)))))
 ```
 
-### 4.3 Search and sorting
+#### Search and sorting
 
 ```lisp
 (define any?
@@ -130,17 +135,11 @@ The definitions use only the core. Parameter names avoid those of the primitives
                                     otherwise (merge-sorted less? (rest a) b (prepend (first a) acc)))))))
 ```
 
-### 4.4 Functions
+### 4.2 `text`
 
 ```lisp
-(define partial
-  (lambda (f &rest fixed)
-    (lambda (&rest more) (apply f (append fixed more)))))
-```
+(import list)
 
-### 4.5 Text
-
-```lisp
 (define join
   (lambda (separator parts)
     (if (empty? parts) ""
@@ -164,8 +163,18 @@ The definitions use only the core. Parameter names avoid those of the primitives
             otherwise (split-step separator width text limit start (+ position 1) acc)))))
 ```
 
+### 4.3 `function`
+
+```lisp
+(import list)
+
+(define partial
+  (lambda (f &rest fixed)
+    (lambda (&rest more) (apply f (append fixed more)))))
+```
+
 ## 5. Conformance
 
-The file `stdlib-conformance.json` has 22 cases, in the same format as the core `eval` cases, with one difference: the standard library is loaded before each program. An implementation that provides the library MUST pass all of them, in addition to the core cases.
+The file `stdlib-conformance.json` has 29 cases, in the same format as the core `eval` cases, with one difference: the libraries `list`, `text` and `function` are available to `import`. Each program imports what it uses. An implementation that provides the library MUST pass all of them, in addition to the core cases.
 
-The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that uses the library, and a traversal of one hundred thousand elements, which only passes if the functions run in constant memory.
+The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that imports a library, a traversal of one hundred thousand elements, which only passes if the functions run in constant memory, and `import` itself: names unbound without it, prefixes, the dependencies of `text` and `function` on `list`, and repeated imports.

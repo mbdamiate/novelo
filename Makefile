@@ -38,7 +38,7 @@ unit: $(UNIT_BIN)
 
 conformance: $(CONFORMANCE_BIN)
 	./$(CONFORMANCE_BIN) conformance.json
-	./$(CONFORMANCE_BIN) --stdlib stdlib-conformance.json
+	./$(CONFORMANCE_BIN) stdlib-conformance.json
 
 asan:
 	$(MAKE) test BUILD=build/asan SANITIZE=1

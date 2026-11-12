@@ -1,14 +1,14 @@
 {
-  "spec": "Standard Library — Immutable Lisp, version 0.1.0",
+  "spec": "Standard Library — Immutable Lisp, version 0.2.0",
   "format": {
-    "eval": "Load the standard library and evaluate 'program' as a file (core section 8.7). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
+    "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text and function available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
   },
   "cases": [
     {
       "id": "library-001",
       "kind": "eval",
       "section": "4.1",
-      "program": "(list (reverse (list 1 2 3)) (reverse ()))",
+      "program": "(import list)\n(list (reverse (list 1 2 3)) (reverse ()))",
       "value": "((3 2 1) ())",
       "output": ""
     },
@@ -16,7 +16,7 @@
       "id": "library-002",
       "kind": "eval",
       "section": "4.1",
-      "program": "(list (map (lambda (x) (* x x)) (list 1 2 3)) (map list (list 1 2)) (map list ()))",
+      "program": "(import list)\n(list (map (lambda (x) (* x x)) (list 1 2 3)) (map list (list 1 2)) (map list ()))",
       "value": "((1 4 9) ((1) (2)) ())",
       "output": ""
     },
@@ -24,7 +24,7 @@
       "id": "library-003",
       "kind": "eval",
       "section": "4.1",
-      "program": "(filter (lambda (x) (> x 1)) (list 1 2 3))",
+      "program": "(import list)\n(filter (lambda (x) (> x 1)) (list 1 2 3))",
       "value": "(2 3)",
       "output": ""
     },
@@ -32,7 +32,7 @@
       "id": "library-004",
       "kind": "eval",
       "section": "4.1",
-      "program": "(list (first (filter (lambda (x) (> x 1)) (list 1 2 3))) (filter (lambda (x) (> x 9)) (list 1 2 3)))",
+      "program": "(import list)\n(list (first (filter (lambda (x) (> x 1)) (list 1 2 3))) (filter (lambda (x) (> x 9)) (list 1 2 3)))",
       "value": "(2 ())",
       "output": ""
     },
@@ -40,103 +40,103 @@
       "id": "library-005",
       "kind": "eval",
       "section": "4.1",
-      "program": "(list (fold - 0 (list 1 2 3)) (fold (lambda (acc x) (prepend x acc)) () (list 1 2 3)) (fold + 0 ()))",
+      "program": "(import list)\n(list (fold - 0 (list 1 2 3)) (fold (lambda (acc x) (prepend x acc)) () (list 1 2 3)) (fold + 0 ()))",
       "value": "(-6 (3 2 1) 0)",
       "output": ""
     },
     {
       "id": "library-006",
       "kind": "eval",
-      "section": "4.2",
-      "program": "(list (append (list 1) (list 2 3)) (append () (list 1)) (append (list 1) ()) (append () ()))",
+      "section": "4.1",
+      "program": "(import list)\n(list (append (list 1) (list 2 3)) (append () (list 1)) (append (list 1) ()) (append () ()))",
       "value": "((1 2 3) (1) (1) ())",
       "output": ""
     },
     {
       "id": "library-007",
       "kind": "eval",
-      "section": "4.2",
-      "program": "(append (list 1) (list 2) (list 3))",
+      "section": "4.1",
+      "program": "(import list)\n(append (list 1) (list 2) (list 3))",
       "error": ":wrong-arguments",
       "output": ""
     },
     {
       "id": "library-008",
       "kind": "eval",
-      "section": "4.2",
-      "program": "(list (take 2 (list 1 2 3)) (take 5 (list 1)) (drop 2 (list 1 2 3)) (drop 0 (list 1)))",
+      "section": "4.1",
+      "program": "(import list)\n(list (take 2 (list 1 2 3)) (take 5 (list 1)) (drop 2 (list 1 2 3)) (drop 0 (list 1)))",
       "value": "((1 2) (1) (3) (1))",
       "output": ""
     },
     {
       "id": "library-009",
       "kind": "eval",
-      "section": "4.2",
-      "program": "(take -1 (list))",
+      "section": "4.1",
+      "program": "(import list)\n(take -1 (list))",
       "error": ":error",
       "output": ""
     },
     {
       "id": "library-010",
       "kind": "eval",
-      "section": "4.2",
-      "program": "(drop -1 (list))",
+      "section": "4.1",
+      "program": "(import list)\n(drop -1 (list))",
       "error": ":error",
       "output": ""
     },
     {
       "id": "library-011",
       "kind": "eval",
-      "section": "4.2",
-      "program": "(list (range 0 5) (range -2 1) (range 0 0) (range 5 0))",
+      "section": "4.1",
+      "program": "(import list)\n(list (range 0 5) (range -2 1) (range 0 0) (range 5 0))",
       "value": "((0 1 2 3 4) (-2 -1 0) () ())",
       "output": ""
     },
     {
       "id": "library-012",
       "kind": "eval",
-      "section": "4.3",
-      "program": "(list (any? integer? (list :a 1)) (every? integer? (list)) (any? integer? ()) (every? integer? (list 1 :a)))",
+      "section": "4.1",
+      "program": "(import list)\n(list (any? integer? (list :a 1)) (every? integer? (list)) (any? integer? ()) (every? integer? (list 1 :a)))",
       "value": "(#true #true #false #false)",
       "output": ""
     },
     {
       "id": "library-013",
       "kind": "eval",
-      "section": "4.3",
-      "program": "(any? (lambda (x) (if (= x 1) #true otherwise (error \"not evaluated\"))) (list 1 2))",
+      "section": "4.1",
+      "program": "(import list)\n(any? (lambda (x) (if (= x 1) #true otherwise (error \"not evaluated\"))) (list 1 2))",
       "value": "#true",
       "output": ""
     },
     {
       "id": "library-014",
       "kind": "eval",
-      "section": "4.3",
-      "program": "(list (sort < (list 3 1 2)) (sort < ()) (sort (lambda (a b) (< (first a) (first b))) (list (list 1 :a) (list 0 :b) (list 1 :c))))",
+      "section": "4.1",
+      "program": "(import list)\n(list (sort < (list 3 1 2)) (sort < ()) (sort (lambda (a b) (< (first a) (first b))) (list (list 1 :a) (list 0 :b) (list 1 :c))))",
       "value": "((1 2 3) () ((0 :b) (1 :a) (1 :c)))",
       "output": ""
     },
     {
       "id": "library-015",
       "kind": "eval",
-      "section": "4.4",
-      "program": "(list ((partial + 1 2) 3) ((partial list)))",
+      "section": "4.3",
+      "program": "(import function)\n(list ((partial + 1 2) 3) ((partial list)))",
       "value": "(6 ())",
       "output": ""
     },
     {
       "id": "library-016",
       "kind": "eval",
-      "section": "4.5",
-      "program": "(list (split \",\" \"a,b,,c\") (split \", \" \"x\") (split \",\" \"\") (join \"-\" (list \"a\" \"b\")) (join \"-\" ()))",
+      "section": "4.2",
+      "program": "(import text)\n(list (split \",\" \"a,b,,c\") (split \", \" \"x\") (split \",\" \"\") (join \"-\" (list \"a\" \"b\")) (join \"-\" ()))",
       "value": "((\"a\" \"b\" \"\" \"c\") (\"x\") (\"\") \"a-b\" \"\")",
       "output": ""
     },
     {
       "id": "library-017",
       "kind": "eval",
-      "section": "4.5",
-      "program": "(split \"\" \"x\")",
+      "section": "4.2",
+      "program": "(import text)\n(split \"\" \"x\")",
       "error": ":error",
       "output": ""
     },
@@ -144,7 +144,7 @@
       "id": "library-018",
       "kind": "eval",
       "section": "1",
-      "program": "(define map (lambda (f xs) :mine)) (map 1 2)",
+      "program": "(import list)\n(define map (lambda (f xs) :mine)) (map 1 2)",
       "value": ":mine",
       "output": ""
     },
@@ -152,7 +152,7 @@
       "id": "library-019",
       "kind": "eval",
       "section": "2",
-      "program": "(map (lambda (x) x) \"abc\")",
+      "program": "(import list)\n(map (lambda (x) x) \"abc\")",
       "error": ":wrong-type",
       "output": ""
     },
@@ -160,7 +160,7 @@
       "id": "library-020",
       "kind": "eval",
       "section": "2",
-      "program": "(define build (lambda (n acc) (if (= n 0) acc otherwise (build (- n 1) (prepend n acc))))) (count (reverse (map (lambda (x) (+ x 1)) (build 100000 ()))))",
+      "program": "(import list)\n(define build (lambda (n acc) (if (= n 0) acc otherwise (build (- n 1) (prepend n acc))))) (count (reverse (map (lambda (x) (+ x 1)) (build 100000 ()))))",
       "value": "100000",
       "output": ""
     },
@@ -168,7 +168,7 @@
       "id": "library-021",
       "kind": "eval",
       "section": "2",
-      "program": "(define m {3 :c 1 :a 2 :b}) (list (sort < (keys m)) (map (lambda (k) (get m k)) (sort < (keys m))) (fold (lambda (acc k) (+ acc k)) 0 (keys m)))",
+      "program": "(import list)\n(define m {3 :c 1 :a 2 :b}) (list (sort < (keys m)) (map (lambda (k) (get m k)) (sort < (keys m))) (fold (lambda (acc k) (+ acc k)) 0 (keys m)))",
       "value": "((1 2 3) (:a :b :c) 6)",
       "output": ""
     },
@@ -178,9 +178,65 @@
       "section": "1",
       "program": "(include \"lib.lisp\" l) (l/doubled (list 1 2))",
       "files": {
-        "lib.lisp": "(define doubled (lambda (xs) (map (lambda (x) (* 2 x)) xs)))"
+        "lib.lisp": "(import list)\n(define doubled (lambda (xs) (map (lambda (x) (* 2 x)) xs)))"
       },
       "value": "(2 4)",
+      "output": ""
+    },
+    {
+      "id": "library-023",
+      "kind": "eval",
+      "section": "1",
+      "program": "(map list (list 1))",
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "library-024",
+      "kind": "eval",
+      "section": "1",
+      "program": "(import list l)\n(l/map (lambda (x) (+ x 1)) (list 1 2))",
+      "value": "(2 3)",
+      "output": ""
+    },
+    {
+      "id": "library-025",
+      "kind": "eval",
+      "section": "1",
+      "program": "(import list l)\n(map list ())",
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "library-026",
+      "kind": "eval",
+      "section": "2",
+      "program": "(import text)\n(fold + 0 (list 1 2))",
+      "value": "3",
+      "output": ""
+    },
+    {
+      "id": "library-027",
+      "kind": "eval",
+      "section": "4.3",
+      "program": "(import function f)\n((f/partial + 1) 2)",
+      "value": "3",
+      "output": ""
+    },
+    {
+      "id": "library-028",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import io)\n(import text)\n(display! (join \", \" (list \"a\" \"b\")))",
+      "value": "#void",
+      "output": "a, b"
+    },
+    {
+      "id": "library-029",
+      "kind": "eval",
+      "section": "2",
+      "program": "(import list)\n(import text)\n(import list)\n(count (range 0 3))",
+      "value": "3",
       "output": ""
     }
   ]

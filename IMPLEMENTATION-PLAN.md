@@ -1,7 +1,7 @@
 # Implementation plan: lisp-min in C23
 
 ## Goal
-An interpreter for the lisp-min core and standard library (v0.1.0), written in C23. Its only inputs are the specification and the conformance suites:
+An interpreter for the lisp-min core and standard library (v0.2.0), written in C23. Its only inputs are the specification and the conformance suites:
 
 - `core-specification.md`
 - `standard-library.md`
@@ -38,9 +38,11 @@ src/
   expander.c        §8.2–8.3 special forms, derived forms, macros, declare
   eval.h/.c         §8.1, 8.2, 8.4 lexical environments, tail loop, application
   primitives.c      §9  the primitive table
-  include.c         §8.8 contexts, prefixes, load once, cycles
+  include.c         §8.8–8.9 contexts, prefixes, load once, cycles; include and import
+  library.h/.c      §8.9 library registry: native (io) and written in the language (list, text, function)
+  library_io.c      §8.9, §9 the native library io: write!, display!, read-line!
   io.h/.c               output, stdin and file system interfaces
-  program.h/.c      §8.7 interpreter state, top level, stdlib loading
+  program.h/.c      §8.7 interpreter state, top level
   repl.c            §8.7 REPL
   main.c                CLI
 tests/
@@ -113,15 +115,16 @@ tests/
 - **Primitives:** the §9 table, one C function per primitive, checking arity and types before doing any work.
 - **Program:**
   - The whole file is read before anything runs. Then each top-level form is expanded and evaluated in turn, and a top-level `sequence` is spliced (§8.7).
-  - **Standard library:**
-    - Loaded at startup from the `lisp` code blocks of `standard-library.md` §4, so the normative definitions are what runs.
-    - The path comes from the build, and an environment variable can override it.
+  - **Libraries (§8.9):**
+    - Nothing is loaded before the program. `(import name prefix?)` goes through the same context machinery as `include`, keyed by library name instead of file path.
+    - `io` is native: its primitives live in `library_io.c` and are bound only by `import`, never in the global table.
+    - `list`, `text` and `function` are read from the `lisp` code blocks of `standard-library.md` §4.1–4.3, so the normative definitions are what runs. The path comes from the build, and `LISP_MIN_STDLIB` overrides it.
 - **IO:**
   - Output goes through a callback.
   - Stdin is a line reader that ends a line only at U+000A, so a CR stays in the line (§9).
   - The file system is an interface with two implementations: the disk, and an in-memory map for tests.
 - **CLI and REPL:**
-  - `lisp-min file.lisp` runs a program, and `lisp-min` alone starts the REPL. `--no-stdlib` skips the standard library.
+  - `lisp-min file.lisp` runs a program, and `lisp-min` alone starts the REPL. The REPL starts with `io`, `list`, `text` and `function` imported (§8.7); files import explicitly.
   - **Exit codes:**
     - 0 on success.
     - 1 on a read error or an uncaught error, with a message on stderr.
@@ -167,17 +170,16 @@ tests/
     - Results are compared with `equal?`, never by printed text.
     - An error result is compared by its `:kind`.
   - **Suites:**
-    - `conformance.json` runs without the standard library.
-    - `stdlib-conformance.json` runs with it.
+    - Both files run with every library available to `import`; the programs import what they use. `conformance.json` only imports `io`.
   - Each case starts from a fresh state and destroys it at the end. After that the live-object count must be zero.
   - **Options:** `-k` filters cases and `-v` lists every case.
 
 ## Phases (each ends with its tests passing)
 1. **Foundation:** Makefile, unit test runner, `value`, `buffer` and `utf8`, with unit tests for refcounting, `equal?` and releasing long lists.
 2. **Reading:** `reader`, `positions` and `printer`, plus the JSON parser and the conformance runner. Every `read`, `read-error` and `read-positions` case passes.
-3. **Evaluation:** `error`, `expander`, `eval`, `primitives` and `program`. Every `eval` case without `files` passes.
-4. **Include:** `include.c`. The `eval` cases with `files` pass.
-5. **Standard library, CLI and REPL:** stdlib loading, `main.c` and `repl.c`. All of `stdlib-conformance.json` passes.
+3. **Evaluation:** `error`, `expander`, `eval`, `primitives`, `program`, plus `import` of the native library `io` (`library`, `library_io`). Every core `eval` case without `files` passes.
+4. **Include:** `include.c`. The core `eval` cases with `files` pass.
+5. **Standard library, CLI and REPL:** the libraries `list`, `text` and `function` from `standard-library.md`, `main.c` and `repl.c`. All of `stdlib-conformance.json` passes.
 6. **Hardening and docs:** both suites pass under `make asan` (AddressSanitizer + UndefinedBehaviorSanitizer). The README is written.
 
 ## Verification

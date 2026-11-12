@@ -14,11 +14,15 @@ The core is a three-stage pipeline:
 2. Expansion: macros and derived forms rewritten into the five special forms (section 8).
 3. Evaluation: special forms, primitives and printing (sections 8 to 10).
 
-**Out of scope.** The standard library, with functions such as `map`, `filter` and `sort`, has its own specification. The extensions already planned, such as multi-pair `if`, sum types and gradual typing, belong to the full specification. The core only reserves the names they use (section 8.2).
+**Libraries.** Nothing beyond the primitives (section 9) is visible to a program until it asks for it. A program declares each library it uses with `import` (8.9), much as a C program declares its headers. The core defines the mechanism and one native library, `io`, which holds the input and output functions.
+
+**Out of scope.** The standard library, with the libraries `list`, `text` and `function` and functions such as `map`, `filter` and `sort`, has its own specification. The extensions already planned, such as multi-pair `if`, sum types and gradual typing, belong to the full specification. The core only reserves the names they use (section 8.2).
 
 **Normative terms.** MUST indicates a mandatory requirement. MUST NOT indicates a prohibition. MAY indicates implementation freedom that does not affect observable behavior.
 
-**Version:** core 0.1.0, draft.
+**Version:** core 0.2.0, draft.
+
+**Changes since 0.1.0.** `import` and libraries (8.9). `display!`, `write!` and `read-line!` moved from the global environment to the native library `io`. The standard library is no longer loaded before the program: a program imports what it uses. The REPL starts with every library imported (8.7).
 
 ## 2. Data model
 
@@ -398,7 +402,7 @@ In the `or` rewrite, `t` is a symbol created by `generate-symbol`, so that it do
 
 ### 8.5 Side effects and errors
 
-**Side effects are implicit.** Any function can perform input and output by calling the primitives `display!`, `write!` and `read-line!`. Since evaluation order is defined (8.1), effects happen in a predictable order. There is no mechanism to intercept or redirect these effects; for code that needs that, the recommended style is callbacks, described below.
+**Side effects are implicit.** Any function can perform input and output by calling `display!`, `write!` and `read-line!`, from the library `io` (8.9), once its file imports it. Since evaluation order is defined (8.1), effects happen in a predictable order. There is no mechanism to intercept or redirect these effects; for code that needs that, the recommended style is callbacks, described below.
 
 **The `!` convention.** The name of a function that interacts with the world outside the program ends in `!`. The rule applies to the input and output primitives and, by convention, to every function that directly calls a function ending in `!`. A function that only calls callbacks received as arguments does not need the mark, because whoever passes the callback decides the effect. The core does not check the convention; a future typing extension MAY check it. Errors (`error`, `raise`) and `generate-symbol` are not marked, because they do not interact with the outside world.
 
@@ -408,7 +412,7 @@ In the `or` rewrite, `t` is a symbol created by `generate-symbol`, so that it do
     (display! (concatenate "Hello, " name "\n"))))
 ```
 
-**Error descriptor.** Every error carries a descriptor: a Map with `:kind` (Keyword), `:message` (String) and `:values` (List). `(error message value …)` creates a descriptor with `:kind :error`. The `:kind`s of core errors are `:unbound-symbol`, `:not-a-function`, `:wrong-arguments`, `:wrong-type`, `:index-out-of-range`, `:missing-key`, `:integer-overflow`, `:division-by-zero`, `:duplicate-key`, `:expansion-error` and `:include-error` (8.8).
+**Error descriptor.** Every error carries a descriptor: a Map with `:kind` (Keyword), `:message` (String) and `:values` (List). `(error message value …)` creates a descriptor with `:kind :error`. The `:kind`s of core errors are `:unbound-symbol`, `:not-a-function`, `:wrong-arguments`, `:wrong-type`, `:index-out-of-range`, `:missing-key`, `:integer-overflow`, `:division-by-zero`, `:duplicate-key`, `:expansion-error`, `:include-error` (8.8) and `:import-error` (8.9).
 
 **Catching.** `(catch body handler)` calls `body`, a function with no arguments. If `body` finishes normally, `catch` returns its value. If an error occurs during `body`, evaluation of `body` is abandoned, and `handler` is called with the descriptor; the result of `handler` becomes the result of `catch`. Catching is exit-only: there is no way to return to the point of the error. An error inside `handler` goes to the next enclosing `catch`.
 
@@ -435,6 +439,7 @@ In **injection**, the function receives the functions that perform the effect, i
     ((get io :tell) "Name? ")
     ((get io :tell) (concatenate "Hello, " ((get io :ask)) "!\n"))))
 
+(import io)
 (greet-user {:ask read-line! :tell display!})                       ; real program: reads stdin
 (greet-user {:ask (lambda () "Ana") :tell (lambda (text) text)})   ; test: → "Hello, Ana!\n"
 ```
@@ -465,9 +470,9 @@ Lists of at least 1,000,000 elements MUST be built, traversed and discarded with
 
 ### 8.7 Programs and REPL
 
-**Loading a program.** The file is read in full by the reader before any evaluation; a read error prevents any form from being evaluated. The implementation MAY load the standard library before the program, but the core and its tests do not depend on it. Then, the top-level forms are processed **one at a time, in order**: each one is expanded and evaluated before the next. Therefore, a macro defined earlier in the file already applies to the following forms. A file included with `include` is read only when that form's turn comes (8.8).
+**Loading a program.** The file is read in full by the reader before any evaluation; a read error prevents any form from being evaluated. Nothing is loaded before the program: a library becomes visible only through `import` (8.9). Then, the top-level forms are processed **one at a time, in order**: each one is expanded and evaluated before the next. Therefore, a macro defined earlier in the file already applies to the following forms. A file included with `include` is read only when that form's turn comes (8.8).
 
-**Top level.** `define`, `define-macro` and `include` are only valid at top level; elsewhere, they are an expansion error. A `sequence` at top level is treated as if its forms were loose in the file, in the same order, and each of them is also at top level. This applies recursively and lets a macro generate several definitions at once. Outside the top level, `sequence` follows the rewrite in section 8.3.
+**Top level.** `define`, `define-macro`, `include` and `import` are only valid at top level; elsewhere, they are an expansion error. A `sequence` at top level is treated as if its forms were loose in the file, in the same order, and each of them is also at top level. This applies recursively and lets a macro generate several definitions at once. Outside the top level, `sequence` follows the rewrite in section 8.3.
 
 **Termination.**
 
@@ -484,6 +489,8 @@ Lists of at least 1,000,000 elements MUST be built, traversed and discarded with
 3. Print the result with `write!`, followed by a newline. If the result is `#void`, print nothing.
 4. On a read error or an uncaught error, show the message, discard the input and go back to step 1.
 
+The REPL starts as if the session began with `(import io)`, `(import list)`, `(import text)` and `(import function)`, in the empty context, so every library the implementation provides is at hand; a library the implementation does not provide is skipped. Step 3 prints with the `write!` rules (section 10) whether or not `write!` is bound.
+
 Redefining a name with `define` replaces the previous binding (8.2). The REPL ends at the end of standard input.
 
 ### 8.8 Including files
@@ -494,11 +501,11 @@ Redefining a name with `define` replaces the previous binding (8.2). The REPL en
 
 **Paths.** A relative path is resolved against the directory of the file that contains the `include`; in the REPL, against the current working directory. An absolute path is used as it is. The separator is `/`. Two paths name the same file when they are equal after being made absolute and having their `.` and `..` segments removed; symbolic links are not resolved.
 
-**Context.** Every top-level form is processed in a context, a sequence of prefixes. The program, the REPL and the standard library run in the empty context. `(include "path" p)` processes the file in the context of the `include` followed by `p`, and `(include "path")` in the same context as the `include`. The **full prefix** of a context joins its prefixes with `/`: the context `geo`, `u` has the full prefix `geo/u`. Two contexts with the same full prefix are the same context.
+**Context.** Every top-level form is processed in a context, a sequence of prefixes. The program and the REPL run in the empty context. A library runs in the context of the `import` that loads it (8.9). `(include "path" p)` processes the file in the context of the `include` followed by `p`, and `(include "path")` in the same context as the `include`. The **full prefix** of a context joins its prefixes with `/`: the context `geo`, `u` has the full prefix `geo/u`. Two contexts with the same full prefix are the same context.
 
 **Definitions in a context.** In the empty context, `define` and `define-macro` bind the global name, as in 8.2. In a context that ends with the prefix `p`, `(define x value)` evaluates `value`, records `x` as a name of that context, and then defines `p/x` in the context before `p`, by the same rule; `define-macro` does the same. The global that ends up bound is the full prefix, `/` and the name: in a file included with `geo` that includes another with `u`, `(define clean …)` in the second file binds `geo/u/clean`, records `clean` in the context `geo/u` and records `u/clean` in the context `geo`.
 
-**Resolving names in a context.** A symbol `x` in code from a non-empty context that is not bound locally (8.2) names the global `F/x`, where `F` is the full prefix of the context, if `x` is at that moment a name of the context; otherwise it names the global `x`. The test happens when the symbol is evaluated, like every global lookup, so a function may call another one defined further down in the same file. The head of a form is a macro under the same rule, tested when the form is expanded. Names the file does not define resolve as usual: the primitives, the standard library and whatever the including program defined are all visible. The rule applies only to symbols evaluated as variables and to macro heads: quoted data, symbols built with `string-to-symbol` and the names of special forms, derived forms and `include` are never prefixed.
+**Resolving names in a context.** A symbol `x` in code from a non-empty context that is not bound locally (8.2) names the global `F/x`, where `F` is the full prefix of the context, if `x` is at that moment a name of the context; otherwise it names the global `x`. The test happens when the symbol is evaluated, like every global lookup, so a function may call another one defined further down in the same file. The head of a form is a macro under the same rule, tested when the form is expanded. Names the file does not define resolve as usual: the primitives, the libraries imported in the empty context and whatever the including program defined are all visible. The rule applies only to symbols evaluated as variables and to macro heads: quoted data, symbols built with `string-to-symbol` and the names of special forms, derived forms, `include` and `import` are never prefixed.
 
 ```lisp
 ;; geo.lisp
@@ -525,9 +532,29 @@ Redefining a name with `define` replaces the previous binding (8.2). The REPL en
 
 An `include` is never inside a `catch`, because it is only valid at top level. So an `:include-error` terminates the program with exit code 1 (8.7). In the REPL, the message is shown, and the definitions already made by the file before the error remain. An error raised while evaluating an included form keeps its own `:kind`.
 
+### 8.9 Libraries and `import`
+
+**Form.** `(import name)` and `(import name prefix)` make a library visible. The arguments are not evaluated: `name` and `prefix` MUST be Symbols. Any other shape, including a third argument, is an expansion error, and so is an `import` outside the top level (8.7). The value of an `import` is `#void`.
+
+**Libraries.** A library is a named set of definitions provided by the implementation. Its name is a Symbol, not a path: it does not depend on the directory of the importing file. A library is either **native**, with functions implemented by the host, or **written in the language**, as a sequence of top-level forms. A program cannot tell the two kinds apart. The core defines one native library, `io`; the standard library defines `list`, `text` and `function`. An implementation MAY provide more.
+
+**Loading.** `(import name prefix)` behaves like an `include` (8.8) of the library with the same prefix: it is processed in its turn, its forms run in the context of the `import` followed by `prefix`, and its definitions are recorded and bound by the rules of 8.8. So `(import list)` in the empty context binds `map` as a global, and `(import list l)` binds `l/map` instead, leaving `map` unbound. The functions of a native library are bound as if each one were defined with `define` in that context, in the order the library lists them. A library is loaded at most once per context; a repeated `import` in the same resulting context is ignored.
+
+**Dependencies.** A library written in the language MAY import other libraries. Its `import` forms run in the library's own context, so the definitions of the dependency become names of that same context: importing `text` in the empty context also binds the globals of `list`, which `text` imports. This is deliberate and mirrors C headers that include other headers.
+
+**Errors.** An `import` of a name the implementation does not provide ends with `:import-error`, whose `:values` are `(name :unknown-library)`, with the name as a Symbol. Like `include`, an `import` is never inside a `catch`, so the error terminates the program with exit code 1 (8.7).
+
+**The library `io`.** It provides `write!`, `display!` and `read-line!`, in that order, with the behavior given in section 9. Without `(import io)`, these names are unbound like any other.
+
+```lisp
+(import io)
+(import text t)
+(display! (t/join ", " (list "a" "b")))   ; prints a, b
+```
+
 ## 9. Primitives
 
-Primitives are native functions bound in the global environment. An argument of the wrong type, an index out of range or an invalid number of arguments is an error (8.4).
+Primitives are native functions bound in the global environment, except for the input and output functions, which belong to the library `io` (8.9) and are bound only where it is imported. An argument of the wrong type, an index out of range or an invalid number of arguments is an error (8.4).
 
 | Group | Functions | Rules |
 | --- | --- | --- |
@@ -543,7 +570,7 @@ Primitives are native functions bound in the global environment. An argument of 
 | Symbols | `string-to-symbol`, `symbol-to-string`, `generate-symbol` | `generate-symbol` creates a new symbol, different from all others and not interned, so macros can avoid capture |
 | Functions | `apply` | `(apply f a … list)` calls `f` with `a …` followed by the elements of `list` |
 | Logic | `not` | returns `#true` if the argument is `#false`, and `#false` in any other case; `and` and `or` are derived forms (8.3) |
-| Input and output | `write!`, `display!`, `read-line!` | `write!` and `display!` write a value to standard output, in the form of section 10, and return `#void`. `read-line!` reads a line from standard input and returns it without the line terminator, or `#void` at end of input. The only line terminator is U+000A, as in 6.1: a U+000D before it stays in the returned string, and a U+000D alone does not end a line. A last line without U+000A is returned as it is |
+| Input and output (library `io`) | `write!`, `display!`, `read-line!` | only after `(import io)` (8.9). `write!` and `display!` write a value to standard output, in the form of section 10, and return `#void`. `read-line!` reads a line from standard input and returns it without the line terminator, or `#void` at end of input. The only line terminator is U+000A, as in 6.1: a U+000D before it stays in the returned string, and a U+000D alone does not end a line. A last line without U+000A is returned as it is |
 | Errors | `error`, `raise`, `catch` | `(error message value …)` interrupts with `{:kind :error :message message :values (value …)}`; `(raise descriptor)` interrupts with an existing descriptor; `(catch body handler)` catches errors (8.5) |
 
 ## 10. Printing
@@ -671,18 +698,18 @@ An implementation is conformant when it passes all the cases below. Results are 
 
 ### 12.4 Conformance file
 
-The file `conformance.json` has 228 cases, each with an `id`, the section it tests and a kind:
+The file `conformance.json` has 241 cases, each with an `id`, the section it tests and a kind:
 
 | Kind | Cases | What it checks |
 | --- | --- | --- |
 | `read` | 20 | `input` produces the same sequence of datums as `equivalent`, or datums with the types in `types` |
 | `read-error` | 37 | reading `input`, or the bytes of `input_hex`, fails with the code `error` at `position` |
 | `read-positions` | 2 | the node indicated by each `path` is in the position table with the expected `position` |
-| `eval` | 169 | `program` runs as a file, without the standard library and with `input` on standard input; the output is exactly `output`, and the program ends with the value `value` or with an uncaught error of the `:kind` given in `error` |
+| `eval` | 182 | `program` runs as a file, with `input` on standard input; it imports at most the library `io`; the output is exactly `output`, and the program ends with the value `value` or with an uncaught error of the `:kind` given in `error` |
 
 An `eval` case that tests `include` (8.8) also has `files`, an object that maps each relative path, with `/` as separator, to the text of that file. The program is the file `main.lisp`, and the paths are relative to its directory. A path missing from `files` cannot be opened.
 
-The `eval` cases cover the special and derived forms, tail calls with one million iterations, equality, arithmetic and overflows, primitives, printing, `catch` and `raise`, both callback patterns, and `include` with and without prefixes. Some cases check that what was removed from the core does not exist: `/`, `same?`, named `lambda`, the names without `!` and the standard library functions. The library has its own cases, in the file `stdlib-conformance.json`.
+The `eval` cases cover the special and derived forms, tail calls with one million iterations, equality, arithmetic and overflows, primitives, printing, `catch` and `raise`, both callback patterns, `include` with and without prefixes, and `import` (8.9). Some cases check that what was removed from the core does not exist: `/`, `same?`, named `lambda`, the names without `!`, the standard library functions without `import`, and the `io` functions without `import`. The library has its own cases, in the file `stdlib-conformance.json`.
 
 **Behaviors fixed by the tests.** While writing the cases, these points needed an answer that the text above does not give yet:
 

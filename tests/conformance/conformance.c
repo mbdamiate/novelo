@@ -1,4 +1,4 @@
-/* Conformance runner (core §12.4): conformance [-k TEXT] [-v] [--stdlib] FILE…
+/* Conformance runner (core §12.4): conformance [-k TEXT] [-v] FILE…
  *
  * Results are compared with equal?, never by printed text. Each case starts
  * from a fresh state, and afterwards no object and no position entry may
@@ -287,10 +287,8 @@ int main(int argument_count, char **arguments) {
             filter = arguments[++index];
         } else if (strcmp(arguments[index], "-v") == 0) {
             verbose = true;
-        } else if (strcmp(arguments[index], "--stdlib") == 0) {
-            /* the standard library arrives in phase 5; its cases are eval cases */
         } else if (arguments[index][0] == '-') {
-            fprintf(stderr, "usage: %s [-k TEXT] [-v] [--stdlib] FILE...\n", arguments[0]);
+            fprintf(stderr, "usage: %s [-k TEXT] [-v] FILE...\n", arguments[0]);
             return 2;
         } else {
             if (!run_suite(arguments[index], filter, verbose, &totals)) return 2;
@@ -298,7 +296,7 @@ int main(int argument_count, char **arguments) {
         }
     }
     if (suite_count == 0) {
-        fprintf(stderr, "usage: %s [-k TEXT] [-v] [--stdlib] FILE...\n", arguments[0]);
+        fprintf(stderr, "usage: %s [-k TEXT] [-v] FILE...\n", arguments[0]);
         return 2;
     }
     return totals.failed ? 1 : 0;

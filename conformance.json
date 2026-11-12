@@ -1,10 +1,10 @@
 {
-  "spec": "Core Specification — Immutable Lisp, version 0.1.0",
+  "spec": "Core Specification — Immutable Lisp, version 0.2.0",
   "format": {
     "read": "Read 'input' (UTF-8). With 'equivalent': also read that text and compare the two datum sequences with equal?. With 'types': the sequence read has exactly these types, in order.",
     "read-error": "Read 'input' (or the bytes of 'input_hex'). Reading MUST fail with the code 'error' at position [line, column].",
     "read-positions": "Read 'input'. For each entry, 'path' indexes the sequence read and then list elements (0-based); the node found MUST be in the position table with 'position'.",
-    "eval": "Evaluate 'program' as a file (section 8.7), WITHOUT the standard library, with 'input' as standard input (empty if absent). Standard output MUST be exactly 'output'. With 'value': the program terminates normally, and the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
+    "eval": "Evaluate 'program' as a file (section 8.7), with only the library io available to import (section 8.9), with 'input' as standard input (empty if absent). Standard output MUST be exactly 'output'. With 'value': the program terminates normally, and the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
   },
   "cases": [
     {
@@ -992,7 +992,7 @@
       "id": "eval-081",
       "kind": "eval",
       "section": "8.3",
-      "program": "(sequence (display! \"a\") (display! \"b\"))",
+      "program": "(import io)\n(sequence (display! \"a\") (display! \"b\"))",
       "value": "#void",
       "output": "ab"
     },
@@ -1488,7 +1488,7 @@
       "id": "eval-210",
       "kind": "eval",
       "section": "10",
-      "program": "(display! \"olá\")",
+      "program": "(import io)\n(display! \"olá\")",
       "value": "#void",
       "output": "olá"
     },
@@ -1496,7 +1496,7 @@
       "id": "eval-211",
       "kind": "eval",
       "section": "10",
-      "program": "(write! \"olá\")",
+      "program": "(import io)\n(write! \"olá\")",
       "value": "#void",
       "output": "\"olá\""
     },
@@ -1504,7 +1504,7 @@
       "id": "eval-212",
       "kind": "eval",
       "section": "10",
-      "program": "(display! 42) (display! \" \") (write! :k) (display! \"\\n\")",
+      "program": "(import io)\n(display! 42) (display! \" \") (write! :k) (display! \"\\n\")",
       "value": "#void",
       "output": "42 :k\n"
     },
@@ -1512,7 +1512,7 @@
       "id": "eval-213",
       "kind": "eval",
       "section": "10",
-      "program": "(write! (list 1 \"a\" :k {:b 2}))",
+      "program": "(import io)\n(write! (list 1 \"a\" :k {:b 2}))",
       "value": "#void",
       "output": "(1 \"a\" :k {:b 2})"
     },
@@ -1520,7 +1520,7 @@
       "id": "eval-214",
       "kind": "eval",
       "section": "10",
-      "program": "(write! \"a\\nb\\t\\\"c\\\"\\\\\")",
+      "program": "(import io)\n(write! \"a\\nb\\t\\\"c\\\"\\\\\")",
       "value": "#void",
       "output": "\"a\\nb\\t\\\"c\\\"\\\\\""
     },
@@ -1528,7 +1528,7 @@
       "id": "eval-215",
       "kind": "eval",
       "section": "10",
-      "program": "(write! \"\u0001\")",
+      "program": "(import io)\n(write! \"\u0001\")",
       "value": "#void",
       "output": "\"\\u{1}\""
     },
@@ -1536,7 +1536,7 @@
       "id": "eval-228",
       "kind": "eval",
       "section": "10",
-      "program": "(write! \"\\r\\u{0}\\u{1F}\\u{7F}\\u{80}é\") (display! \"\\r\\u{1B}\")",
+      "program": "(import io)\n(write! \"\\r\\u{0}\\u{1F}\\u{7F}\\u{80}é\") (display! \"\\r\\u{1B}\")",
       "value": "#void",
       "output": "\"\\r\\u{0}\\u{1F}\\u{7F}é\"\r\u001b"
     },
@@ -1544,7 +1544,7 @@
       "id": "eval-216",
       "kind": "eval",
       "section": "10",
-      "program": "(write! (list (lambda (x) x) +))",
+      "program": "(import io)\n(write! (list (lambda (x) x) +))",
       "value": "#void",
       "output": "(#<function> #<function>)"
     },
@@ -1552,7 +1552,7 @@
       "id": "eval-217",
       "kind": "eval",
       "section": "9",
-      "program": "(list (read-line!) (read-line!) (read-line!))",
+      "program": "(import io)\n(list (read-line!) (read-line!) (read-line!))",
       "value": "(\"line 1\" \"line 2\" #void)",
       "output": "",
       "input": "line 1\nline 2\n"
@@ -1561,7 +1561,7 @@
       "id": "eval-218",
       "kind": "eval",
       "section": "9",
-      "program": "(list (read-line!) (read-line!))",
+      "program": "(import io)\n(list (read-line!) (read-line!))",
       "value": "(\"a\" #void)",
       "output": "",
       "input": "a"
@@ -1570,7 +1570,7 @@
       "id": "eval-224",
       "kind": "eval",
       "section": "9",
-      "program": "(list (read-line!) (read-line!) (read-line!) (read-line!))",
+      "program": "(import io)\n(list (read-line!) (read-line!) (read-line!) (read-line!))",
       "input": "a\r\nb\rc\n\r",
       "value": "(\"a\\r\" \"b\\rc\" \"\\r\" #void)",
       "output": ""
@@ -1579,7 +1579,7 @@
       "id": "eval-219",
       "kind": "eval",
       "section": "9",
-      "program": "(define r (display! \"x\")) (void? r)",
+      "program": "(import io)\n(define r (display! \"x\")) (void? r)",
       "value": "#true",
       "output": "x"
     },
@@ -1587,7 +1587,7 @@
       "id": "eval-220",
       "kind": "eval",
       "section": "8.7",
-      "program": "(display! \"a\") (error \"x\") (display! \"b\")",
+      "program": "(import io)\n(display! \"a\") (error \"x\") (display! \"b\")",
       "error": ":error",
       "output": "a"
     },
@@ -1643,7 +1643,7 @@
       "id": "catch-007",
       "kind": "eval",
       "section": "8.5",
-      "program": "(catch (lambda () (sequence (display! \"a\") (error \"x\") (display! \"b\"))) (lambda (p) :caught))",
+      "program": "(import io)\n(catch (lambda () (sequence (display! \"a\") (error \"x\") (display! \"b\"))) (lambda (p) :caught))",
       "value": ":caught",
       "output": "a"
     },
@@ -1723,7 +1723,7 @@
       "id": "callback-002",
       "kind": "eval",
       "section": "8.5",
-      "program": "(define greet-user (lambda (io) ((get io :tell) (concatenate \"Hello, \" ((get io :ask)) \"!\\n\")))) (greet-user {:ask read-line! :tell display!})",
+      "program": "(import io)\n(define greet-user (lambda (io) ((get io :tell) (concatenate \"Hello, \" ((get io :ask)) \"!\\n\")))) (greet-user {:ask read-line! :tell display!})",
       "value": "#void",
       "output": "Hello, Ana!\n",
       "input": "Ana\n"
@@ -1783,7 +1783,7 @@
       "id": "include-002",
       "kind": "eval",
       "section": "8.8",
-      "program": "(display! \"1\") (include \"a.lisp\")",
+      "program": "(import io)\n(display! \"1\") (include \"a.lisp\")",
       "files": {
         "a.lisp": "(display! \"a\")"
       },
@@ -1942,7 +1942,7 @@
       "id": "include-016",
       "kind": "eval",
       "section": "8.8",
-      "program": "(include \"u.lisp\") (include \"./u.lisp\") (include \"lib/../u.lisp\") (include \"u.lisp\" p) (include \"u.lisp\" p)",
+      "program": "(import io)\n(include \"u.lisp\") (include \"./u.lisp\") (include \"lib/../u.lisp\") (include \"u.lisp\" p) (include \"u.lisp\" p)",
       "files": {
         "u.lisp": "(display! \"u\")"
       },
@@ -1953,7 +1953,7 @@
       "id": "include-017",
       "kind": "eval",
       "section": "8.8",
-      "program": "(include \"util.lisp\" u) (include \"geo.lisp\" geo) (list (u/clean) (geo/u/clean))",
+      "program": "(import io)\n(include \"util.lisp\" u) (include \"geo.lisp\" geo) (list (u/clean) (geo/u/clean))",
       "files": {
         "util.lisp": "(display! \"u\")\n(define clean (lambda () :clean))",
         "geo.lisp": "(include \"util.lisp\" u)"
@@ -1977,7 +1977,7 @@
       "id": "include-019",
       "kind": "eval",
       "section": "8.8",
-      "program": "(display! \"x\") (include \"main.lisp\")",
+      "program": "(import io)\n(display! \"x\") (include \"main.lisp\")",
       "error": ":include-error",
       "output": "x"
     },
@@ -1985,7 +1985,7 @@
       "id": "include-020",
       "kind": "eval",
       "section": "8.8",
-      "program": "(display! \"a\") (include \"missing.lisp\")",
+      "program": "(import io)\n(display! \"a\") (include \"missing.lisp\")",
       "error": ":include-error",
       "output": "a"
     },
@@ -1993,7 +1993,7 @@
       "id": "include-021",
       "kind": "eval",
       "section": "8.8",
-      "program": "(display! \"a\") (include \"bad.lisp\")",
+      "program": "(import io)\n(display! \"a\") (include \"bad.lisp\")",
       "files": {
         "bad.lisp": "(define x 1)\n(define y"
       },
@@ -2064,6 +2064,116 @@
         "lib.lisp": "(define v (swap 1 -))"
       },
       "value": "-1",
+      "output": ""
+    },
+    {
+      "id": "import-001",
+      "kind": "eval",
+      "section": "8.9",
+      "program": "(import io)\n(display! \"hi\")",
+      "value": "#void",
+      "output": "hi"
+    },
+    {
+      "id": "import-002",
+      "kind": "eval",
+      "section": "8.9",
+      "program": "(display! \"hi\")",
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "import-003",
+      "kind": "eval",
+      "section": "8.9",
+      "program": "(import io out)\n(out/display! \"x\")",
+      "value": "#void",
+      "output": "x"
+    },
+    {
+      "id": "import-004",
+      "kind": "eval",
+      "section": "8.9",
+      "program": "(import io out)\n(display! \"x\")",
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "import-005",
+      "kind": "eval",
+      "section": "8.9",
+      "program": "(import io)\n(import io)\n(display! \"a\")",
+      "value": "#void",
+      "output": "a"
+    },
+    {
+      "id": "import-006",
+      "kind": "eval",
+      "section": "8.9",
+      "program": "(import nonexistent)",
+      "error": ":import-error",
+      "output": ""
+    },
+    {
+      "id": "import-007",
+      "kind": "eval",
+      "section": "8.9",
+      "program": "(import \"io\")",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "import-008",
+      "kind": "eval",
+      "section": "8.9",
+      "program": "(import io out extra)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "import-009",
+      "kind": "eval",
+      "section": "8.9",
+      "program": "(list (import io))",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "import-010",
+      "kind": "eval",
+      "section": "8.9",
+      "program": "(import io)",
+      "value": "#void",
+      "output": ""
+    },
+    {
+      "id": "import-011",
+      "kind": "eval",
+      "section": "8.9",
+      "program": "(include \"say.lisp\" s)\n(s/say! \"ok\")",
+      "files": {
+        "say.lisp": "(import io)\n(define say! (lambda (text) (display! text)))"
+      },
+      "value": "#void",
+      "output": "ok"
+    },
+    {
+      "id": "import-012",
+      "kind": "eval",
+      "section": "8.9",
+      "program": "(include \"say.lisp\" s)\n(display! \"x\")",
+      "files": {
+        "say.lisp": "(import io)\n(define say! (lambda (text) (display! text)))"
+      },
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "import-013",
+      "kind": "eval",
+      "section": "8.9",
+      "program": "(import io)\n(define display! (lambda (text) :mine))\n(display! \"a\")",
+      "value": ":mine",
       "output": ""
     }
   ]
