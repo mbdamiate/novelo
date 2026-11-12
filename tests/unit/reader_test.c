@@ -90,7 +90,8 @@ static void t_literals(void) {
     CHECK_READ_ERROR("#", "unknown-dispatch", 1, 1);
     CHECK_READ_ERROR("#;", "unknown-dispatch", 1, 1);
     CHECK_READ_ERROR("#|", "unknown-dispatch", 1, 1);
-    CHECK_READ_ERROR("#{1}", "unknown-dispatch", 1, 1);
+    CHECK_READ_ERROR("#(1)", "unknown-dispatch", 1, 1);
+    CHECK_READ_ERROR("# {1}", "unknown-dispatch", 1, 1);
     CHECK_READ_ERROR("#<function>", "unknown-dispatch", 1, 1);
 }
 
@@ -192,6 +193,35 @@ static void t_nesting_limit(void) {
     memset(prefixes, '\'', 1001);
     prefixes[1001] = '\0';
     CHECK_READ_ERROR(prefixes, "nesting-too-deep", 1, 1001);
+
+    /* a "#{" is one opener, at its '#' (§5.6) */
+    char sets[2003];
+    memset(sets, '(', 999);
+    memcpy(sets + 999, "#{#{", 4);
+    sets[1003] = '\0';
+    CHECK_READ_ERROR(sets, "nesting-too-deep", 1, 1002);
+}
+
+/* §5.2, §5.5 — sets */
+static void t_sets(void) {
+    Value *datum = read_one("#{1 \"a\" (2)}");
+    CHECK(datum && datum->kind == LISP_KIND_SET && lisp_map_count(datum) == 3);
+    if (datum) {
+        Value *element = lisp_integer(1);
+        CHECK(lisp_set_contains(datum, element));
+        LispPosition position;
+        CHECK(lisp_position_lookup(datum, &position) && position.line == 1 && position.column == 1);
+    }
+    lisp_release(datum);
+    datum = read_one("#{}");
+    CHECK(datum == lisp_set_new());
+    datum = read_one("#{ ; comment\n }");
+    CHECK(datum == lisp_set_new());
+    CHECK_READ_ERROR("#{1 1}", "duplicate-element", 1, 1);
+    CHECK_READ_ERROR("x #{(a) (a)}", "duplicate-element", 1, 3);
+    CHECK_READ_ERROR("#{1", "unclosed-delimiter", 1, 1);
+    CHECK_READ_ERROR("#{1)", "mismatched-delimiter", 1, 4);
+    CHECK_READ_ERROR("#{1 \"x}", "unterminated-string", 1, 5);
 }
 
 static void t_positions(void) {
@@ -246,6 +276,7 @@ const TestSuite reader_suite = {"reader", (const TestCase[]){
     {"prefixes and atmosphere", t_prefixes_and_atmosphere},
     {"symbols are interned while reading", t_interning_while_reading},
     {"nesting limit", t_nesting_limit},
+    {"sets", t_sets},
     {"positions", t_positions},
     {"invalid UTF-8 in reading order", t_invalid_utf8},
     {"incomplete-input errors", t_incomplete_errors},

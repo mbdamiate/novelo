@@ -163,6 +163,7 @@ KIND_PREDICATE(is_symbol, value->kind == LISP_KIND_SYMBOL)
 KIND_PREDICATE(is_keyword, value->kind == LISP_KIND_KEYWORD)
 KIND_PREDICATE(is_list, lisp_is_list(value))
 KIND_PREDICATE(is_map, value->kind == LISP_KIND_MAP)
+KIND_PREDICATE(is_set, value->kind == LISP_KIND_SET)
 KIND_PREDICATE(is_function, lisp_is_function(value))
 
 /* ---- lists -------------------------------------------------------------------------------- */
@@ -203,10 +204,11 @@ static bool size_of(LispState *state, const char *function, const Value *value, 
     switch ((LispKind)value->kind) {
     case LISP_KIND_EMPTY:
     case LISP_KIND_PAIR: *size = lisp_list_length(value); return true;
-    case LISP_KIND_MAP: *size = lisp_map_count(value); return true;
+    case LISP_KIND_MAP:
+    case LISP_KIND_SET: *size = lisp_map_count(value); return true;
     case LISP_KIND_STRING: *size = lisp_as_string(value)->length; return true;
     default:
-        lisp_error(state, "wrong-type", LISP_LIST((Value *)value), "%s expects a List, Map or String, got a %s",
+        lisp_error(state, "wrong-type", LISP_LIST((Value *)value), "%s expects a List, Map, Set or String, got a %s",
                    function, lisp_type_name(value));
         return false;
     }
@@ -239,7 +241,11 @@ PRIMITIVE(get) {
 
 PRIMITIVE(contains) {
     (void)argument_count;
-    if (!lisp_expect_kind(state, "contains?", arguments[0], LISP_KIND_MAP, "Map")) return nullptr;
+    /* a key of a map, or an element of a set (a set's values are #true) */
+    if (arguments[0]->kind != LISP_KIND_SET
+        && !lisp_expect_kind(state, "contains?", arguments[0], LISP_KIND_MAP, "Map or Set")) {
+        return nullptr;
+    }
     return lisp_bool(lisp_map_get(arguments[0], arguments[1]) != nullptr);
 }
 
@@ -263,6 +269,32 @@ PRIMITIVE(keys) {
     Value *key, *value;
     for (size_t cursor = 0; lisp_map_next(arguments[0], &cursor, &key, &value);) {
         lisp_list_append_take(&builder, lisp_retain(key));
+    }
+    return lisp_list_builder_finish(&builder);
+}
+
+/* ---- sets (§9) ---------------------------------------------------------------------------- */
+
+PRIMITIVE(adjoin) {
+    (void)argument_count;
+    if (!lisp_expect_kind(state, "adjoin", arguments[0], LISP_KIND_SET, "Set")) return nullptr;
+    return lisp_set_adjoin(arguments[0], arguments[1]);
+}
+
+PRIMITIVE(disjoin) {
+    (void)argument_count;
+    if (!lisp_expect_kind(state, "disjoin", arguments[0], LISP_KIND_SET, "Set")) return nullptr;
+    return lisp_set_disjoin(arguments[0], arguments[1]);
+}
+
+PRIMITIVE(elements) {
+    (void)argument_count;
+    if (!lisp_expect_kind(state, "elements", arguments[0], LISP_KIND_SET, "Set")) return nullptr;
+    LispListBuilder builder;
+    lisp_list_builder_init(&builder);
+    Value *element;
+    for (size_t cursor = 0; lisp_set_next(arguments[0], &cursor, &element);) {
+        lisp_list_append_take(&builder, lisp_retain(element));
     }
     return lisp_list_builder_finish(&builder);
 }
@@ -448,6 +480,7 @@ static const LispNativeFunction primitives[] = {
     {"keyword?", 1, 1, primitive_is_keyword},
     {"list?", 1, 1, primitive_is_list},
     {"map?", 1, 1, primitive_is_map},
+    {"set?", 1, 1, primitive_is_set},
     {"function?", 1, 1, primitive_is_function},
     {"list", 0, -1, primitive_list},
     {"prepend", 2, 2, primitive_prepend},
@@ -460,6 +493,9 @@ static const LispNativeFunction primitives[] = {
     {"associate", 3, 3, primitive_associate},
     {"dissociate", 2, 2, primitive_dissociate},
     {"keys", 1, 1, primitive_keys},
+    {"adjoin", 2, 2, primitive_adjoin},
+    {"disjoin", 2, 2, primitive_disjoin},
+    {"elements", 1, 1, primitive_elements},
     {"concatenate", 0, -1, primitive_concatenate},
     {"string-at", 2, 2, primitive_string_at},
     {"substring", 3, 3, primitive_substring},

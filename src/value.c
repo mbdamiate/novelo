@@ -17,6 +17,7 @@ Value lisp_void_object = {.kind = LISP_KIND_VOID, .flags = LISP_IMMORTAL};
 Value lisp_empty_object = {.kind = LISP_KIND_EMPTY, .flags = LISP_IMMORTAL};
 
 static LispMap empty_map = {.header = {.kind = LISP_KIND_MAP, .flags = LISP_IMMORTAL}};
+static LispMap empty_set = {.header = {.kind = LISP_KIND_SET, .flags = LISP_IMMORTAL}};
 
 /* ---- allocation and release ------------------------------------------------ */
 
@@ -57,7 +58,8 @@ static void destroy(Value *object) {
         lisp_release(pair->rest);
         break;
     }
-    case LISP_KIND_MAP: {
+    case LISP_KIND_MAP:
+    case LISP_KIND_SET: {
         LispMap *map = (LispMap *)object;
         lisp_release(map->root); /* trie nodes are opaque objects, released through the work stack */
         free(map->ordered);
@@ -107,6 +109,7 @@ const char *lisp_type_name(const Value *value) {
     case LISP_KIND_EMPTY:
     case LISP_KIND_PAIR: return "List";
     case LISP_KIND_MAP: return "Map";
+    case LISP_KIND_SET: return "Set";
     case LISP_KIND_CLOSURE:
     case LISP_KIND_PRIMITIVE: return "Function";
     case LISP_KIND_OPAQUE: return ((const LispOpaque *)value)->class->name;
@@ -511,13 +514,13 @@ static Value *trie_dissociate(const Value *root, unsigned shift, const Value *ke
     return node_with_slot(node, bit, nullptr, child);
 }
 
-/* A map over a trie (taken). */
-static Value *map_from_trie(Value *root, size_t count, uint64_t next_sequence) {
+/* A map or set (by kind) over a trie (taken). */
+static Value *map_from_trie(LispKind kind, Value *root, size_t count, uint64_t next_sequence) {
     if (count == 0) {
         lisp_release(root);
-        return &empty_map.header;
+        return kind == LISP_KIND_SET ? &empty_set.header : &empty_map.header;
     }
-    LispMap *map = (LispMap *)lisp_object_new(LISP_KIND_MAP, sizeof(LispMap));
+    LispMap *map = (LispMap *)lisp_object_new(kind, sizeof(LispMap));
     map->count = count;
     map->root = root;
     map->next_sequence = next_sequence;
@@ -557,7 +560,8 @@ Value *lisp_map_associate(const Value *map_value, Value *key, Value *value) {
     LispMapEntry entry = {.key = key, .value = value, .hash = lisp_hash(key), .sequence = map->next_sequence};
     bool added = false;
     Value *root = trie_associate(map->root, 0, &entry, &added);
-    return map_from_trie(root, map->count + (added ? 1 : 0), map->next_sequence + (added ? 1 : 0));
+    return map_from_trie((LispKind)map->header.kind, root, map->count + (added ? 1 : 0),
+                         map->next_sequence + (added ? 1 : 0));
 }
 
 Value *lisp_map_dissociate(Value *map_value, const Value *key) {
@@ -565,8 +569,21 @@ Value *lisp_map_dissociate(Value *map_value, const Value *key) {
     uint64_t hash = lisp_hash(key);
     if (map->count == 0 || !trie_find(map->root, key, hash)) return lisp_retain(map_value);
     Value *root = trie_dissociate(map->root, 0, key, hash);
-    return map_from_trie(root, map->count - 1, map->next_sequence);
+    return map_from_trie((LispKind)map->header.kind, root, map->count - 1, map->next_sequence);
 }
+
+Value *lisp_set_new(void) { return &empty_set.header; }
+
+bool lisp_set_insert_take(Value **set, Value *element) {
+    return lisp_map_insert_take(set, element, LISP_TRUE);
+}
+
+Value *lisp_set_adjoin(const Value *set, Value *element) {
+    if (lisp_set_contains(set, element)) return lisp_retain((Value *)set);
+    return lisp_map_associate(set, element, LISP_TRUE);
+}
+
+Value *lisp_set_disjoin(Value *set, const Value *element) { return lisp_map_dissociate(set, element); }
 
 /* ---- iteration in insertion order ---- */
 
@@ -684,7 +701,8 @@ bool lisp_equal(const Value *left, const Value *right) {
             push_comparison(&stack, lisp_rest(first), lisp_rest(second));
             push_comparison(&stack, lisp_first(first), lisp_first(second));
             break;
-        case LISP_KIND_MAP: {
+        case LISP_KIND_MAP:
+        case LISP_KIND_SET: { /* a set's values are all #true, so the same loop compares elements */
             if (lisp_map_count(first) != lisp_map_count(second)) {
                 equal = false;
                 break;
@@ -735,9 +753,11 @@ static uint64_t hash_at(const Value *value, int depth) {
         }
         return hash;
     }
-    case LISP_KIND_MAP: {
-        if (depth == 0) return 0x5000;
-        uint64_t hash = 0x5001 + lisp_map_count(value);
+    case LISP_KIND_MAP:
+    case LISP_KIND_SET: {
+        bool is_set = value->kind == LISP_KIND_SET;
+        if (depth == 0) return is_set ? 0x6000 : 0x5000;
+        uint64_t hash = (is_set ? 0x6001 : 0x5001) + lisp_map_count(value);
         Value *key, *entry_value;
         for (size_t cursor = 0; lisp_map_next(value, &cursor, &key, &entry_value);) {
             /* Sum: independent of iteration order (§2.3). */

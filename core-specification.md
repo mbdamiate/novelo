@@ -16,13 +16,15 @@ The core is a three-stage pipeline:
 
 **Libraries.** Nothing beyond the primitives (section 9) is visible to a program until it asks for it. A program declares each library it uses with `import` (8.9), much as a C program declares its headers. The core defines the mechanism and one native library, `io`, which holds the input and output functions.
 
-**Out of scope.** The standard library, with the libraries `list`, `text`, `function` and `map` and functions such as `map`, `filter` and `sort`, has its own specification. The extensions already planned, such as multi-pair `if`, sum types and gradual typing, belong to the full specification. The core only reserves the names they use (section 8.2).
+**Out of scope.** The standard library, with the libraries `list`, `text`, `function`, `map` and `set` and functions such as `map`, `filter` and `sort`, has its own specification. The extensions already planned, such as multi-pair `if`, sum types and gradual typing, belong to the full specification. The core only reserves the names they use (section 8.2).
 
 **Name.** The language is called **Novelo**, Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as the lists of the language are. Source files use the extension `.nvl`; the extension is a convention, and `include` accepts any path (8.8).
 
 **Normative terms.** MUST indicates a mandatory requirement. MUST NOT indicates a prohibition. MAY indicates implementation freedom that does not affect observable behavior.
 
-**Version:** core 0.4.0, draft.
+**Version:** core 0.5.0, draft.
+
+**Changes since 0.4.0.** A new type, Set, written `#{…}` (2, 5.2, 5.5), with the read error `duplicate-element` (7.4) and the runtime error `:duplicate-element` (8.4, 8.5). Set literals evaluate their elements like map literals (8.1, 8.4). `equal?`, printing and quasiquote handle sets (2.4.1, 8.3, 10). New primitives `set?`, `adjoin`, `disjoin` and `elements`; `count`, `empty?` and `contains?` accept sets (9). Sets are persistent, like maps (8.6). The REPL also imports the library `set` (8.7).
 
 **Changes since 0.3.0.** Maps are persistent: `associate`, `dissociate` and `get` MUST NOT copy the whole map, and a map of one million keys MUST be built one key at a time (8.6). The REPL also imports the library `map` of the standard library (8.7).
 
@@ -36,7 +38,7 @@ The core is a three-stage pipeline:
 
 ## 2. Data model
 
-The reader produces values of eight types, and evaluation adds a ninth, Function, for closures and primitives, which the reader never produces. All of them are immutable: no operation of the language changes a value after it is created.
+The reader produces values of nine types, and evaluation adds a tenth, Function, for closures and primitives, which the reader never produces. All of them are immutable: no operation of the language changes a value after it is created.
 
 | Type | Written example | Content |
 | --- | --- | --- |
@@ -48,6 +50,7 @@ The reader produces values of eight types, and evaluation adds a ninth, Function
 | Keyword | `:name` | interned name, a type distinct from Symbol |
 | List | `(a b)`, `()` | proper linked list; `()` is the empty list |
 | Map | `{:a 1}` | key-value pairs, unique keys |
+| Set | `#{1 2}` | elements, unique under `equal?` |
 | Function | no written form | closure created by `lambda`, or a primitive |
 
 ### 2.1 Proper lists
@@ -58,9 +61,9 @@ Every list is proper: the rest of a non-empty list is always a list. Dotted pair
 
 Two symbols with the same name MUST be the same object, comparable by identity. The same holds for keywords. A symbol and a keyword with the same name are different values. The implementation MAY share the storage of the name between them. The only exception is symbols created by `generate-symbol` (section 9), which are not interned.
 
-### 2.3 Order in maps
+### 2.3 Order in maps and sets
 
-List preserves reading order. The iteration order of Map, which `keys` (section 9) exposes, is unspecified: the implementation MAY use hash-based persistent structures. For this reason, the conformance tests compare maps by equality, not by printed text.
+List preserves reading order. The iteration order of Map, which `keys` (section 9) exposes, and of Set, which `elements` exposes, is unspecified: the implementation MAY use hash-based persistent structures. For this reason, the conformance tests compare maps and sets by equality, not by printed text.
 
 ### 2.4 Equality
 
@@ -80,6 +83,7 @@ The language has two equality predicates. Maps and the conformance tests use `eq
 - **Symbol, Keyword:** identity (because of interning).
 - **List:** same length and `equal?` elements, in order.
 - **Map:** same number of pairs and, for each key of one, an `equal?` key in the other with an `equal?` value, regardless of order.
+- **Set:** same number of elements and, for each element of one, an `equal?` element in the other, regardless of order. A Set is never `equal?` to a Map or a List with the same contents.
 - **Function:** identity: a function is only `equal?` to itself.
 
 ### 2.4.2 `=`
@@ -105,10 +109,11 @@ atmosphere    = { whitespace | line-comment } ;
 whitespace    = U+0020 | U+0009 | U+000A | U+000D | U+000C ;
 line-comment  = ";" , { any code point except U+000A } ;
 
-datum         = list | map | prefixed | string | hash-literal | keyword | token ;
+datum         = list | map | set | prefixed | string | hash-literal | keyword | token ;
 
 list          = "(" , atmosphere , { datum , atmosphere } , ")" ;
 map           = "{" , atmosphere , { datum , atmosphere } , "}" ;  (* even count *)
+set           = "#{" , atmosphere , { datum , atmosphere } , "}" ;  (* no repeats *)
 prefixed      = ( "'" | "`" | ",@" | "," ) , atmosphere , datum ;
 
 hash-literal  = ( "#true" | "#false" | "#void" ) ;  (* followed by a delimiter *)
@@ -204,7 +209,7 @@ Rule 2 exists so that typos in numbers do not silently become symbols, and to re
 
 ## 5. Collections and shorthands
 
-Two collections have their own delimiters, four prefixes expand into two-element lists, and square brackets are reserved.
+Three collections have their own delimiters, four prefixes expand into two-element lists, and square brackets are reserved.
 
 ### 5.1 Collection delimiters
 
@@ -212,6 +217,7 @@ Two collections have their own delimiters, four prefixes expand into two-element
 | --- | --- | --- |
 | List | `(` | `)` |
 | Map | `{` | `}` |
+| Set | `#{` | `}` |
 
 Three errors apply to all of them:
 
@@ -219,9 +225,11 @@ Three errors apply to all of them:
 - A closer of another kind, as in `(1 2}`: `mismatched-delimiter`, at the position of the wrong closer.
 - A closer with no matching opener, such as `)` at top level: `unexpected-delimiter`, at its position.
 
-### 5.2 Maps
+### 5.2 Maps and sets
 
 A map contains an even number of datums, read as key, value, key, value. An odd number MUST produce `odd-map`. Two keys equal under `equal?` (section 2.4) MUST produce `duplicate-key`. Both errors are reported at the position of the `{`, because atoms have no position of their own (section 6). The message MAY include the index of the repeated pair.
+
+A set opens with `#{`, with no atmosphere between `#` and `{`, and holds any number of datums, its elements. Two elements equal under `equal?` MUST produce `duplicate-element`, at the position of the `#`. `#{}` is the empty set. A set closes with `}`, so `#{1 2)` is a `mismatched-delimiter` at the `)`.
 
 ### 5.3 Reserved characters
 
@@ -246,12 +254,13 @@ A `#` at the start of a datum can only begin one of these forms:
 | --- | --- |
 | `#true`, `#false` | Boolean |
 | `#void` | Void |
+| `#{` | Set (5.2) |
 
 Any other continuation, including `#` alone, MUST produce `unknown-dispatch` at the position of the `#`. This reserves room for future extensions without breaking existing code.
 
 ### 5.6 Nesting limit
 
-At most 1000 collections or prefixes may be open at the same time. The 1001st opener MUST produce `nesting-too-deep` at its position. The limit protects recursive implementations against stack overflow and makes behavior identical across languages.
+At most 1000 collections or prefixes may be open at the same time; a `#{` counts as one opener, at the position of the `#`. The 1001st opener MUST produce `nesting-too-deep` at its position. The limit protects recursive implementations against stack overflow and makes behavior identical across languages.
 
 ## 6. Source positions
 
@@ -265,6 +274,7 @@ A position is the pair (line, column), both starting at 1. The line advances aft
 
 - Every non-empty List, including those generated by prefixes, with the position of the `(` or of the prefix character.
 - Every Map, with the position of the `{`. The empty map MAY have no position, if the implementation does not allocate it as a distinct object.
+- Every Set, with the position of the `#`. The empty set MAY have no position, as the empty map.
 
 Example: in `(define x↵  {:a 1})`, the list is at 1:1 and the map at 2:3.
 
@@ -294,7 +304,7 @@ The read operation takes the complete source text and returns one of two things:
 
 ### 7.3 Detection order
 
-The error reported is the first one detected in a left-to-right read. The `odd-map` and `duplicate-key` checks happen when the map is closed, after all of its contents have been read. Therefore, in `{:a 1 :a "x}`, the error is `unterminated-string`. Inner errors come before outer ones: in `(a (b`, the error is `unclosed-delimiter` at the second `(`. Inside a string, an escape is checked as it is read (4.3), so an invalid escape comes before the end of an unterminated string.
+The error reported is the first one detected in a left-to-right read. The `odd-map` and `duplicate-key` checks happen when the map is closed, after all of its contents have been read, and so does the `duplicate-element` check of a set. Therefore, in `{:a 1 :a "x}`, the error is `unterminated-string`. Inner errors come before outer ones: in `(a (b`, the error is `unclosed-delimiter` at the second `(`. Inside a string, an escape is checked as it is read (4.3), so an invalid escape comes before the end of an unterminated string.
 
 ### 7.4 Catalog
 
@@ -315,6 +325,7 @@ The error reported is the first one detected in a left-to-right read. The `odd-m
 | `unknown-dispatch` | `#` with no valid continuation | the `#` | 5.5 |
 | `odd-map` | map with an odd number of datums | the `{` | 5.2 |
 | `duplicate-key` | repeated key in a map | the `{` | 5.2 |
+| `duplicate-element` | repeated element in a set | the `#` | 5.2 |
 | `nesting-too-deep` | the 1001st opener | that opener | 5.6 |
 
 ## 8. Evaluation
@@ -329,6 +340,7 @@ The evaluator knows five special forms. Everything else is function application 
 | Symbol | the value bound to the name: first in the local environment, from the innermost `lambda` outward, then in the global one (8.2, lexical scope); unbound is an error |
 | `()` | the empty list itself |
 | Map | a new map with evaluated keys and values, left to right (8.4) |
+| Set | a new set with evaluated elements, left to right (8.4) |
 | Non-empty List | special form, macro or application, depending on the first element |
 
 In an **application** `(f a b …)`, the operator is evaluated first and the arguments next, left to right. If the operator is not a function, or if the number of arguments does not fit, the result is an error.
@@ -385,7 +397,7 @@ Every implementation MUST provide `let`, `sequence`, `and`, `or` and `quasiquote
 
 In the `or` rewrite, `t` is a symbol created by `generate-symbol`, so that it does not capture names from user code.
 
-**`quasiquote`** builds a datum like `quote`, but evaluates the marked parts. `(unquote e)` is replaced by the value of `e`. `(unquote-splicing e)` must evaluate to a list, whose elements are inserted in its place; it is only valid inside lists. A `quasiquote` inside another raises the level, and only the markers of the outermost level are evaluated, as in R7RS. `unquote` outside `quasiquote` is an expansion error.
+**`quasiquote`** builds a datum like `quote`, but evaluates the marked parts. `(unquote e)` is replaced by the value of `e`. `(unquote-splicing e)` must evaluate to a list, whose elements are inserted in its place; it is only valid inside lists. Inside a quasiquoted map or set, keys, values and elements may be unquoted like the elements of a list; `unquote-splicing` is only valid inside lists. A `quasiquote` inside another raises the level, and only the markers of the outermost level are evaluated, as in R7RS. `unquote` outside `quasiquote` is an expansion error.
 
 ```lisp
 (let ((x 1) (xs (list 2 3)))
@@ -397,6 +409,8 @@ In the `or` rewrite, `t` is a symbol created by `generate-symbol`, so that it do
 **Falsity.** Only `#false` is false. `()`, `0`, `""` and `#void` are true; the empty list is tested with `empty?`.
 
 **Map literals** evaluate keys and values, left to right: `{:sum (+ 1 2)}` is a map with the value `3` at key `:sum`. For the literal datum, use `quote`. Keys that only repeat after evaluation, as in `{a 1 b 2}` with `a` and `b` equal, MUST produce an error.
+
+**Set literals** evaluate their elements, left to right: `#{(+ 1 2) x}` is a set with `3` and the value of `x`. For the literal datum, use `quote`. Elements that only repeat after evaluation, as in `#{a b}` with `a` and `b` equal, MUST produce `:duplicate-element`.
 
 **Tail calls are guaranteed.** A call in tail position MUST NOT use more space than the call it replaces, so that tail recursion runs in constant memory. It is the only looping mechanism. The tail positions are the last expression of a `lambda` body and both branches of an `if` that is itself in tail position. Through rewriting, the following inherit the position of the form that contains them: the body of a `let`, the last expression of a `sequence`, and the last argument of an `and` or an `or`.
 
@@ -428,11 +442,11 @@ In the `or` rewrite, `t` is a symbol created by `generate-symbol`, so that it do
     (display! (concatenate "Hello, " name "\n"))))
 ```
 
-**Error descriptor.** Every error carries a descriptor: a Map with `:kind` (Keyword), `:message` (String) and `:values` (List), and, once the error has left an expression with a known position, `:position` (below). `(error message value …)` creates a descriptor with `:kind :error`. The `:kind`s of core errors are `:unbound-symbol`, `:not-a-function`, `:wrong-arguments`, `:wrong-type`, `:index-out-of-range`, `:missing-key`, `:integer-overflow`, `:division-by-zero`, `:duplicate-key`, `:expansion-error`, `:stack-overflow` (8.4), `:io-error` (section 9, `read-line!`), `:include-error` (8.8) and `:import-error` (8.9).
+**Error descriptor.** Every error carries a descriptor: a Map with `:kind` (Keyword), `:message` (String) and `:values` (List), and, once the error has left an expression with a known position, `:position` (below). `(error message value …)` creates a descriptor with `:kind :error`. The `:kind`s of core errors are `:unbound-symbol`, `:not-a-function`, `:wrong-arguments`, `:wrong-type`, `:index-out-of-range`, `:missing-key`, `:integer-overflow`, `:division-by-zero`, `:duplicate-key`, `:duplicate-element`, `:expansion-error`, `:stack-overflow` (8.4), `:io-error` (section 9, `read-line!`), `:include-error` (8.8) and `:import-error` (8.9).
 
 **Positions in errors.** When an error leaves the expansion or the evaluation of an expression that has a source position, and its descriptor has no key `:position` yet, the descriptor gains `:position`: a Map with `:line` and `:column`, Integers with the coordinates of 6.1, and, when the expression was read from a file, `:file`, a String that names that file. The text of `:file` is implementation-defined; it names the program, the included file (8.8) or the source of a library (8.9).
 
-The position of an expression is the position of the innermost List or Map of the position table (6.2) that contains it in the source. An atom has no position of its own (6.3), so it takes the position of the list around it; code generated by a macro or a derived form takes the position of the nearest enclosing form that has one (6.3). Each top-level form is itself an expression, so an error raised while processing `define`, `define-macro`, `include` or `import` takes the position of that form. As a result:
+The position of an expression is the position of the innermost List, Map or Set of the position table (6.2) that contains it in the source. An atom has no position of its own (6.3), so it takes the position of the list around it; code generated by a macro or a derived form takes the position of the nearest enclosing form that has one (6.3). Each top-level form is itself an expression, so an error raised while processing `define`, `define-macro`, `include` or `import` takes the position of that form. As a result:
 
 - The position is the innermost one. In `(+ 1 (quotient 1 0))`, the `:division-by-zero` is at `(quotient 1 0)`; in `(define f (lambda () (first ())))`, a call to `f` from anywhere fails at `(first ())`, the expression where the error happened, not at the call.
 - `(error message value …)` takes the position of its call.
@@ -496,7 +510,7 @@ In **continuation**, the function receives the rest of the work as an argument, 
 
 Lists of at least 1,000,000 elements MUST be built, traversed and discarded without error.
 
-Maps are persistent: `associate` and `dissociate` return a new map that shares most of its structure with the original, which stays unchanged. Neither of them, nor `get` and `contains?`, may copy or traverse the whole map: their cost MUST grow at most logarithmically with the number of keys. As a result, a map of at least 1,000,000 keys MUST be built with `associate`, one key at a time, queried, reduced with `dissociate` and discarded without error. `keys`, `equal?` and printing traverse the whole map, so their cost grows with its size. A hash array mapped trie, as in `implementation-notes.md`, meets these requirements.
+Maps are persistent: `associate` and `dissociate` return a new map that shares most of its structure with the original, which stays unchanged. Neither of them, nor `get` and `contains?`, may copy or traverse the whole map: their cost MUST grow at most logarithmically with the number of keys. As a result, a map of at least 1,000,000 keys MUST be built with `associate`, one key at a time, queried, reduced with `dissociate` and discarded without error. `keys`, `equal?` and printing traverse the whole map, so their cost grows with its size. Sets are persistent in the same way: `adjoin`, `disjoin` and `contains?` follow the same rule, and a set of at least 1,000,000 elements MUST be built with `adjoin`, one element at a time. A hash array mapped trie, as in `implementation-notes.md`, meets these requirements.
 
 Memory management is otherwise left to the implementation and has no observable effect. Non-normative advice for implementers is in `implementation-notes.md`.
 
@@ -521,7 +535,7 @@ Memory management is otherwise left to the implementation and has no observable 
 3. Print the result with `write!`, followed by a newline. If the result is `#void`, print nothing.
 4. On a read error or an uncaught error, show the message, discard the input and go back to step 1.
 
-The REPL starts as if the session began with `(import io)`, `(import list)`, `(import text)`, `(import function)` and `(import map)`, in the empty context, so every library the implementation provides is at hand; a library the implementation does not provide is skipped. Step 3 prints with the `write!` rules (section 10) whether or not `write!` is bound.
+The REPL starts as if the session began with `(import io)`, `(import list)`, `(import text)`, `(import function)`, `(import map)` and `(import set)`, in the empty context, so every library the implementation provides is at hand; a library the implementation does not provide is skipped. Step 3 prints with the `write!` rules (section 10) whether or not `write!` is bound.
 
 Redefining a name with `define` replaces the previous binding (8.2). The REPL ends at the end of standard input.
 
@@ -594,12 +608,13 @@ Primitives are native functions bound in the global environment, except for the 
 | Integer division | `quotient`, `remainder` | truncating toward zero; a zero divisor is an error |
 | Comparison | `<`, `>`, `<=`, `>=`, `=` | Integer only, two or more arguments, chained: `(< a b c)` |
 | Equality | `equal?` | section 2.4 |
-| Types | `boolean?`, `void?`, `integer?`, `string?`, `symbol?`, `keyword?`, `list?`, `map?`, `function?` | one predicate per type; `function?` holds for closures and primitives |
+| Types | `boolean?`, `void?`, `integer?`, `string?`, `symbol?`, `keyword?`, `list?`, `map?`, `set?`, `function?` | one predicate per type; `function?` holds for closures and primitives |
 | Lists | `list`, `prepend`, `first`, `rest` | `(prepend x xs)` puts `x` in front of `xs`; `first` and `rest` of `()` are errors |
-| Maps and sizes | `count`, `empty?`, `get`, `contains?`, `associate`, `dissociate`, `keys` | `count` and `empty?` work on List, Map and String. `(get m k default)` returns `default` if `k` does not exist; without a default, it is an error. `contains?` tests whether the map has the key. `keys` returns a new list with each key of the map exactly once, in the iteration order of 2.3, and `(keys {})` is `()`; together with `get`, it is how a program traverses a map |
+| Maps and sizes | `count`, `empty?`, `get`, `contains?`, `associate`, `dissociate`, `keys` | `count` and `empty?` work on List, Map, Set and String. `(get m k default)` returns `default` if `k` does not exist; without a default, it is an error. `contains?` tests whether the map has the key, or whether the set has the element. `keys` returns a new list with each key of the map exactly once, in the iteration order of 2.3, and `(keys {})` is `()`; together with `get`, it is how a program traverses a map |
 | Strings | `concatenate`, `string-at`, `substring`, `to-string` | indices count code points; `(substring s start end)` excludes `end`; `to-string` returns the text `display!` would print; `concatenate` accepts zero or more strings, and `(concatenate)` returns `""` |
 | Number parsing | `string-to-number` | reads the whole text under the rules of section 4 and returns an Integer; if the text is not an integer, returns `#void`; if it is out of range, it is an error (`:integer-overflow`) |
 | Symbols | `string-to-symbol`, `symbol-to-string`, `generate-symbol` | `generate-symbol` creates a new symbol, different from all others and not interned, so macros can avoid capture |
+| Sets | `adjoin`, `disjoin`, `elements` | `(adjoin s x)` returns the set with `x`, and `(disjoin s x)` the set without `x`; each returns the same set when there is nothing to change. `elements` returns a new list with each element of the set exactly once, in the iteration order of 2.3, and `(elements #{})` is `()`. `get`, `keys`, `associate` and `dissociate` take only maps |
 | Functions | `apply` | `(apply f a … list)` calls `f` with `a …` followed by the elements of `list` |
 | Logic | `not` | returns `#true` if the argument is `#false`, and `#false` in any other case; `and` and `or` are derived forms (8.3) |
 | Input and output (library `io`) | `write!`, `display!`, `read-line!` | only after `(import io)` (8.9). `write!` and `display!` write a value to standard output, in the form of section 10, and return `#void`. `read-line!` reads a line from standard input and returns it without the line terminator, or `#void` at end of input. The only line terminator is U+000A, as in 6.1: a U+000D before it stays in the returned string, and a U+000D alone does not end a line. A last line without U+000A is returned as it is. A line that is not valid UTF-8 (3.2) produces `:io-error` with `:values` `(:invalid-utf8)`; the line is consumed, so the next `read-line!` reads the one after it |
@@ -607,7 +622,7 @@ Primitives are native functions bound in the global environment, except for the 
 
 ## 10. Printing
 
-**`write!`** prints in a form that reads back: reading the printed text MUST produce a value `equal?` to the original, with the three exceptions below. The REPL uses `write!`. **`display!`** prints for humans: a String passed directly to it comes out without quotes and without escapes, and everything else comes out as with `write!`. That includes strings inside a List or Map, which keep their quotes and escapes, so the printed collection stays unambiguous: `(display! (list "a b" "c"))` prints `("a b" "c")`, which cannot be confused with the three-element list printed for `(list "a" "b" "c")`. To print the text of several strings, join them first.
+**`write!`** prints in a form that reads back: reading the printed text MUST produce a value `equal?` to the original, with the three exceptions below. The REPL uses `write!`. **`display!`** prints for humans: a String passed directly to it comes out without quotes and without escapes, and everything else comes out as with `write!`. That includes strings inside a List, Map or Set, which keep their quotes and escapes, so the printed collection stays unambiguous: `(display! (list "a b" "c"))` prints `("a b" "c")`, which cannot be confused with the three-element list printed for `(list "a" "b" "c")`. To print the text of several strings, join them first.
 
 | Type | Form printed by `write!` |
 | --- | --- |
@@ -615,7 +630,7 @@ Primitives are native functions bound in the global environment, except for the 
 | Integer | decimal, with `-` if negative |
 | String | in double quotes, with `\n`, `\t`, `\r`, `\"` and `\\` escaped; every other character from U+0000 to U+001F, and U+007F, comes out as `\u{H…}` with uppercase hexadecimal digits and no leading zeros, such as `\u{0}` and `\u{1B}`; all other characters come out as they are |
 | Symbol, Keyword | the name, preceded by `:` for keywords |
-| List, Map | delimiters of section 5.1, elements separated by one space; Map order unspecified |
+| List, Map, Set | delimiters of section 5.1, elements separated by one space; Map and Set order unspecified |
 | Function | `#<function>` |
 
 The exceptions to reading back are:
@@ -674,6 +689,7 @@ An implementation is conformant when it passes all the cases below. Results are 
 | `(a ; comment↵ b)` | ≡ `(a b)` |
 | `(1 (2) ())` | List |
 | `{:b 2 :a 1}` | ≡ `{:a 1 :b 2}` |
+| `#{2 1 #{}}` | ≡ `#{#{} 1 2}` |
 | `"a↵b"` | ≡ `"a\nb"` |
 | `"\r\u{41}\u{000042}\u{1f600}\u{1F600}\u{0}"` | ≡ the string U+000D, `A`, `B`, two `😀`, U+0000 |
 | `"😀 é"` | String |
@@ -695,7 +711,8 @@ An implementation is conformant when it passes all the cases below. Results are 
 | `'` | `unexpected-eof` | 1:2 |
 | `#;` | `unknown-dispatch` | 1:1 |
 | `#\|` | `unknown-dispatch` | 1:1 |
-| `#{1}` | `unknown-dispatch` | 1:1 |
+| `#(1)` | `unknown-dispatch` | 1:1 |
+| `# {1}` | `unknown-dispatch` | 1:1 |
 | `"abc` | `unterminated-string` | 1:1 |
 | `{:a 1 :a "x}` | `unterminated-string` | 1:10 |
 | `"\q"` | `invalid-escape` | 1:2 |
@@ -721,6 +738,9 @@ An implementation is conformant when it passes all the cases below. Results are 
 | `#<function>` | `unknown-dispatch` | 1:1 |
 | `{:a 1 :b}` | `odd-map` | 1:1 |
 | `{:a 1 :a 2}` | `duplicate-key` | 1:1 |
+| `#{1 (1) 1}` | `duplicate-element` | 1:1 |
+| `#{1 2)` | `mismatched-delimiter` | 1:6 |
+| `(#{1` | `unclosed-delimiter` | 1:2 |
 | 1001 times `(` | `nesting-too-deep` | 1:1001 |
 | the byte FF | `invalid-utf8` | 1:1 |
 | `a` followed by a lone C3 byte | `invalid-utf8` | 1:2 |
@@ -728,23 +748,23 @@ An implementation is conformant when it passes all the cases below. Results are 
 ### 12.3 Additional checks
 
 - **Interning:** in `(foo foo :foo)`, the two `foo` are the same object, and `:foo` is different from `foo`.
-- **Positions:** in `(define x↵  {:a 1})`, the list is at 1:1 and the map at 2:3. In `(a 'b)`, the list `(quote b)` is at 1:4.
+- **Positions:** in `(define x↵  {:a 1})`, the list is at 1:1 and the map at 2:3. In `(a 'b)`, the list `(quote b)` is at 1:4. In `(x↵ #{1})`, the set is at 2:2.
 - **Nesting limit:** 1000 times `(` followed by 1000 times `)` read without error.
 
 ### 12.4 Conformance file
 
-The file `conformance.json` has 271 cases, each with an `id`, the section it tests and a kind:
+The file `conformance.json` has 288 cases, each with an `id`, the section it tests and a kind:
 
 | Kind | Cases | What it checks |
 | --- | --- | --- |
-| `read` | 20 | `input` produces the same sequence of datums as `equivalent`, or datums with the types in `types` |
-| `read-error` | 40 | reading `input`, or the bytes of `input_hex`, fails with the code `error` at `position` |
-| `read-positions` | 2 | the node indicated by each `path` is in the position table with the expected `position` |
-| `eval` | 209 | `program` runs as a file, with `input` (or the bytes of `input_hex`) on standard input; it imports at most the library `io`; the output is exactly `output`, and the program ends with the value `value` or with an uncaught error of the `:kind` given in `error`; with `error_position`, the descriptor of that error has a `:position` whose `:line` and `:column` are the given pair, or, when `error_position` is `null`, no `:position` |
+| `read` | 22 | `input` produces the same sequence of datums as `equivalent`, or datums with the types in `types` |
+| `read-error` | 45 | reading `input`, or the bytes of `input_hex`, fails with the code `error` at `position` |
+| `read-positions` | 3 | the node indicated by each `path` is in the position table with the expected `position` |
+| `eval` | 218 | `program` runs as a file, with `input` (or the bytes of `input_hex`) on standard input; it imports at most the library `io`; the output is exactly `output`, and the program ends with the value `value` or with an uncaught error of the `:kind` given in `error`; with `error_position`, the descriptor of that error has a `:position` whose `:line` and `:column` are the given pair, or, when `error_position` is `null`, no `:position` |
 
 An `eval` case that tests `include` (8.8) also has `files`, an object that maps each relative path, with `/` as separator, to the text of that file. The program is the file `main.nvl`, and the paths are relative to its directory. A path missing from `files` cannot be opened.
 
-The `eval` cases cover the special and derived forms, tail calls with one million iterations, a traversal of a list of one million elements with `empty?`, `first` and `rest` (8.6), a map of one million keys built with `associate`, persistence and `dissociate` on large maps, keys whose hashes may collide (8.6), 10,000 nested non-tail calls and `:stack-overflow`, equality, arithmetic and overflows, primitives, `read-line!` with invalid UTF-8, printing (including `display!` of strings inside collections), `catch` and `raise`, the positions in errors (8.5), both callback patterns, `include` with and without prefixes, and `import` (8.9). Some cases check that what was removed from the core does not exist: `/`, `same?`, named `lambda`, the names without `!`, the standard library functions without `import`, and the `io` functions without `import`. The library has its own cases, in the file `stdlib-conformance.json`.
+The `eval` cases cover the special and derived forms, tail calls with one million iterations, a traversal of a list of one million elements with `empty?`, `first` and `rest` (8.6), a map of one million keys built with `associate`, persistence and `dissociate` on large maps, keys whose hashes may collide (8.6), sets: reading, literals, equality, printing, quasiquote, the primitives and a set of one million elements, 10,000 nested non-tail calls and `:stack-overflow`, equality, arithmetic and overflows, primitives, `read-line!` with invalid UTF-8, printing (including `display!` of strings inside collections), `catch` and `raise`, the positions in errors (8.5), both callback patterns, `include` with and without prefixes, and `import` (8.9). Some cases check that what was removed from the core does not exist: `/`, `same?`, named `lambda`, the names without `!`, the standard library functions without `import`, and the `io` functions without `import`. The library has its own cases, in the file `stdlib-conformance.json`.
 
 **Behaviors fixed by the tests.** While writing the cases, these points needed an answer that the text above does not give yet:
 
@@ -753,4 +773,4 @@ The `eval` cases cover the special and derived forms, tail calls with one millio
 - `dissociate` of a missing key returns the map unchanged.
 - A `raise` with a valid descriptor and a custom `:kind`, such as `:custom`, terminates the program with that `:kind`.
 
-Version 0.2.1 settled the remaining points in the text (see its list of changes), and the cases cover them. Version 0.3.0 added the positions in errors, and version 0.4.0 the persistent maps; their cases cover them too.
+Version 0.2.1 settled the remaining points in the text (see its list of changes), and the cases cover them. Version 0.3.0 added the positions in errors, version 0.4.0 the persistent maps and version 0.5.0 the type Set; their cases cover them too.

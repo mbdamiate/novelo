@@ -1,5 +1,5 @@
 {
-  "spec": "Core Specification — Novelo, version 0.4.0",
+  "spec": "Core Specification — Novelo, version 0.5.0",
   "format": {
     "read": "Read 'input' (UTF-8). With 'equivalent': also read that text and compare the two datum sequences with equal?. With 'types': the sequence read has exactly these types, in order.",
     "read-error": "Read 'input' (or the bytes of 'input_hex'). Reading MUST fail with the code 'error' at position [line, column].",
@@ -177,6 +177,24 @@
       ]
     },
     {
+      "id": "read-021",
+      "kind": "read",
+      "section": "5.2",
+      "input": "#{2 1 #{}}",
+      "equivalent": "#{#{} 1 2}"
+    },
+    {
+      "id": "read-022",
+      "kind": "read",
+      "section": "5.2",
+      "input": "#{} #{:a} {#{1} 2}",
+      "types": [
+        "Set",
+        "Set",
+        "Map"
+      ]
+    },
+    {
       "id": "read-error-001",
       "kind": "read-error",
       "section": "5.1",
@@ -306,7 +324,7 @@
         1,
         1
       ],
-      "input": "#{1}"
+      "input": "#(1)"
     },
     {
       "id": "read-error-013",
@@ -617,6 +635,61 @@
       "input": "\"\\u{D800"
     },
     {
+      "id": "read-error-041",
+      "kind": "read-error",
+      "section": "5.5",
+      "error": "unknown-dispatch",
+      "position": [
+        1,
+        1
+      ],
+      "input": "# {1}"
+    },
+    {
+      "id": "read-error-042",
+      "kind": "read-error",
+      "section": "5.2",
+      "error": "duplicate-element",
+      "position": [
+        1,
+        1
+      ],
+      "input": "#{1 (1) 1}"
+    },
+    {
+      "id": "read-error-043",
+      "kind": "read-error",
+      "section": "5.2",
+      "error": "mismatched-delimiter",
+      "position": [
+        1,
+        6
+      ],
+      "input": "#{1 2)"
+    },
+    {
+      "id": "read-error-044",
+      "kind": "read-error",
+      "section": "5.1",
+      "error": "unclosed-delimiter",
+      "position": [
+        1,
+        2
+      ],
+      "input": "(#{1"
+    },
+    {
+      "id": "read-error-045",
+      "kind": "read-error",
+      "section": "7.3",
+      "error": "unterminated-string",
+      "position": [
+        1,
+        7
+      ],
+      "input": "#{1 1 \"x}"
+    },
+    {
       "id": "read-position-001",
       "kind": "read-positions",
       "section": "6.2",
@@ -657,6 +730,33 @@
           "position": [
             1,
             4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "read-position-003",
+      "kind": "read-positions",
+      "section": "6.2",
+      "input": "(x\n #{1})",
+      "positions": [
+        {
+          "path": [
+            0
+          ],
+          "position": [
+            1,
+            1
+          ]
+        },
+        {
+          "path": [
+            0,
+            1
+          ],
+          "position": [
+            2,
+            2
           ]
         }
       ]
@@ -1751,6 +1851,82 @@
       "section": "8.6",
       "program": "(define build (lambda (n m) (if (= n 0) m otherwise (build (- n 1) (associate m n (* n 2))))))\n(define m (build 1000 {}))\n(define replaced (associate m 500 :x))\n(list (count replaced) (get replaced 500) (equal? m replaced) (equal? (associate replaced 500 1000) m) (equal? (dissociate (associate m 0 :zero) 0) m))",
       "value": "(1000 :x #false #true #true)",
+      "output": ""
+    },
+    {
+      "id": "set-001",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(define x 5)\n(list #{(+ 1 2) x} '#{(+ 1 2)} (set? #{}) (set? {}) (map? #{}) (list? #{}))",
+      "value": "(#{3 5} #{(+ 1 2)} #true #false #false #false)",
+      "output": ""
+    },
+    {
+      "id": "set-002",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(define a 1)\n(define b 1)\n(list 1\n  #{a b})",
+      "error": ":duplicate-element",
+      "error_position": [
+        4,
+        3
+      ],
+      "output": ""
+    },
+    {
+      "id": "set-003",
+      "kind": "eval",
+      "section": "2.4.1",
+      "program": "(list (equal? #{1 2} #{2 1}) (equal? #{1} #{1 2}) (equal? #{} {}) (equal? #{} ()) (equal? #{#{1}} #{#{1}}) (get {#{1 2} :x} #{2 1}))",
+      "value": "(#true #false #false #false #true :x)",
+      "output": ""
+    },
+    {
+      "id": "set-004",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (count #{1 2 3}) (empty? #{}) (empty? #{1}) (contains? #{1 2} 2) (contains? #{1 2} 3) (adjoin #{1} 2) (adjoin #{1} 1) (disjoin #{1 2} 1) (disjoin #{1} 5) (elements #{}) (elements #{7}) (count (elements #{1 2 3})) (equal? (disjoin (adjoin #{} 1) 1) #{}))",
+      "value": "(3 #true #false #true #false #{1 2} #{1} #{2} #{1} () (7) 3 #true)",
+      "output": ""
+    },
+    {
+      "id": "set-005",
+      "kind": "eval",
+      "section": "9",
+      "program": "(define kind-of (lambda (thunk) (catch thunk (lambda (problem) (get problem :kind)))))\n(list (kind-of (lambda () (get #{1} 1))) (kind-of (lambda () (keys #{1}))) (kind-of (lambda () (associate #{} 1 2))) (kind-of (lambda () (adjoin {} 1))) (kind-of (lambda () (elements {}))) (kind-of (lambda () (disjoin (list 1) 1))))",
+      "value": "(:wrong-type :wrong-type :wrong-type :wrong-type :wrong-type :wrong-type)",
+      "output": ""
+    },
+    {
+      "id": "set-006",
+      "kind": "eval",
+      "section": "10",
+      "program": "(import io)\n(write! #{\"a\"})\n(display! #{\"b c\"})\n(write! (list #{} {:k #{:v}}))",
+      "value": "#void",
+      "output": "#{\"a\"}#{\"b c\"}(#{} {:k #{:v}})"
+    },
+    {
+      "id": "set-007",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(define x 2)\n(list `#{1 ,x} `{:s #{,x}} `#{(a ,x)})",
+      "value": "(#{1 2} {:s #{2}} #{(a 2)})",
+      "output": ""
+    },
+    {
+      "id": "set-008",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "`#{,@(list 1 2)}",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "set-009",
+      "kind": "eval",
+      "section": "8.6",
+      "program": "(define build (lambda (n s) (if (= n 0) s otherwise (build (- n 1) (adjoin s n)))))\n(define s (build 1000000 #{}))\n(list (count s) (contains? s 1) (contains? s 1000000) (contains? s 0) (count (disjoin s 500000)) (count s))",
+      "value": "(1000000 #true #true #false 999999 1000000)",
       "output": ""
     },
     {

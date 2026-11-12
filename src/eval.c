@@ -205,6 +205,27 @@ static Value *build_map(LispState *state, const LispNode *node, Value *environme
     return map;
 }
 
+/* Elements in order, left to right (§8.4); elements that repeat only after
+ * evaluation are an error. */
+static Value *build_set(LispState *state, const LispNode *node, Value *environment, Value *context) {
+    Value *set = lisp_set_new();
+    for (size_t index = 0; index < node->child_count; index++) {
+        Value *element = lisp_eval(state, node->children[index], environment, context);
+        if (!element) {
+            lisp_release(set);
+            return nullptr;
+        }
+        Value *element_for_error = lisp_retain(element);
+        if (!lisp_set_insert_take(&set, element)) {
+            lisp_release(set);
+            return lisp_error(state, "duplicate-element", lisp_prepend_take(element_for_error, LISP_EMPTY),
+                              "an element repeats in the set");
+        }
+        lisp_release(element_for_error);
+    }
+    return set;
+}
+
 static Value *build_list(LispState *state, const LispNode *node, Value *environment, Value *context) {
     LispListBuilder builder;
     lisp_list_builder_init(&builder);
@@ -269,6 +290,9 @@ Value *lisp_eval(LispState *state, Value *node, Value *environment, Value *conte
         case LISP_NODE_MAP:
         case LISP_NODE_MAP_BUILD:
             result = build_map(state, current, environment, context);
+            goto done;
+        case LISP_NODE_SET:
+            result = build_set(state, current, environment, context);
             goto done;
         case LISP_NODE_LIST_BUILD:
             result = build_list(state, current, environment, context);

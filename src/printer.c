@@ -74,6 +74,16 @@ static void print_value(LispBuffer *output, const Value *value) {
         lisp_buffer_append_byte(output, '}');
         return;
     }
+    case LISP_KIND_SET: {
+        lisp_buffer_append_string(output, "#{");
+        Value *element;
+        for (size_t cursor = 0; lisp_set_next(value, &cursor, &element);) {
+            if (cursor > 1) lisp_buffer_append_byte(output, ' ');
+            print_value(output, element);
+        }
+        lisp_buffer_append_byte(output, '}');
+        return;
+    }
     case LISP_KIND_CLOSURE:
     case LISP_KIND_PRIMITIVE:
         lisp_buffer_append_string(output, "#<function>");

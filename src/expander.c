@@ -434,11 +434,35 @@ static Value *quasi_map(LispState *state, Value *template, int level, const Scop
     return node;
 }
 
+/* The elements of a quasiquoted set, each quasi-expanded; splicing is only
+ * valid inside lists (§8.3). */
+static Value *quasi_set(LispState *state, Value *template, int level, const Scope *scope, Value *context) {
+    size_t count = lisp_map_count(template);
+    if (count == 0) return constant_node(template);
+    Value *node = lisp_node_new(LISP_NODE_SET, count);
+    LispNode *builder = mutable_node(node);
+    Value *element;
+    size_t index = 0;
+    for (size_t cursor = 0; lisp_set_next(template, &cursor, &element); index++) {
+        if (is_marker_form(element, lisp_symbols()->unquote_splicing)) {
+            lisp_release(node);
+            return lisp_expansion_error(state, template, "unquote-splicing is only valid inside lists");
+        }
+        builder->children[index] = quasi(state, element, level, scope, context);
+        if (!builder->children[index]) {
+            lisp_release(node);
+            return nullptr;
+        }
+    }
+    return node;
+}
+
 /* Only the markers of the outermost level are evaluated (R7RS levels):
  * quasiquote raises the level, unquote and unquote-splicing lower it. */
 static Value *quasi(LispState *state, Value *template, int level, const Scope *scope, Value *context) {
     const LispSymbols *symbols = lisp_symbols();
     if (template->kind == LISP_KIND_MAP) return quasi_map(state, template, level, scope, context);
+    if (template->kind == LISP_KIND_SET) return quasi_set(state, template, level, scope, context);
     if (template->kind != LISP_KIND_PAIR) return constant_node(template);
 
     Value *head = lisp_first(template);
@@ -523,6 +547,24 @@ static Value *expand_map_literal(LispState *state, Value *map, const Scope *scop
     return node;
 }
 
+/* §8.4: the elements are evaluated left to right, in reading order. */
+static Value *expand_set_literal(LispState *state, Value *set, const Scope *scope, Value *context) {
+    size_t count = lisp_map_count(set);
+    if (count == 0) return constant_node(set);
+    Value *node = lisp_node_new(LISP_NODE_SET, count);
+    LispNode *literal = mutable_node(node);
+    Value *element;
+    size_t index = 0;
+    for (size_t cursor = 0; lisp_set_next(set, &cursor, &element); index++) {
+        literal->children[index] = expand(state, element, scope, context);
+        if (!literal->children[index]) {
+            lisp_release(node);
+            return nullptr;
+        }
+    }
+    return node;
+}
+
 static Value *expand_symbol(Value *symbol, const Scope *scope) {
     size_t depth, index;
     if (find_local(scope, symbol, &depth, &index)) {
@@ -540,6 +582,7 @@ static Value *expand_form(LispState *state, Value *form, const Scope *scope, Val
     if (!lisp_check_stack(state)) return nullptr;
     if (form->kind == LISP_KIND_SYMBOL) return expand_symbol(form, scope);
     if (form->kind == LISP_KIND_MAP) return expand_map_literal(state, form, scope, context);
+    if (form->kind == LISP_KIND_SET) return expand_set_literal(state, form, scope, context);
     if (form->kind != LISP_KIND_PAIR) return constant_node(form);
 
     const LispSymbols *symbols = lisp_symbols();
@@ -578,7 +621,8 @@ static Value *expand_form(LispState *state, Value *form, const Scope *scope, Val
 
 void lisp_note_position(LispState *state, const Value *form) {
     LispPosition position;
-    if ((form->kind == LISP_KIND_PAIR || form->kind == LISP_KIND_MAP) && lisp_position_lookup(form, &position)) {
+    bool is_collection = form->kind == LISP_KIND_PAIR || form->kind == LISP_KIND_MAP || form->kind == LISP_KIND_SET;
+    if (is_collection && lisp_position_lookup(form, &position)) {
         state->expansion_position = position;
     }
 }

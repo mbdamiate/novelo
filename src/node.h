@@ -23,6 +23,7 @@ typedef enum LispNodeKind {
     LISP_NODE_MAP,        /* children: key, value, key, value … (map literal, §8.4) */
     LISP_NODE_LIST_BUILD, /* children: parts; splices[i]: part i is ,@ (quasiquote) */
     LISP_NODE_MAP_BUILD,  /* children: key, value … (quasiquote template of a Map) */
+    LISP_NODE_SET,        /* children: elements (set literal or quasiquote template of a Set, §8.4) */
 } LispNodeKind;
 
 typedef struct LispNode {

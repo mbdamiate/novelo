@@ -37,6 +37,7 @@ static const char *const error_names[] = {
     [LISP_READ_UNKNOWN_DISPATCH] = "unknown-dispatch",
     [LISP_READ_ODD_MAP] = "odd-map",
     [LISP_READ_DUPLICATE_KEY] = "duplicate-key",
+    [LISP_READ_DUPLICATE_ELEMENT] = "duplicate-element",
     [LISP_READ_NESTING_TOO_DEEP] = "nesting-too-deep",
 };
 
@@ -217,11 +218,28 @@ static Value *finish_map(Reader *reader, Value *elements, LispPosition opener) {
     return map;
 }
 
-/* §5.1, §5.2 — the opener is the current code point. */
+static Value *finish_set(Reader *reader, Value *elements, LispPosition opener) {
+    Value *set = lisp_set_new();
+    size_t index = 0;
+    for (const Value *rest = elements; rest != LISP_EMPTY; rest = lisp_rest(rest), index++) {
+        if (!lisp_set_insert_take(&set, lisp_retain(lisp_first(rest)))) {
+            lisp_release(set);
+            fail(reader, LISP_READ_DUPLICATE_ELEMENT, opener, "repeated element at index %zu", index);
+            return nullptr;
+        }
+    }
+    return set;
+}
+
+/* §5.1, §5.2 — the opener is the current code point: '(', '{', or the '#'
+ * of a set's "#{". */
 static bool read_collection(Reader *reader, Value **datum) {
     LispPosition opener = reader->position;
+    bool is_set = peek(reader) == '#';
+    if (is_set) advance(reader); /* the '#'; the '{' follows (read_dispatch checked it) */
     uint32_t opening = peek(reader);
     uint32_t closing = opening == '(' ? ')' : '}';
+    const char *opener_text = is_set ? "#{" : opening == '(' ? "(" : "{";
     if (!enter_nesting(reader, opener)) return false;
     advance(reader);
 
@@ -232,14 +250,13 @@ static bool read_collection(Reader *reader, Value **datum) {
         uint32_t code_point = peek(reader);
         if (code_point == END_OF_INPUT) {
             lisp_list_builder_discard(&elements);
-            return fail(reader, LISP_READ_UNCLOSED_DELIMITER, opener, "'%c' is never closed",
-                        (char)opening);
+            return fail(reader, LISP_READ_UNCLOSED_DELIMITER, opener, "'%s' is never closed", opener_text);
         }
         if (code_point == closing) break;
         if (is_closer(code_point)) {
             lisp_list_builder_discard(&elements);
             return fail(reader, LISP_READ_MISMATCHED_DELIMITER, reader->position,
-                        "'%c' closes '%c'", (char)code_point, (char)opening);
+                        "'%c' closes '%s'", (char)code_point, opener_text);
         }
         Value *element;
         if (!read_datum(reader, &element)) {
@@ -257,10 +274,10 @@ static bool read_collection(Reader *reader, Value **datum) {
         *datum = list;
         return true;
     }
-    Value *map = finish_map(reader, list, opener);
+    Value *map = is_set ? finish_set(reader, list, opener) : finish_map(reader, list, opener);
     lisp_release(list);
     if (!map) return false;
-    if (map->flags & LISP_IMMORTAL) { /* the empty map has no position (§6.2) */
+    if (map->flags & LISP_IMMORTAL) { /* the empty map or set has no position (§6.2) */
         *datum = map;
         return true;
     }
@@ -391,6 +408,8 @@ static bool read_string(Reader *reader, Value **datum) {
 /* §4.4, §5.5 */
 static bool read_dispatch(Reader *reader, Value **datum) {
     LispPosition hash = reader->position;
+    bool opens_set = reader->index + 1 < reader->count && reader->code_points[reader->index + 1] == '{';
+    if (opens_set) return read_collection(reader, datum); /* §5.5: #{ */
     read_token_text(reader); /* '#' is a constituent, so it starts the token */
     const char *token = reader->text.data;
     if (strcmp(token, "#true") == 0) {

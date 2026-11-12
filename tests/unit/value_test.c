@@ -383,6 +383,41 @@ static void t_map_trie_against_model(void) {
     for (size_t index = 0; index < snapshot_count; index++) lisp_release(snapshots[index]);
 }
 
+/* §2, §9 — sets share the trie with maps but are a type of their own. */
+static void t_sets(void) {
+    Value *one = lisp_integer(1), *two = lisp_integer(2);
+    Value *set = lisp_set_new();
+    CHECK(lisp_set_insert_take(&set, lisp_retain(one)));
+    CHECK(lisp_set_insert_take(&set, lisp_retain(two)));
+    CHECK(!lisp_set_insert_take(&set, lisp_integer(1)));
+    CHECK_INT(lisp_map_count(set), 2);
+    CHECK_STR(lisp_type_name(set), "Set");
+
+    Value *same = lisp_set_adjoin(set, one); /* already there: the same set */
+    CHECK(same == set);
+    Value *without = lisp_set_disjoin(set, one);
+    CHECK(lisp_set_contains(set, one) && !lisp_set_contains(without, one));
+    Value *empty = lisp_set_disjoin(without, two);
+    CHECK(empty == lisp_set_new());
+    CHECK(empty != lisp_map_new(0));
+
+    /* a set never equals a map with the same keys, and hashes apart from it */
+    Value *map = map_of(2, (Value *[]){one, LISP_TRUE, two, LISP_TRUE});
+    CHECK(!lisp_equal(set, map));
+    CHECK(lisp_hash(set) != lisp_hash(map));
+    Value *other_order = lisp_set_adjoin(lisp_set_new(), two);
+    Value *both = lisp_set_adjoin(other_order, one);
+    CHECK(lisp_equal(set, both));
+    CHECK(lisp_hash(set) == lisp_hash(both));
+    CHECK(!lisp_equal(lisp_set_new(), lisp_map_new(0)));
+
+    size_t visited = 0;
+    Value *element;
+    for (size_t cursor = 0; lisp_set_next(set, &cursor, &element);) visited++;
+    CHECK_INT(visited, 2);
+    RELEASE_ALL(set, same, without, map, other_order, both);
+}
+
 static void t_map_equality_ignores_order(void) {
     Value *key_a = lisp_keyword_cstr("a"), *key_b = lisp_keyword_cstr("b"), *key_c = lisp_keyword_cstr("c");
     Value *one = lisp_integer(1), *two = lisp_integer(2);
@@ -428,6 +463,7 @@ const TestSuite value_suite = {"value", (const TestCase[]){
     {"maps keep insertion order", t_map_keeps_insertion_order},
     {"maps grow and take structural keys", t_map_growth_and_structural_keys},
     {"map equality ignores order", t_map_equality_ignores_order},
+    {"sets", t_sets},
     {"the map trie matches a model, with collisions and snapshots", t_map_trie_against_model},
     {"hash is consistent with equal?", t_hash_consistent},
     {},

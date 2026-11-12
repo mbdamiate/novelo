@@ -1,7 +1,7 @@
 {
-  "spec": "Standard Library — Novelo, version 0.3.0",
+  "spec": "Standard Library — Novelo, version 0.4.0",
   "format": {
-    "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text, function and map available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
+    "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text, function, map and set available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
   },
   "cases": [
     {
@@ -325,6 +325,54 @@
       "section": "4.4",
       "program": "(import map m)\n(list (m/merge {:a 1} {:b 2}) (m/reverse (list 1 2)) (catch (lambda () merge) (lambda (problem) (get problem :kind))))",
       "value": "({:a 1 :b 2} (2 1) :unbound-symbol)",
+      "output": ""
+    },
+    {
+      "id": "library-041",
+      "kind": "eval",
+      "section": "4.5",
+      "program": "(import set)\n(list (from-list (list 1 2 1 3)) (from-list ()))",
+      "value": "(#{1 2 3} #{})",
+      "output": ""
+    },
+    {
+      "id": "library-042",
+      "kind": "eval",
+      "section": "4.5",
+      "program": "(import set)\n(list (union #{1 2} #{2 3}) (intersection #{1 2 3} #{2 3 4}) (difference #{1 2 3} #{2}) (union #{} #{}) (intersection #{1} #{}) (difference #{1} #{1}))",
+      "value": "(#{1 2 3} #{2 3} #{1 3} #{} #{} #{})",
+      "output": ""
+    },
+    {
+      "id": "library-043",
+      "kind": "eval",
+      "section": "4.5",
+      "program": "(import set)\n(list (subset? #{1} #{1 2}) (subset? #{1 3} #{1 2}) (subset? #{} #{}) (subset? #{1} #{}))",
+      "value": "(#true #false #true #false)",
+      "output": ""
+    },
+    {
+      "id": "library-044",
+      "kind": "eval",
+      "section": "4.5",
+      "program": "(import set)\n(define a (from-list (range 0 100000)))\n(define b (from-list (range 50000 150000)))\n(list (count a) (count (union a b)) (count (intersection a b)) (count (difference a b)) (subset? (intersection a b) b) (contains? (difference a b) 50000))",
+      "value": "(100000 150000 50000 50000 #true #false)",
+      "output": ""
+    },
+    {
+      "id": "library-045",
+      "kind": "eval",
+      "section": "4.5",
+      "program": "(import set)\n(union #{1} {:a 1})",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-046",
+      "kind": "eval",
+      "section": "4.5",
+      "program": "(import map)\n(import set s)\n(list (merge {:a 1} {:b 2}) (s/union #{1} #{2}) (s/reverse (list 1 2)) (catch (lambda () union) (lambda (problem) (get problem :kind))))",
+      "value": "({:a 1 :b 2} #{1 2} (2 1) :unbound-symbol)",
       "output": ""
     }
   ]

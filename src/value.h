@@ -32,6 +32,7 @@ typedef enum LispKind : uint8_t {
     LISP_KIND_EMPTY,     /* ()            — type List */
     LISP_KIND_PAIR,      /* non-empty list — type List */
     LISP_KIND_MAP,
+    LISP_KIND_SET,       /* a LispMap whose values are all #true */
     LISP_KIND_CLOSURE,   /* type Function */
     LISP_KIND_PRIMITIVE, /* type Function */
     LISP_KIND_OPAQUE,    /* internal objects (nodes, environments, contexts) */
@@ -238,10 +239,38 @@ Value *lisp_map_get(const Value *map, const Value *key); /* borrowed, or nullptr
 [[nodiscard]] Value *lisp_map_associate(const Value *map, Value *key, Value *value);
 [[nodiscard]] Value *lisp_map_dissociate(Value *map, const Value *key);
 
+/* ---- sets (§2, §9) ------------------------------------------------------------ */
+
+/* A Set is a LispMap of kind LISP_KIND_SET whose values are all #true, so it
+ * shares the trie, its persistence and its order. lisp_map_count gives its
+ * size. */
+
+/* The immortal empty set. */
+[[nodiscard]] Value *lisp_set_new(void);
+
+/* Builder insertion into a set only the caller holds. Takes the element.
+ * Returns false, and releases it, if the element is already present. */
+bool lisp_set_insert_take(Value **set, Value *element);
+
+static inline bool lisp_set_contains(const Value *set, const Value *element) {
+    return lisp_map_get(set, element) != nullptr;
+}
+
+/* Persistent: the set with (or without) the element; the same set, retained,
+ * when there is nothing to change. */
+[[nodiscard]] Value *lisp_set_adjoin(const Value *set, Value *element);
+[[nodiscard]] Value *lisp_set_disjoin(Value *set, const Value *element);
+
 /* Iteration in insertion order: for (size_t cursor = 0;
  * lisp_map_next(map, &cursor, &key, &value);) … (borrowed). The first call
  * sorts the entries once and keeps the order with the map. */
 bool lisp_map_next(const Value *map, size_t *cursor, Value **key, Value **value);
+
+/* Iteration over a set, like lisp_map_next. */
+static inline bool lisp_set_next(const Value *set, size_t *cursor, Value **element) {
+    Value *value;
+    return lisp_map_next(set, cursor, element, &value);
+}
 
 /* ---- functions ------------------------------------------------------------- */
 
