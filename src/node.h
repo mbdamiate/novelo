@@ -9,6 +9,7 @@
  */
 #pragma once
 
+#include "positions.h"
 #include "value.h"
 
 typedef enum LispNodeKind {
@@ -35,6 +36,9 @@ typedef struct LispNode {
     bool *splices;
     size_t parameter_count; /* required parameters, before &rest */
     bool has_rest;
+    /* §8.5 — where the code was read, or the position of the nearest
+     * enclosing form that has one (§6.3); line 0 when none is known. */
+    LispPosition position;
 } LispNode;
 
 extern const LispClass lisp_node_class;

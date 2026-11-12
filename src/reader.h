@@ -51,6 +51,12 @@ void lisp_describe_read_error(LispBuffer *output, const char *path, const LispRe
  * every non-empty List and Map. On failure fills *error and returns false. */
 [[nodiscard]] bool lisp_read(const char *source, size_t length, Value **datums, LispReadError *error);
 
+/* lisp_read for the source of a file: the recorded positions also name the
+ * file (`file_name`, or no file when nullptr), for the positions of errors
+ * (§8.5). */
+[[nodiscard]] bool lisp_read_file(const char *source, size_t length, const char *file_name, Value **datums,
+                                  LispReadError *error);
+
 /* core §4.1, §4.6 — integer syntax, shared with string-to-number (§9). */
 typedef enum LispIntegerParse {
     LISP_INTEGER_OK,

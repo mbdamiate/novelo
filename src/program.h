@@ -34,6 +34,10 @@ struct LispState {
     Value *included;       /* Map: (path full-prefix) → #true, files loaded per context (§8.8) */
     Value *library_path;   /* String: the standard library document (stdlib §4) */
     LispBuffer line;       /* scratch line for read-line! */
+    /* §8.5 — the position of the innermost form being processed or expanded
+     * that has one; line 0 when none. Nodes and errors without a position of
+     * their own take it. */
+    LispPosition expansion_position;
     const char *stack_base; /* address near the top of the thread's stack */
     size_t stack_limit;     /* bytes of stack evaluation may use */
 };

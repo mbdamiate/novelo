@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-This repository specifies **Novelo**, an immutable Lisp (core v0.2.2, standard library v0.2.1); the name means "ball of yarn" in Portuguese, and source files use `.nvl`, and implements an interpreter for it in **C23**, following `IMPLEMENTATION-PLAN.md` phase by phase. Each phase ends with its tests passing and one commit. All six phases are done: all 254 core and 29 stdlib cases and the unit tests pass, also under `make asan`. `README.md` covers building, running, the source map, the design and the behavior the spec leaves to the implementation. Core 0.2.1 settled the points 0.2.0 left open; when a new gap appears, decide it with the user, write it into the spec and add conformance cases rather than only documenting the choice.
+This repository specifies **Novelo**, an immutable Lisp (core v0.3.0, standard library v0.2.1); the name means "ball of yarn" in Portuguese, and source files use `.nvl`, and implements an interpreter for it in **C23**, following `IMPLEMENTATION-PLAN.md` phase by phase. Each phase ends with its tests passing and one commit. All six phases are done, and the language is now being extended one feature at a time (core 0.3.0 added source positions to runtime errors): all 265 core and 29 stdlib cases and the unit tests pass, also under `make asan`. `README.md` covers building, running, the source map, the design and the behavior the spec leaves to the implementation. Core 0.2.1 settled the points 0.2.0 left open; when a new gap appears, decide it with the user, write it into the spec and add conformance cases rather than only documenting the choice.
 
 | File | Role |
 | --- | --- |
 | `core-specification.md` | Normative core: reader (§2–7), positions (§6), read errors (§7), evaluation (§8), primitives (§9), printing (§10), conformance (§12) |
 | `standard-library.md` | Normative stdlib: the libraries `list`, `text`, `function`, whose sources are the `lisp` code blocks of §4.1–4.3 |
-| `conformance.json` | 254 core cases (`read`, `read-error`, `read-positions`, `eval`); programs import at most `io` |
+| `conformance.json` | 265 core cases (`read`, `read-error`, `read-positions`, `eval`, with an optional `error_position`); programs import at most `io` |
 | `stdlib-conformance.json` | 29 stdlib `eval` cases; programs import `list`, `text` or `function` |
 | `IMPLEMENTATION-PLAN.md` | Architecture, decisions, file layout, phases, test runners |
 | `README.md` | Building, running, source map, design, implementation-defined behavior |
@@ -37,7 +37,7 @@ Both test runners take `-k TEXT` to filter tests or cases by name or id (substri
 - Variable, parameter and field names are full words (`index`, `code_point`, `builder`, `environment`), never abbreviations (`i`, `cp`, `b`, `env`). The user asked for this.
 - Comments, messages and docs are in English.
 
-The CLI (`main.c`): `build/novelo file.nvl` runs a file, `build/novelo` alone starts the REPL (`repl.c`), which starts with every library imported and prompts only when stdin is a terminal. Exit codes are 0 for success, 1 for a read error or uncaught error, and 2 for bad arguments or an unreadable program file. Messages go to stderr as `path:line:column: read error :code: message` or `error :kind: message values…`.
+The CLI (`main.c`): `build/novelo file.nvl` runs a file, `build/novelo` alone starts the REPL (`repl.c`), which starts with every library imported and prompts only when stdin is a terminal. Exit codes are 0 for success, 1 for a read error or uncaught error, and 2 for bad arguments or an unreadable program file. Messages go to stderr as `path:line:column: read error :code: message` or `path:line:column: error :kind: message values…` (the position comes from the descriptor's `:position`, and is left out when there is none).
 
 ## Constraints that shape the code
 
@@ -47,7 +47,8 @@ The CLI (`main.c`): `build/novelo file.nvl` runs a file, `build/novelo` alone st
 - **Cite the spec in each file**, e.g. `/* core §8.3 */`.
 - **Memory is reference counted.** The heap is acyclic: values are immutable and recursion goes through global names resolved at call time. Ownership rule: a function returning `Value *` returns a new reference, and arguments are borrowed unless the function name ends in `_take`. Release must be iterative (explicit work stack), because dropping a 1M-element list must not recurse in C. `lisp_live_objects()` counts non-immortal objects, and both runners check that it returns to its baseline after each test or case.
 - **Errors are return values.** Never use `setjmp`/`longjmp`, because a jump would skip releases. A failing call returns `nullptr`/`false` and leaves a pending `{:kind :message :values}` descriptor in the interpreter state. Read errors are a separate `{code, line, column}` struct and never reach `catch`.
-- **Position table:** a side table keyed by node address. Freeing a node must remove its entry, so a reused address never inherits a stale position (core §6.4).
+- **Position table:** a side table keyed by node address. Freeing a node must remove its entry, so a reused address never inherits a stale position (core §6.4). `LispPosition` also carries a `file` id (positions.c keeps the names as plain C strings, so they never count as live objects); `lisp_read_file` records it.
+- **Positions in errors (core §8.5):** every `LispNode` has a `position`. `expand` stamps it from the form, or from `state->expansion_position` (the nearest enclosing form) for nodes built by derived forms, quasiquote and macros. On failure, `lisp_eval`, `expand` and the top-level `process` call `lisp_error_locate`, which adds `:position` only if the descriptor has none, so the innermost location wins and `raise` keeps an existing one.
 
 ## Pipeline architecture
 

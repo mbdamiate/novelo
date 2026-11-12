@@ -536,7 +536,7 @@ static Value *expand_symbol(Value *symbol, const Scope *scope) {
     return node;
 }
 
-static Value *expand(LispState *state, Value *form, const Scope *scope, Value *context) {
+static Value *expand_form(LispState *state, Value *form, const Scope *scope, Value *context) {
     if (!lisp_check_stack(state)) return nullptr;
     if (form->kind == LISP_KIND_SYMBOL) return expand_symbol(form, scope);
     if (form->kind == LISP_KIND_MAP) return expand_map_literal(state, form, scope, context);
@@ -572,6 +572,42 @@ static Value *expand(LispState *state, Value *form, const Scope *scope, Value *c
         return node;
     }
     return expand_application(state, form, scope, context);
+}
+
+/* ---- positions (§6.3, §8.5) ------------------------------------------------------------------- */
+
+void lisp_note_position(LispState *state, const Value *form) {
+    LispPosition position;
+    if ((form->kind == LISP_KIND_PAIR || form->kind == LISP_KIND_MAP) && lisp_position_lookup(form, &position)) {
+        state->expansion_position = position;
+    }
+}
+
+/* Gives the position to the node and to every node under it that has none
+ * yet. Nodes that went through expand already have one, so each node is
+ * stamped once; the rest were built by the derived forms and quasiquote. */
+static void stamp(Value *value, LispPosition position) {
+    LispNode *node = mutable_node(value);
+    if (position.line == 0 || node->position.line != 0) return;
+    node->position = position;
+    for (size_t index = 0; index < node->child_count; index++) {
+        if (node->children[index]) stamp(node->children[index], position);
+    }
+}
+
+/* Expands a form inside the position of the nearest enclosing form that has
+ * one, or its own. */
+static Value *expand(LispState *state, Value *form, const Scope *scope, Value *context) {
+    LispPosition enclosing = state->expansion_position;
+    lisp_note_position(state, form);
+    Value *node = expand_form(state, form, scope, context);
+    if (node) {
+        stamp(node, state->expansion_position);
+    } else {
+        lisp_error_locate(state, state->expansion_position);
+    }
+    state->expansion_position = enclosing;
+    return node;
 }
 
 Value *lisp_expand(LispState *state, Value *form, Value *context) {

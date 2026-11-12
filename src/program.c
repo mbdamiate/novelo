@@ -106,8 +106,12 @@ static Value *process_sequence(LispState *state, Value *form, Value *context) {
     return last;
 }
 
+/* §8.5: an error that leaves a top-level form takes the position of that form
+ * (or of the form a macro turned it into) unless it already has one. */
 static Value *process(LispState *state, Value *form, Value *context) {
     lisp_retain(form);
+    LispPosition enclosing = state->expansion_position;
+    lisp_note_position(state, form);
     Value *result = nullptr;
     const LispSymbols *symbols = lisp_symbols();
     for (;;) {
@@ -139,6 +143,7 @@ static Value *process(LispState *state, Value *form, Value *context) {
             if (expansion) {
                 lisp_release(form);
                 form = expansion;
+                lisp_note_position(state, form);
                 continue;
             }
         }
@@ -149,20 +154,32 @@ static Value *process(LispState *state, Value *form, Value *context) {
         }
         break;
     }
+    if (!result) lisp_error_locate(state, state->expansion_position);
+    state->expansion_position = enclosing;
     lisp_release(form);
+    return result;
+}
+
+/* A form of a file (or of a REPL input) starts with no enclosing position:
+ * the include or import that loads the file is not around it in the source. */
+static Value *process_alone(LispState *state, Value *form, Value *context) {
+    LispPosition enclosing = state->expansion_position;
+    state->expansion_position = (LispPosition){};
+    Value *result = process(state, form, context);
+    state->expansion_position = enclosing;
     return result;
 }
 
 Value *lisp_process_top_level(LispState *state, Value *form, Value *context) {
     note_stack_base(state);
-    return process(state, form, context);
+    return process_alone(state, form, context);
 }
 
 LispRunResult lisp_run_source(LispState *state, const char *source, size_t length, const char *path,
                               Value **last_value, LispReadError *read_error) {
     note_stack_base(state);
     Value *forms;
-    if (!lisp_read(source, length, &forms, read_error)) return LISP_RUN_READ_ERROR;
+    if (!lisp_read_file(source, length, path, &forms, read_error)) return LISP_RUN_READ_ERROR;
     /* The program is a file still being loaded while it runs (§8.8, cycles). */
     if (path) {
         Value *absolute = lisp_path_resolve(state->working_directory, path);
@@ -172,7 +189,7 @@ LispRunResult lisp_run_source(LispState *state, const char *source, size_t lengt
     Value *last = LISP_VOID;
     for (const Value *rest = forms; rest->kind == LISP_KIND_PAIR; rest = lisp_rest(rest)) {
         lisp_release(last);
-        last = process(state, lisp_first(rest), nullptr);
+        last = process_alone(state, lisp_first(rest), nullptr);
         if (!last) break;
     }
     if (path) lisp_loading_pop(state);

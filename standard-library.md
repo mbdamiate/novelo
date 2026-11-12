@@ -10,7 +10,7 @@ The standard library is made of three libraries, in the sense of core section 8.
 
 The reference definitions in section 4 are normative. The implementation MAY replace any of them with a native version, as long as the observable behavior is identical, including errors and the names each library binds.
 
-**Version:** 0.2.1, draft, on top of core 0.2.2.
+**Version:** 0.2.1, draft, on top of core 0.3.0.
 
 **Changes since 0.2.0.** The language is named Novelo (core 0.2.2); the cases in `stdlib-conformance.json` use `.nvl` file names. The libraries are unchanged.
 

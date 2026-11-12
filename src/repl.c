@@ -17,13 +17,13 @@ static void write_buffer(LispOutput output, const LispBuffer *buffer) {
     output.write(output.context, buffer->data ? buffer->data : "", buffer->length);
 }
 
-/* Reports the pending error as "error :kind: message values…". */
+/* Reports the pending error as "line:column: error :kind: message values…"
+ * (positions count from the start of the input, §8.5). */
 static void report_error(LispState *state, const LispReplOptions *options) {
     Value *descriptor = lisp_take_error(state);
     LispBuffer message;
     lisp_buffer_init(&message);
-    lisp_buffer_append_string(&message, "error ");
-    lisp_describe_error(&message, descriptor);
+    lisp_describe_uncaught_error(&message, descriptor);
     lisp_buffer_append_byte(&message, '\n');
     write_buffer(options->errors, &message);
     lisp_buffer_free(&message);

@@ -242,7 +242,10 @@ static void replace(Value **slot, Value *replacement) {
 }
 
 Value *lisp_eval(LispState *state, Value *node, Value *environment, Value *context) {
-    if (!lisp_check_stack(state)) return nullptr;
+    if (!lisp_check_stack(state)) {
+        lisp_error_locate(state, lisp_as_node(node)->position);
+        return nullptr;
+    }
     lisp_retain(node);
     lisp_retain(environment);
     lisp_retain(context);
@@ -339,6 +342,8 @@ Value *lisp_eval(LispState *state, Value *node, Value *environment, Value *conte
     }
 
 done:
+    /* §8.5: the innermost node with a position names where the error left. */
+    if (!result) lisp_error_locate(state, lisp_as_node(node)->position);
     lisp_release(node);
     lisp_release(environment);
     lisp_release(context);

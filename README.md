@@ -1,6 +1,6 @@
 # Novelo
 
-An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.2.2) and the standard library (`standard-library.md`, v0.2.1).
+An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.3.0) and the standard library (`standard-library.md`, v0.2.1).
 
 *Novelo* is Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as Novelo's lists are. Source files end in `.nvl`.
 
@@ -8,7 +8,7 @@ Every case of both conformance suites passes:
 
 | Suite | Cases |
 | --- | --- |
-| core | 254 |
+| core | 265 |
 | stdlib | 29 |
 
 Those runs report no leaks, and they also pass under AddressSanitizer and UndefinedBehaviorSanitizer.
@@ -55,7 +55,14 @@ Messages go to standard error, after whatever the program had already printed:
 
 ```
 program.nvl:3:1: read error :odd-map: map with an odd number of datums
-error :unbound-symbol: unbound symbol car car
+program.nvl:7:5: error :unbound-symbol: unbound symbol car car
+```
+
+An uncaught error names the innermost form, read from a file, that contains the failing expression (core §8.5). A `catch` handler finds the same position in the descriptor, under `:position`:
+
+```lisp
+(catch (lambda () (quotient 1 0))
+  (lambda (problem) (get problem :position)))   ; → {:line 1 :column 19 :file "program.nvl"}
 ```
 
 **Programs** see only the core primitives until they import a library (core §8.9):
@@ -103,9 +110,9 @@ make conformance
 | `src/buffer.h/.c` | | growable byte buffer, allocation helpers |
 | `src/utf8.h/.c` | core §3.2 | strict UTF-8 decoding and encoding |
 | `src/reader.h/.c` | core §3–7 | tokens, literals, escapes, collections, nesting limit, read errors in §7.3 order |
-| `src/positions.h/.c` | core §6 | side table: node address → line and column |
+| `src/positions.h/.c` | core §6, §8.5 | side table: node address → line, column and file; the names of the files read |
 | `src/printer.h/.c` | core §10 | `write!` and `display!` text |
-| `src/error.h/.c` | core §8.5 | the pending error `{:kind :message :values}` |
+| `src/error.h/.c` | core §8.5, §8.7 | the pending error `{:kind :message :values}`, its `:position`, the messages for stderr |
 | `src/node.h`, `src/expander.h/.c` | core §8.2–8.3 | special forms, derived forms, quasiquote, macros, lexical addresses |
 | `src/eval.h/.c` | core §8.1, 8.2, 8.4 | environments, the evaluation loop with tail calls, application, globals, stack guard |
 | `src/primitives.h/.c` | core §9 | the primitive table |
@@ -142,11 +149,19 @@ make conformance
 - Non-tail recursion uses the C stack. The CLI and the conformance runner run on a thread with a 512 MB stack.
 - A guard raises the catchable `:stack-overflow` before that stack runs out.
 
-**Positions** live in a side table keyed by node address. Freeing a node removes its entry, so a reused address never inherits a stale position (core §6.4).
+**Positions** live in a side table keyed by node address. Freeing a node removes its entry, so a reused address never inherits a stale position (core §6.4). Each entry also names its file, as an index into a list of file names that the reader fills.
+
+**Positions in errors.**
+
+- The expander copies the position of each form it expands into the node it builds. Nodes without one of their own, built for derived forms, quasiquote or the output of a macro, take the position of the nearest enclosing form.
+- When a node fails, the evaluator adds `:position` to the pending descriptor, unless it already has one. The innermost failing node does this first, so the position is where the error happened.
+- Expansion errors and errors of top-level forms such as `include` are located the same way.
 
 ## Implementation-defined behavior
 
 Core 0.2.1 settled the points that versions up to 0.2.0 left open, such as `display!` of strings inside collections, `:stack-overflow` and `:io-error`. They are now in the specification and in the conformance cases. What the specification still leaves to the implementation, this interpreter does as follows:
+
+- **`:file` in error positions.** For the program, it is the path as given on the command line. For an included file, it is the absolute path. For a library written in the language, it is the path of the standard library document, and the line is its line in that document. In the REPL there is no `:file`, and lines count from the start of each input.
 
 - **Call depth.** The specification requires at least 10,000 nested non-tail calls. Here the limit is the 512 MB stack of the CLI and the conformance runner, minus a 16 MB margin, which allows well over 100,000 nested calls. Beyond it, `:stack-overflow` is raised.
 - **Libraries that cannot be loaded.** When the standard library document cannot be read, or has no code for the library, `import` gives `:import-error` with `:values` `(name :cannot-open)`. A read error in the document gives `(name code line column)`, with the line and column in the document.

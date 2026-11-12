@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct Entry {
     const Value *node; /* nullptr marks an empty slot */
@@ -87,9 +88,41 @@ static void forget(const Value *node) {
 
 size_t lisp_position_count(void) { return entry_count; }
 
+/* ---- file names ------------------------------------------------------------------ */
+
+/* Plain C strings, not Values, so they never count as live objects; a
+ * program names only a handful of files, so a linear search is enough. */
+static char **file_names;
+static uint32_t file_name_count, file_name_capacity;
+
+uint32_t lisp_source_file_register(const char *name) {
+    for (uint32_t index = 0; index < file_name_count; index++) {
+        if (strcmp(file_names[index], name) == 0) return index + 1;
+    }
+    if (file_name_count == file_name_capacity) {
+        file_name_capacity = file_name_capacity ? file_name_capacity * 2 : 8;
+        char **bigger = lisp_xcalloc(file_name_capacity, sizeof *file_names);
+        if (file_name_count) memcpy(bigger, file_names, file_name_count * sizeof *file_names);
+        free(file_names);
+        file_names = bigger;
+    }
+    size_t length = strlen(name) + 1;
+    file_names[file_name_count] = lisp_xmalloc(length);
+    memcpy(file_names[file_name_count], name, length);
+    return ++file_name_count;
+}
+
+const char *lisp_source_file_name(uint32_t file) {
+    return file > 0 && file <= file_name_count ? file_names[file - 1] : nullptr;
+}
+
 void lisp_positions_shutdown(void) {
     assert(entry_count == 0);
     free(entries);
     entries = nullptr;
     entry_count = capacity = 0;
+    for (uint32_t index = 0; index < file_name_count; index++) free(file_names[index]);
+    free(file_names);
+    file_names = nullptr;
+    file_name_count = file_name_capacity = 0;
 }

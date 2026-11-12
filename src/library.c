@@ -133,7 +133,7 @@ static Value *library_forms(LispState *state, const LispLibrary *library, Value 
                                     &source)) {
         lisp_error(state, "import-error", LISP_LIST(name, lisp_keyword_cstr("cannot-open")),
                    "no code for %s in section %s of %s", library->name, library->section, path);
-    } else if (!lisp_read(source.data ? source.data : "", source.length, &forms, &read_error)) {
+    } else if (!lisp_read_file(source.data ? source.data : "", source.length, path, &forms, &read_error)) {
         Value *line = lisp_integer(read_error.position.line);
         Value *column = lisp_integer(read_error.position.column);
         lisp_error(state, "import-error",

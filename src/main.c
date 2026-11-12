@@ -58,8 +58,7 @@ static int run_program(LispState *state, const char *path) {
         write_error(&message);
     } else if (result == LISP_RUN_ERROR) {
         Value *descriptor = lisp_take_error(state);
-        lisp_buffer_append_string(&message, "error ");
-        lisp_describe_error(&message, descriptor);
+        lisp_describe_uncaught_error(&message, descriptor);
         lisp_release(descriptor);
         write_error(&message);
     }

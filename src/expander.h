@@ -19,6 +19,10 @@ const LispSymbols *lisp_symbols(void);
  * :expansion-error (or a macro's error) pending. */
 [[nodiscard]] Value *lisp_expand(LispState *state, Value *form, Value *context);
 
+/* §8.5 — if the form is a List or Map with a recorded position, makes it the
+ * position of the innermost form being processed (state->expansion_position). */
+void lisp_note_position(LispState *state, const Value *form);
+
 /* If form is a macro call in the context, stores its expansion (one step, a
  * new reference) in *expansion; otherwise stores nullptr. Returns false if
  * the macro failed. Used by the top level, which must see the forms a macro

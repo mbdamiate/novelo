@@ -51,6 +51,20 @@ Value *lisp_error_from_descriptor(LispState *state, Value *descriptor) {
     return nullptr;
 }
 
+void lisp_error_locate(LispState *state, LispPosition position) {
+    if (position.line == 0 || !state->error || state->error->kind != LISP_KIND_MAP) return;
+    Value *key = lisp_keyword_cstr("position");
+    if (lisp_map_get(state->error, key)) return;
+    Value *where = lisp_map_new(3);
+    (void)lisp_map_insert_take(&where, lisp_keyword_cstr("line"), lisp_integer(position.line));
+    (void)lisp_map_insert_take(&where, lisp_keyword_cstr("column"), lisp_integer(position.column));
+    const char *file = lisp_source_file_name(position.file);
+    if (file) (void)lisp_map_insert_take(&where, lisp_keyword_cstr("file"), lisp_string_cstr(file));
+    Value *descriptor = lisp_map_associate(state->error, key, where);
+    lisp_release(where);
+    set_pending(state, descriptor);
+}
+
 Value *lisp_take_error(LispState *state) {
     Value *descriptor = state->error;
     state->error = nullptr;
@@ -77,4 +91,26 @@ void lisp_describe_error(LispBuffer *output, const Value *descriptor) {
             lisp_print(output, lisp_first(rest), LISP_PRINT_WRITE);
         }
     }
+}
+
+void lisp_describe_uncaught_error(LispBuffer *output, const Value *descriptor) {
+    /* A descriptor built by the program may hold anything under :position. */
+    Value *position = lisp_map_get(descriptor, lisp_keyword_cstr("position"));
+    if (position && position->kind == LISP_KIND_MAP) {
+        Value *file = lisp_map_get(position, lisp_keyword_cstr("file"));
+        Value *line = lisp_map_get(position, lisp_keyword_cstr("line"));
+        Value *column = lisp_map_get(position, lisp_keyword_cstr("column"));
+        if (line && column && line->kind == LISP_KIND_INTEGER && column->kind == LISP_KIND_INTEGER) {
+            if (file && file->kind == LISP_KIND_STRING) {
+                lisp_print(output, file, LISP_PRINT_DISPLAY);
+                lisp_buffer_append_byte(output, ':');
+            }
+            char coordinates[48];
+            snprintf(coordinates, sizeof coordinates, "%lld:%lld: ", (long long)lisp_integer_value(line),
+                     (long long)lisp_integer_value(column));
+            lisp_buffer_append_string(output, coordinates);
+        }
+    }
+    lisp_buffer_append_string(output, "error ");
+    lisp_describe_error(output, descriptor);
 }

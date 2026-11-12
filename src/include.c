@@ -247,7 +247,8 @@ Value *lisp_include(LispState *state, Value *form, Value *context) {
         result = LISP_VOID; /* already loaded in this context */
     } else if (!state->files.read_file(state->files.context, lisp_as_string(absolute_path)->data, &contents)) {
         include_error(state, LISP_LIST(path, lisp_keyword_cstr("cannot-open")), "cannot open the file");
-    } else if (!lisp_read(contents.data ? contents.data : "", contents.length, &forms, &read_error)) {
+    } else if (!lisp_read_file(contents.data ? contents.data : "", contents.length,
+                               lisp_as_string(absolute_path)->data, &forms, &read_error)) {
         Value *line = lisp_integer(read_error.position.line);
         Value *column = lisp_integer(read_error.position.column);
         include_error(state, LISP_LIST(path, lisp_keyword_cstr(lisp_read_error_name(read_error.code)), line, column),

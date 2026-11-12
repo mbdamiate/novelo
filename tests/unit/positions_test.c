@@ -2,13 +2,15 @@
 #include "test.h"
 
 #include "positions.h"
+#include "reader.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 static void t_records_and_forgets(void) {
     size_t entries_before = lisp_position_count();
     Value *list = lisp_prepend_take(lisp_integer(1), LISP_EMPTY);
-    lisp_position_record(list, (LispPosition){3, 7});
+    lisp_position_record(list, (LispPosition){.line = 3, .column = 7});
     LispPosition position;
     CHECK(lisp_position_lookup(list, &position));
     CHECK_INT(position.line, 3);
@@ -29,7 +31,7 @@ static void t_unrecorded_node_has_no_position(void) {
 static void t_reused_address_has_no_position(void) {
     for (int attempt = 0; attempt < 100; attempt++) {
         Value *old_node = lisp_prepend_take(lisp_integer(attempt), LISP_EMPTY);
-        lisp_position_record(old_node, (LispPosition){1, 1});
+        lisp_position_record(old_node, (LispPosition){.line = 1, .column = 1});
         uintptr_t old_address = (uintptr_t)old_node;
         lisp_release(old_node);
         Value *new_node = lisp_prepend_take(lisp_integer(attempt), LISP_EMPTY);
@@ -46,7 +48,7 @@ static void t_many_entries(void) {
     Value **nodes = malloc(COUNT * sizeof *nodes);
     for (int index = 0; index < COUNT; index++) {
         nodes[index] = lisp_prepend_take(lisp_integer(index), LISP_EMPTY);
-        lisp_position_record(nodes[index], (LispPosition){(uint32_t)index + 1, 1});
+        lisp_position_record(nodes[index], (LispPosition){.line = (uint32_t)index + 1, .column = 1});
     }
     for (int index = 0; index < COUNT; index += 2) lisp_release(nodes[index]);
     for (int index = 1; index < COUNT; index += 2) {
@@ -59,10 +61,37 @@ static void t_many_entries(void) {
     free(nodes);
 }
 
+/* §8.5: positions read from a file name it, through the file registry. */
+static void t_file_names(void) {
+    uint32_t first = lisp_source_file_register("one.nvl");
+    CHECK(first >= 1);
+    CHECK_INT(lisp_source_file_register("one.nvl"), first);
+    uint32_t second = lisp_source_file_register("two.nvl");
+    CHECK(second != first);
+    CHECK(strcmp(lisp_source_file_name(second), "two.nvl") == 0);
+    CHECK(lisp_source_file_name(0) == nullptr);
+
+    Value *datums;
+    LispReadError error;
+    CHECK(lisp_read_file("\n  (a)", 6, "two.nvl", &datums, &error));
+    LispPosition position;
+    CHECK(lisp_position_lookup(lisp_first(datums), &position));
+    CHECK_INT(position.line, 2);
+    CHECK_INT(position.column, 3);
+    CHECK_INT(position.file, second);
+    lisp_release(datums);
+
+    CHECK(lisp_read("(a)", 3, &datums, &error));
+    CHECK(lisp_position_lookup(lisp_first(datums), &position));
+    CHECK_INT(position.file, 0);
+    lisp_release(datums);
+}
+
 const TestSuite positions_suite = {"positions", (const TestCase[]){
     {"records and forgets", t_records_and_forgets},
     {"an unrecorded node has no position", t_unrecorded_node_has_no_position},
     {"a reused address has no position", t_reused_address_has_no_position},
     {"many entries with interleaved removal", t_many_entries},
+    {"file names", t_file_names},
     {},
 }};

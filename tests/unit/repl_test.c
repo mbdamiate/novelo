@@ -53,12 +53,15 @@ static void t_continuation(void) {
 
 static void t_errors(void) {
     /* an error discards the rest of its input; the session goes on */
-    CHECK_SESSION("(car 1) 5\n6\n", "6\n", "error :unbound-symbol: unbound symbol car car\n");
+    CHECK_SESSION("(car 1) 5\n6\n", "6\n", "1:1: error :unbound-symbol: unbound symbol car car\n");
     CHECK_SESSION(")\n7\n", "7\n", "1:1: read error :unexpected-delimiter: ')' without an opener\n");
     /* an input left open at the end */
     CHECK_SESSION("(list 1\n", "", "1:1: read error :unclosed-delimiter: '(' is never closed\n");
     /* definitions made before an error in the same input remain */
-    CHECK_SESSION("(define y 2) (error \"no\") 3\ny\n", "2\n", "error :error: no\n");
+    CHECK_SESSION("(define y 2) (error \"no\") 3\ny\n", "2\n", "1:14: error :error: no\n");
+    /* positions count from the start of each input (§8.5); a lone symbol has none */
+    CHECK_SESSION("1\n(list\n  (quotient 1 0))\n", "1\n", "2:3: error :division-by-zero: quotient: division by zero\n");
+    CHECK_SESSION("nothing\n", "", "error :unbound-symbol: unbound symbol nothing nothing\n");
 }
 
 /* read-line! reads the lines that follow the input in the same stream; at

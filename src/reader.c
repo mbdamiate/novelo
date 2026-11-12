@@ -467,7 +467,7 @@ static bool read_datum(Reader *reader, Value **datum) {
 static void decode(Reader *reader, const char *source, size_t length) {
     const unsigned char *bytes = (const unsigned char *)source;
     reader->code_points = lisp_xmalloc((length + 1) * sizeof(uint32_t));
-    LispPosition position = {1, 1};
+    LispPosition position = {.line = 1, .column = 1, .file = reader->position.file};
     size_t offset = 0;
     while (offset < length) {
         uint32_t code_point;
@@ -487,7 +487,13 @@ static void decode(Reader *reader, const char *source, size_t length) {
 }
 
 bool lisp_read(const char *source, size_t length, Value **datums, LispReadError *error) {
-    Reader reader = {.position = {1, 1}, .error = error};
+    return lisp_read_file(source, length, nullptr, datums, error);
+}
+
+bool lisp_read_file(const char *source, size_t length, const char *file_name, Value **datums,
+                    LispReadError *error) {
+    uint32_t file = file_name ? lisp_source_file_register(file_name) : 0;
+    Reader reader = {.position = {1, 1, file}, .error = error};
     lisp_buffer_init(&reader.text);
     decode(&reader, source, length);
 

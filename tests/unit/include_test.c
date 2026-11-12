@@ -107,6 +107,68 @@ static void t_error_values(void) {
     file_run_finish(&run);
 }
 
+/* §8.5: :position names the file the failing code was read from. */
+static void check_error_position(const char *file, int line, FileRun *run, const char *expected) {
+    if (run->result != LISP_RUN_ERROR) {
+        test_fail(file, line, "expected an error");
+        return;
+    }
+    Value *position = lisp_map_get(run->state->error, lisp_keyword_cstr("position"));
+    if (!position) {
+        test_fail(file, line, "the error has no :position, expected %s", expected);
+        return;
+    }
+    test_check_equal(file, line, position, expected);
+}
+#define CHECK_ERROR_POSITION(run, expected) check_error_position(__FILE__, __LINE__, (run), (expected))
+
+static void t_error_positions(void) {
+    FileRun run;
+    file_run(&run, "(+ 1\n  (first ()))", 0, nullptr);
+    CHECK_ERROR_POSITION(&run, "{:line 2 :column 3 :file \"main.nvl\"}");
+    file_run_finish(&run);
+
+    file_run(&run, "(include \"lib/f.nvl\")\n(boom)", 1,
+             (LispMemoryFile[]){FILE("/lib/f.nvl", "(define boom (lambda ()\n  (first ())))")});
+    CHECK_ERROR_POSITION(&run, "{:line 2 :column 3 :file \"/lib/f.nvl\"}");
+    file_run_finish(&run);
+
+    /* an include that fails is at the include form */
+    file_run(&run, "\n(include \"missing.nvl\")", 0, nullptr);
+    CHECK_ERROR_POSITION(&run, "{:line 2 :column 1 :file \"main.nvl\"}");
+    file_run_finish(&run);
+}
+
+/* §8.7: the message names the position; a :position the program built is
+ * used when it has the right shape and ignored otherwise. */
+static void t_uncaught_error_message(void) {
+    static const struct {
+        const char *program;
+        const char *message;
+    } cases[] = {
+        {"\n  (quotient 1 0)", "main.nvl:2:3: error :division-by-zero: quotient: division by zero"},
+        {"(raise {:kind :x :message \"m\" :values (quote (1)) :position {:file \"f\" :line 4 :column 5}})",
+         "f:4:5: error :x: m 1"},
+        {"(raise {:kind :x :message \"m\" :values () :position {:line 4 :column 5}})", "4:5: error :x: m"},
+        {"(raise {:kind :x :message \"m\" :values () :position 5})", "error :x: m"},
+    };
+    for (size_t index = 0; index < sizeof cases / sizeof cases[0]; index++) {
+        FileRun run;
+        file_run(&run, cases[index].program, 0, nullptr);
+        CHECK_INT(run.result, LISP_RUN_ERROR);
+        if (run.result == LISP_RUN_ERROR) {
+            LispBuffer message;
+            lisp_buffer_init(&message);
+            lisp_describe_uncaught_error(&message, run.state->error);
+            if (strcmp(message.data, cases[index].message) != 0) {
+                test_fail(__FILE__, __LINE__, "message \"%s\", expected \"%s\"", message.data, cases[index].message);
+            }
+            lisp_buffer_free(&message);
+        }
+        file_run_finish(&run);
+    }
+}
+
 static void t_nested_directories(void) {
     FileRun run;
     file_run(&run, "(include \"a/b/c.nvl\" c) (c/where)", 3,
@@ -189,6 +251,8 @@ static void t_disk(void) {
 const TestSuite include_suite = {"include", (const TestCase[]){
     {"path resolution", t_path_resolution},
     {"error values", t_error_values},
+    {"error positions name their file", t_error_positions},
+    {"the message of an uncaught error", t_uncaught_error_message},
     {"nested directories and absolute paths", t_nested_directories},
     {"definitions before an error remain", t_definitions_before_error_remain},
     {"a failed include can be retried", t_retry_after_failure},

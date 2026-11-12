@@ -1,10 +1,10 @@
 {
-  "spec": "Core Specification — Novelo, version 0.2.2",
+  "spec": "Core Specification — Novelo, version 0.3.0",
   "format": {
     "read": "Read 'input' (UTF-8). With 'equivalent': also read that text and compare the two datum sequences with equal?. With 'types': the sequence read has exactly these types, in order.",
     "read-error": "Read 'input' (or the bytes of 'input_hex'). Reading MUST fail with the code 'error' at position [line, column].",
     "read-positions": "Read 'input'. For each entry, 'path' indexes the sequence read and then list elements (0-based); the node found MUST be in the position table with 'position'.",
-    "eval": "Evaluate 'program' as a file (section 8.7), with only the library io available to import (section 8.9), with 'input' (or the bytes of 'input_hex') as standard input (empty if absent). Standard output MUST be exactly 'output'. With 'value': the program terminates normally, and the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
+    "eval": "Evaluate 'program' as a file (section 8.7), with only the library io available to import (section 8.9), with 'input' (or the bytes of 'input_hex') as standard input (empty if absent). Standard output MUST be exactly 'output'. With 'value': the program terminates normally, and the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'. With 'error_position': the descriptor of that error has a :position whose :line and :column are the pair [line, column]; when it is null, the descriptor has no :position."
   },
   "cases": [
     {
@@ -1823,6 +1823,106 @@
       "section": "8.5",
       "program": "(define catch-kind (lambda (kind default thunk) (catch thunk (lambda (problem) (if (equal? (get problem :kind) kind) default otherwise (raise problem)))))) (list (catch-kind :division-by-zero 0 (lambda () (quotient 1 0))) (catch (lambda () (catch-kind :division-by-zero 0 (lambda () (first ())))) (lambda (p) (get p :kind))))",
       "value": "(0 :wrong-type)",
+      "output": ""
+    },
+    {
+      "id": "error-position-001",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define where (lambda (p) (list (get (get p :position) :line) (get (get p :position) :column))))\n(catch (lambda ()\n  (+ 1 (quotient 1 0)))\n  where)",
+      "value": "(3 8)",
+      "output": ""
+    },
+    {
+      "id": "error-position-002",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define where (lambda (p) (list (get (get p :position) :line) (get (get p :position) :column))))\n(define f (lambda () (first ())))\n(catch (lambda () (f)) where)",
+      "value": "(2 22)",
+      "output": ""
+    },
+    {
+      "id": "error-position-003",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define where (lambda (p) (list (get (get p :position) :line) (get (get p :position) :column))))\n(catch (lambda () (list 1\n  nothing-here)) where)",
+      "value": "(2 19)",
+      "output": ""
+    },
+    {
+      "id": "error-position-004",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define where (lambda (p) (list (get (get p :position) :line) (get (get p :position) :column))))\n(catch (lambda () (error \"boom\" 1))\n  (lambda (p) (list (get p :kind) (get p :message) (get p :values) (where p))))",
+      "value": "(:error \"boom\" (1) (2 19))",
+      "output": ""
+    },
+    {
+      "id": "error-position-005",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define where (lambda (p) (list (get (get p :position) :line) (get (get p :position) :column))))\n(catch (lambda ()\n    (raise {:kind :custom :message \"m\" :values ()}))\n  where)",
+      "value": "(3 5)",
+      "output": ""
+    },
+    {
+      "id": "error-position-006",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define where (lambda (p) (list (get (get p :position) :line) (get (get p :position) :column))))\n(define rethrow (lambda (p) (raise p)))\n(catch (lambda ()\n         (catch (lambda () (quotient 1 0))\n                rethrow))\n  where)",
+      "value": "(4 28)",
+      "output": ""
+    },
+    {
+      "id": "error-position-007",
+      "kind": "eval",
+      "section": "6.3",
+      "program": "(define where (lambda (p) (list (get (get p :position) :line) (get (get p :position) :column))))\n(define-macro divide-by-zero (lambda (x) (list 'quotient x 0)))\n(catch (lambda ()\n  (divide-by-zero 5))\n  where)",
+      "value": "(4 3)",
+      "output": ""
+    },
+    {
+      "id": "error-position-008",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define where (lambda (p) (list (get (get p :position) :line) (get (get p :position) :column))))\n(include \"lib.nvl\")\n(catch boom (lambda (p) (list (where p) (string? (get (get p :position) :file)))))",
+      "files": {
+        "lib.nvl": "(define boom (lambda ()\n  (first ())))"
+      },
+      "value": "((2 3) #true)",
+      "output": ""
+    },
+    {
+      "id": "error-position-009",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define x 1)\n(define f (lambda ()\n  (if 1 2 3)))",
+      "error": ":expansion-error",
+      "error_position": [
+        3,
+        3
+      ],
+      "output": ""
+    },
+    {
+      "id": "error-position-010",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define x 1)\n(define 2 3)",
+      "error": ":expansion-error",
+      "error_position": [
+        2,
+        1
+      ],
+      "output": ""
+    },
+    {
+      "id": "error-position-011",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define x 1)\nnothing-here",
+      "error": ":unbound-symbol",
+      "error_position": null,
       "output": ""
     },
     {

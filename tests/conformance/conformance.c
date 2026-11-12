@@ -208,6 +208,30 @@ static void describe_value(LispBuffer *output, const Value *value) {
     lisp_print(output, value, LISP_PRINT_WRITE);
 }
 
+/* core §8.5, §12.4 — with `error_position`, the uncaught descriptor has a
+ * :position with that [line, column]; with null, it has no :position. */
+static void check_error_position(const Json *test_case, const Value *descriptor, CaseResult *result) {
+    const Json *expected = json_member(test_case, "error_position");
+    if (!expected) return;
+    Value *position = lisp_map_get(descriptor, lisp_keyword_cstr("position"));
+    if (expected->kind == JSON_NULL) {
+        if (position) failure(result, "the error has a :position, expected none");
+        return;
+    }
+    int64_t expected_line = expected->items[0].integer;
+    int64_t expected_column = expected->items[1].integer;
+    Value *line = position && position->kind == LISP_KIND_MAP ? lisp_map_get(position, lisp_keyword_cstr("line")) : nullptr;
+    Value *column =
+        position && position->kind == LISP_KIND_MAP ? lisp_map_get(position, lisp_keyword_cstr("column")) : nullptr;
+    if (!line || !column || line->kind != LISP_KIND_INTEGER || column->kind != LISP_KIND_INTEGER) {
+        failure(result, "the error has no :position, expected %lld:%lld", (long long)expected_line,
+                (long long)expected_column);
+    } else if (lisp_integer_value(line) != expected_line || lisp_integer_value(column) != expected_column) {
+        failure(result, "error at %lld:%lld, expected %lld:%lld", (long long)lisp_integer_value(line),
+                (long long)lisp_integer_value(column), (long long)expected_line, (long long)expected_column);
+    }
+}
+
 /* Runs on a thread with a large stack (see lisp_run_on_large_stack). */
 static void run_eval_on_thread(void *argument) {
     EvalCall *call = argument;
@@ -280,6 +304,8 @@ static void run_eval_on_thread(void *argument) {
         } else if (!kind || strcmp(actual.data, expected_error) != 0) {
             lisp_describe_error(&message, state->error);
             failure(result, "error %s, expected %s", message.data, expected_error);
+        } else {
+            check_error_position(test_case, state->error, result);
         }
         lisp_buffer_free(&actual);
     } else if (run == LISP_RUN_ERROR) {

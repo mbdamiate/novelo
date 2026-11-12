@@ -10,10 +10,13 @@
 
 #include <stdint.h>
 
-/* Line and column start at 1; the column counts code points (§6.1). */
+/* Line and column start at 1; the column counts code points (§6.1). `file`
+ * names the file the position is in (lisp_source_file_register), or is 0 when
+ * the source has no file, as in the REPL. A line of 0 means no position. */
 typedef struct LispPosition {
     uint32_t line;
     uint32_t column;
+    uint32_t file;
 } LispPosition;
 
 /* Records where a non-empty List or Map was read. The node must be counted
@@ -26,5 +29,13 @@ bool lisp_position_lookup(const Value *node, LispPosition *position);
 /* Number of entries (for leak checks in tests). */
 size_t lisp_position_count(void);
 
-/* Frees the table; it must be empty. */
+/* Frees the table, which must be empty, and the file names. */
 void lisp_positions_shutdown(void);
+
+/* core §8.5 — the names of the files positions come from, kept for the
+ * :file of error positions. Registering a name again returns the same id;
+ * ids start at 1. */
+uint32_t lisp_source_file_register(const char *name);
+
+/* The name of a registered file, or nullptr for 0. */
+const char *lisp_source_file_name(uint32_t file);
