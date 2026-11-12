@@ -1,6 +1,7 @@
 /* core §3–7 — the reader: text to datums, with positions and read errors. */
 #pragma once
 
+#include "buffer.h"
 #include "positions.h"
 #include "value.h"
 
@@ -40,6 +41,10 @@ const char *lisp_read_error_name(LispReadErrorCode code);
 /* True for the errors caused only by input ending too soon, which a REPL
  * answers by reading another line. */
 bool lisp_read_error_is_incomplete(LispReadErrorCode code);
+
+/* core §8.7 — appends "path:line:column: read error :code: message" for
+ * stderr; without a path, "line:column: …". */
+void lisp_describe_read_error(LispBuffer *output, const char *path, const LispReadError *error);
 
 /* core §7.1 — reads the complete source. On success stores the List of
  * top-level datums in *datums (a new reference) and records the position of

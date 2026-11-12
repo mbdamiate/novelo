@@ -274,7 +274,7 @@ static void t_import(void) {
     CHECK_RUN_ERROR("(import io a) (a/write! 1) (write! 2)", ":unbound-symbol");
     CHECK_RUN_ERROR("(import)", ":expansion-error");
     CHECK_RUN_ERROR("(import io :p)", ":expansion-error");
-    CHECK_RUN_ERROR("(import list)", ":import-error");
+    CHECK_RUN_ERROR("(import no-such-library)", ":import-error");
 }
 
 const TestSuite eval_suite = {"eval", (const TestCase[]){

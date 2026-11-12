@@ -28,6 +28,7 @@ LispState *lisp_state_new(const LispStateOptions *options) {
     const char *directory = options->working_directory;
     if (!directory) directory = getcwd(current_directory, sizeof current_directory) ? current_directory : "/";
     state->working_directory = lisp_string_cstr(directory);
+    state->library_path = lisp_string_cstr(options->library_path ? options->library_path : lisp_default_library_path());
     state->loading = LISP_EMPTY;
     state->included = lisp_map_new(0);
     state->contexts = lisp_map_new(0);
@@ -42,6 +43,7 @@ void lisp_state_free(LispState *state) {
     lisp_release(state->error);
     lisp_globals_free(&state->globals);
     lisp_release(state->working_directory);
+    lisp_release(state->library_path);
     lisp_release(state->loading);
     lisp_release(state->included);
     lisp_release(state->contexts);

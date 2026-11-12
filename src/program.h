@@ -32,6 +32,7 @@ struct LispState {
     Value *working_directory; /* String: absolute; resolves relative paths outside files (§8.8) */
     Value *loading;        /* List of Strings: absolute paths of the files still loading, innermost first */
     Value *included;       /* Map: (path full-prefix) → #true, files loaded per context (§8.8) */
+    Value *library_path;   /* String: the standard library document (stdlib §4) */
     LispBuffer line;       /* scratch line for read-line! */
     const char *stack_base; /* address near the top of the thread's stack */
     size_t stack_limit;     /* bytes of stack evaluation may use */
@@ -42,6 +43,7 @@ typedef struct LispStateOptions {
     LispInput input;
     LispFileSystem files;          /* default: the disk */
     const char *working_directory; /* absolute; default: the process's current directory */
+    const char *library_path;      /* the standard library document; default: lisp_default_library_path() */
     /* Bytes of C stack the interpreter may use, counted from the frame that
      * calls lisp_run_source; deeper non-tail recursion raises :stack-overflow.
      * Zero means a conservative default that fits a default thread. */

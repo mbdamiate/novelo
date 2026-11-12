@@ -47,6 +47,19 @@ bool lisp_read_error_is_incomplete(LispReadErrorCode code) {
            || code == LISP_READ_UNEXPECTED_EOF;
 }
 
+void lisp_describe_read_error(LispBuffer *output, const char *path, const LispReadError *error) {
+    char position[64];
+    snprintf(position, sizeof position, "%s%u:%u: read error :", path ? ":" : "", (unsigned)error->position.line,
+             (unsigned)error->position.column);
+    if (path) lisp_buffer_append_string(output, path);
+    lisp_buffer_append_string(output, position);
+    lisp_buffer_append_string(output, lisp_read_error_name(error->code));
+    if (error->message[0]) {
+        lisp_buffer_append_string(output, ": ");
+        lisp_buffer_append_string(output, error->message);
+    }
+}
+
 /* ---- integers (§4.1, §4.6) --------------------------------------------------- */
 
 static bool is_digit(char character) { return character >= '0' && character <= '9'; }

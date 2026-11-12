@@ -1,6 +1,6 @@
 # lisp-min — build, tests and sanitizers.
 #
-#   make              build the library objects (and, from phase 5, the CLI)
+#   make              build the interpreter, build/lisp-min
 #   make test         unit tests + conformance suites
 #   make unit         unit tests only
 #   make conformance  conformance suites only
@@ -26,19 +26,19 @@ UNIT_BIN := $(BUILD)/unit-tests
 CONFORMANCE_SRC := $(wildcard tests/conformance/*.c)
 CONFORMANCE_OBJ := $(CONFORMANCE_SRC:tests/conformance/%.c=$(BUILD)/tests/conformance/%.o)
 CONFORMANCE_BIN := $(BUILD)/conformance
+CLI_BIN := $(BUILD)/lisp-min
 
 .PHONY: all test unit conformance asan clean
 
-all: $(LIB_OBJ)
+all: $(CLI_BIN)
 
 test: unit conformance
 
 unit: $(UNIT_BIN)
 	./$(UNIT_BIN)
 
-# stdlib-conformance.json joins in phase 5, with the libraries list, text and function.
 conformance: $(CONFORMANCE_BIN)
-	./$(CONFORMANCE_BIN) conformance.json
+	./$(CONFORMANCE_BIN) conformance.json stdlib-conformance.json
 
 asan:
 	$(MAKE) test BUILD=build/asan SANITIZE=1
@@ -46,11 +46,17 @@ asan:
 clean:
 	rm -rf build
 
+$(CLI_BIN): $(BUILD)/src/main.o $(LIB_OBJ)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
 $(UNIT_BIN): $(UNIT_OBJ) $(LIB_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 $(CONFORMANCE_BIN): $(CONFORMANCE_OBJ) $(LIB_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+# The standard library document read by import (stdlib §4); LISP_MIN_STDLIB overrides it.
+$(BUILD)/src/library.o: CFLAGS += -DLISP_MIN_STDLIB_DEFAULT='"$(CURDIR)/standard-library.md"'
 
 $(BUILD)/src/%.o: src/%.c
 	@mkdir -p $(dir $@)
@@ -64,4 +70,4 @@ $(BUILD)/tests/conformance/%.o: tests/conformance/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -Isrc -c -o $@ $<
 
--include $(LIB_OBJ:.o=.d) $(UNIT_OBJ:.o=.d) $(CONFORMANCE_OBJ:.o=.d)
+-include $(BUILD)/src/main.d $(LIB_OBJ:.o=.d) $(UNIT_OBJ:.o=.d) $(CONFORMANCE_OBJ:.o=.d)
