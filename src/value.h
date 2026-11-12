@@ -76,16 +76,21 @@ typedef struct LispPair {
 } LispPair;
 
 typedef struct LispMapEntry {
-    Value *key;     /* nullptr marks an empty slot */
+    Value *key;
     Value *value;
     uint64_t hash;
 } LispMapEntry;
 
+/* A compact hash table: entries in insertion order, plus an index of slots.
+ * Iteration follows insertion order, which keeps the reading order of map
+ * literals for left-to-right evaluation (§8.4). */
 typedef struct LispMap {
     Value header;
     size_t count;
-    size_t capacity; /* zero or a power of two, at least twice count */
-    LispMapEntry entries[];
+    size_t entry_capacity;
+    size_t slot_capacity;   /* zero or a power of two, at least twice count */
+    LispMapEntry *entries;  /* entries[0..count) */
+    uint32_t *slots;        /* 0: empty; otherwise the entry index plus one */
 } LispMap;
 
 typedef struct LispClosure {
@@ -217,9 +222,9 @@ void lisp_list_builder_discard(LispListBuilder *builder);
 /* A new map with room for `expected` keys; the empty map is immortal. */
 [[nodiscard]] Value *lisp_map_new(size_t expected);
 
-/* Builder insertion into a map that only the caller holds (refs == 1); may
- * move the map. Takes key and value. Returns false, and releases both, if the
- * key is already present. */
+/* Builder insertion into a map that only the caller holds (refs == 1). Takes
+ * key and value. Returns false, and releases both, if the key is already
+ * present. When *map is the shared empty map, it is replaced by a new one. */
 bool lisp_map_insert_take(Value **map, Value *key, Value *value);
 
 static inline size_t lisp_map_count(const Value *map) { return ((const LispMap *)map)->count; }

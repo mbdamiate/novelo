@@ -66,7 +66,8 @@ tests/
     - Symbols made by `generate-symbol` are not interned, and they are counted like any other object.
   - **Pair:** `{first, rest}`, so prepending is O(1).
   - **Map:**
-    - An open-addressing hash table, with a structural hash and keys compared by `equal?`.
+    - A compact hash table: entries in insertion order plus an open-addressing index, with a structural hash and keys compared by `equal?`.
+    - Insertion order keeps the reading order of map literals, which §8.4 evaluates left to right; `keys` and printing follow it too.
     - `associate` and `dissociate` copy the table.
   - **Closure:** `{lambda node (counted), environment, include context}`.
   - **Primitive:** `{name, minimum and maximum arity, function pointer}`.
@@ -111,7 +112,7 @@ tests/
   - **Deep non-tail recursion:**
     - Uses the C stack.
     - `main.c` runs the interpreter on a pthread with a 512 MB stack.
-    - A depth counter turns exhaustion into an `error: stack overflow` message with exit code 1, instead of a crash.
+    - A stack guard turns exhaustion into a catchable error `:stack-overflow`, instead of a crash. It compares the current frame address with the base recorded when the interpreter is entered, so the limit is in bytes and holds under sanitizers too.
 - **Primitives:** the §9 table, one C function per primitive, checking arity and types before doing any work.
 - **Program:**
   - The whole file is read before anything runs. Then each top-level form is expanded and evaluated in turn, and a top-level `sequence` is spliced (§8.7).

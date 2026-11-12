@@ -59,12 +59,12 @@ static void destroy(Value *object) {
     }
     case LISP_KIND_MAP: {
         LispMap *map = (LispMap *)object;
-        for (size_t slot = 0; slot < map->capacity; slot++) {
-            if (map->entries[slot].key) {
-                lisp_release(map->entries[slot].key);
-                lisp_release(map->entries[slot].value);
-            }
+        for (size_t index = 0; index < map->count; index++) {
+            lisp_release(map->entries[index].key);
+            lisp_release(map->entries[index].value);
         }
+        free(map->entries);
+        free(map->slots);
         break;
     }
     case LISP_KIND_CLOSURE: {
@@ -304,43 +304,61 @@ void lisp_list_builder_discard(LispListBuilder *builder) {
 
 /* ---- maps -------------------------------------------------------------------------- */
 
-static size_t capacity_for(size_t count) {
-    size_t capacity = 4;
+static size_t slot_capacity_for(size_t count) {
+    size_t capacity = 8;
     while (capacity < 2 * count) capacity *= 2;
     return capacity;
 }
 
-static LispMap *map_alloc(size_t capacity) {
-    LispMap *map = (LispMap *)lisp_object_new(LISP_KIND_MAP, sizeof(LispMap) + capacity * sizeof(LispMapEntry));
+static LispMap *map_alloc(size_t entry_capacity) {
+    LispMap *map = (LispMap *)lisp_object_new(LISP_KIND_MAP, sizeof(LispMap));
     map->count = 0;
-    map->capacity = capacity;
-    memset(map->entries, 0, capacity * sizeof(LispMapEntry));
+    map->entry_capacity = entry_capacity ? entry_capacity : 1;
+    map->entries = lisp_xmalloc(map->entry_capacity * sizeof(LispMapEntry));
+    map->slot_capacity = slot_capacity_for(map->entry_capacity);
+    map->slots = lisp_xcalloc(map->slot_capacity, sizeof(uint32_t));
     return map;
 }
 
-/* Slot holding `key`, or the empty slot where it would go. Requires capacity > count. */
-static size_t map_slot(const LispMap *map, const Value *key, uint64_t hash) {
-    size_t mask = map->capacity - 1;
-    size_t slot = hash & mask;
-    for (;;) {
-        const LispMapEntry *entry = &map->entries[slot];
-        if (!entry->key || (entry->hash == hash && lisp_equal(entry->key, key))) return slot;
-        slot = (slot + 1) & mask;
+/* Slot holding the entry for `key`, or the empty slot where it would go. */
+static size_t find_slot(const LispMap *map, const Value *key, uint64_t hash) {
+    size_t mask = map->slot_capacity - 1;
+    for (size_t slot = hash & mask;; slot = (slot + 1) & mask) {
+        uint32_t entry_number = map->slots[slot];
+        if (entry_number == 0) return slot;
+        const LispMapEntry *entry = &map->entries[entry_number - 1];
+        if (entry->hash == hash && lisp_equal(entry->key, key)) return slot;
     }
 }
 
-/* Places an entry known to be absent (used when rebuilding a table). */
-static void map_place(LispMap *map, Value *key, Value *value, uint64_t hash) {
-    size_t mask = map->capacity - 1;
-    size_t slot = hash & mask;
-    while (map->entries[slot].key) slot = (slot + 1) & mask;
-    map->entries[slot] = (LispMapEntry){.key = key, .value = value, .hash = hash};
+static void rebuild_slots(LispMap *map, size_t slot_capacity) {
+    free(map->slots);
+    map->slot_capacity = slot_capacity;
+    map->slots = lisp_xcalloc(slot_capacity, sizeof(uint32_t));
+    size_t mask = slot_capacity - 1;
+    for (size_t index = 0; index < map->count; index++) {
+        size_t slot = map->entries[index].hash & mask;
+        while (map->slots[slot]) slot = (slot + 1) & mask;
+        map->slots[slot] = (uint32_t)(index + 1);
+    }
+}
+
+/* Appends an entry known to be absent; the map must be private to the caller. */
+static void append_entry(LispMap *map, Value *key, Value *value, uint64_t hash) {
+    if (map->count == map->entry_capacity) {
+        map->entry_capacity *= 2;
+        map->entries = lisp_xrealloc(map->entries, map->entry_capacity * sizeof(LispMapEntry));
+    }
+    if (2 * (map->count + 1) > map->slot_capacity) rebuild_slots(map, slot_capacity_for(map->count + 1));
+    size_t slot = find_slot(map, key, hash);
+    map->entries[map->count] = (LispMapEntry){.key = key, .value = value, .hash = hash};
+    map->slots[slot] = (uint32_t)(map->count + 1);
     map->count++;
 }
 
 Value *lisp_map_new(size_t expected) {
     if (expected == 0) return &empty_map.header;
-    return &map_alloc(capacity_for(expected))->header;
+    return &map_alloc(expected)->header;
 }
 
 bool lisp_map_insert_take(Value **map_reference, Value *key, Value *value) {
@@ -351,47 +369,36 @@ bool lisp_map_insert_take(Value **map_reference, Value *key, Value *value) {
         lisp_release(value);
         return false;
     }
-    if (2 * (map->count + 1) > map->capacity) {
-        LispMap *bigger = map_alloc(capacity_for(map->count + 1));
-        for (size_t slot = 0; slot < map->capacity; slot++) {
-            LispMapEntry *entry = &map->entries[slot];
-            if (entry->key) map_place(bigger, entry->key, entry->value, entry->hash);
-        }
-        if (!(map->header.flags & LISP_IMMORTAL)) { /* the entries moved, so free only the table */
-            free(map);
-            live_objects--;
-        }
-        map = bigger;
+    if (map->header.flags & LISP_IMMORTAL) { /* the shared empty map: start a real one */
+        map = map_alloc(4);
         *map_reference = &map->header;
     }
-    map_place(map, key, value, lisp_hash(key));
+    append_entry(map, key, value, lisp_hash(key));
     return true;
 }
 
 Value *lisp_map_get(const Value *map_value, const Value *key) {
     const LispMap *map = (const LispMap *)map_value;
     if (map->count == 0) return nullptr;
-    const LispMapEntry *entry = &map->entries[map_slot(map, key, lisp_hash(key))];
-    return entry->key ? entry->value : nullptr;
+    uint32_t entry_number = map->slots[find_slot(map, key, lisp_hash(key))];
+    return entry_number ? map->entries[entry_number - 1].value : nullptr;
 }
 
 Value *lisp_map_associate(const Value *map_value, Value *key, Value *value) {
     const LispMap *map = (const LispMap *)map_value;
-    LispMap *copy = map_alloc(capacity_for(map->count + 1));
-    for (size_t slot = 0; slot < map->capacity; slot++) {
-        const LispMapEntry *entry = &map->entries[slot];
-        if (entry->key) {
-            map_place(copy, lisp_retain(entry->key), lisp_retain(entry->value), entry->hash);
-        }
+    LispMap *copy = map_alloc(map->count + 1);
+    for (size_t index = 0; index < map->count; index++) {
+        const LispMapEntry *entry = &map->entries[index];
+        append_entry(copy, lisp_retain(entry->key), lisp_retain(entry->value), entry->hash);
     }
     uint64_t hash = lisp_hash(key);
-    LispMapEntry *entry = &copy->entries[map_slot(copy, key, hash)];
-    if (entry->key) {
+    uint32_t entry_number = copy->slots[find_slot(copy, key, hash)];
+    if (entry_number) { /* replace the value, keeping the key's position */
+        LispMapEntry *entry = &copy->entries[entry_number - 1];
         lisp_release(entry->value);
         entry->value = lisp_retain(value);
     } else {
-        *entry = (LispMapEntry){.key = lisp_retain(key), .value = lisp_retain(value), .hash = hash};
-        copy->count++;
+        append_entry(copy, lisp_retain(key), lisp_retain(value), hash);
     }
     return &copy->header;
 }
@@ -400,11 +407,11 @@ Value *lisp_map_dissociate(Value *map_value, const Value *key) {
     if (!lisp_map_get(map_value, key)) return lisp_retain(map_value);
     const LispMap *map = (const LispMap *)map_value;
     if (map->count == 1) return &empty_map.header;
-    LispMap *copy = map_alloc(capacity_for(map->count - 1));
-    for (size_t slot = 0; slot < map->capacity; slot++) {
-        const LispMapEntry *entry = &map->entries[slot];
-        if (entry->key && !lisp_equal(entry->key, key)) {
-            map_place(copy, lisp_retain(entry->key), lisp_retain(entry->value), entry->hash);
+    LispMap *copy = map_alloc(map->count - 1);
+    for (size_t index = 0; index < map->count; index++) {
+        const LispMapEntry *entry = &map->entries[index];
+        if (!lisp_equal(entry->key, key)) {
+            append_entry(copy, lisp_retain(entry->key), lisp_retain(entry->value), entry->hash);
         }
     }
     return &copy->header;
@@ -412,16 +419,11 @@ Value *lisp_map_dissociate(Value *map_value, const Value *key) {
 
 bool lisp_map_next(const Value *map_value, size_t *cursor, Value **key, Value **value) {
     const LispMap *map = (const LispMap *)map_value;
-    for (size_t slot = *cursor; slot < map->capacity; slot++) {
-        if (map->entries[slot].key) {
-            *key = map->entries[slot].key;
-            *value = map->entries[slot].value;
-            *cursor = slot + 1;
-            return true;
-        }
-    }
-    *cursor = map->capacity;
-    return false;
+    if (*cursor >= map->count) return false;
+    *key = map->entries[*cursor].key;
+    *value = map->entries[*cursor].value;
+    (*cursor)++;
+    return true;
 }
 
 /* ---- functions and opaque objects ------------------------------------------------------- */

@@ -247,6 +247,37 @@ static void t_maps(void) {
     RELEASE_ALL(map, associated, without_b, unchanged, empty);
 }
 
+static void t_map_keeps_insertion_order(void) {
+    Value *map = lisp_map_new(0);
+    for (int64_t number = 0; number < 100; number++) {
+        CHECK(lisp_map_insert_take(&map, lisp_integer(99 - number), lisp_integer(number)));
+    }
+    int64_t expected_key = 99;
+    Value *key, *value;
+    for (size_t cursor = 0; lisp_map_next(map, &cursor, &key, &value); expected_key--) {
+        CHECK_INT(lisp_integer_value(key), expected_key);
+    }
+    CHECK_INT(expected_key, -1);
+
+    /* associate keeps the position of an existing key and appends a new one */
+    Value *replaced = lisp_map_associate(map, lisp_integer(50), LISP_TRUE);
+    Value *appended = lisp_map_associate(map, lisp_integer(500), LISP_TRUE);
+    size_t cursor = 49;
+    CHECK(lisp_map_next(replaced, &cursor, &key, &value));
+    CHECK_INT(lisp_integer_value(key), 50);
+    CHECK(value == LISP_TRUE);
+    cursor = 100;
+    CHECK(lisp_map_next(appended, &cursor, &key, &value));
+    CHECK_INT(lisp_integer_value(key), 500);
+
+    /* dissociate keeps the order of the others */
+    Value *without = lisp_map_dissociate(map, lisp_integer(99));
+    cursor = 0;
+    CHECK(lisp_map_next(without, &cursor, &key, &value));
+    CHECK_INT(lisp_integer_value(key), 98);
+    RELEASE_ALL(map, replaced, appended, without);
+}
+
 static void t_map_growth_and_structural_keys(void) {
     Value *map = lisp_map_new(0);
     for (int64_t number = 0; number < 2000; number++) {
@@ -301,6 +332,7 @@ const TestSuite value_suite = {"value", (const TestCase[]){
     {"functions compare by identity", t_functions},
     {"opaque objects are dropped once", t_opaque},
     {"maps", t_maps},
+    {"maps keep insertion order", t_map_keeps_insertion_order},
     {"maps grow and take structural keys", t_map_growth_and_structural_keys},
     {"map equality ignores order", t_map_equality_ignores_order},
     {"hash is consistent with equal?", t_hash_consistent},

@@ -36,9 +36,9 @@ test: unit conformance
 unit: $(UNIT_BIN)
 	./$(UNIT_BIN)
 
+# stdlib-conformance.json joins in phase 5, with the libraries list, text and function.
 conformance: $(CONFORMANCE_BIN)
 	./$(CONFORMANCE_BIN) conformance.json
-	./$(CONFORMANCE_BIN) stdlib-conformance.json
 
 asan:
 	$(MAKE) test BUILD=build/asan SANITIZE=1

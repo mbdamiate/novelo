@@ -91,6 +91,7 @@ void lisp_buffer_appendf(LispBuffer *buffer, const char *format, ...) {
 
 char *lisp_buffer_take(LispBuffer *buffer, size_t *length) {
     reserve(buffer, 0);
+    buffer->data[buffer->length] = '\0'; /* an empty buffer may never have been written */
     char *data = buffer->data;
     if (length) *length = buffer->length;
     *buffer = (LispBuffer){};

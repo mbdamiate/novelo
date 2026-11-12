@@ -49,10 +49,21 @@ static void t_code_points_and_take(void) {
     free(bytes);
 }
 
+static void t_take_empty(void) {
+    LispBuffer buffer;
+    lisp_buffer_init(&buffer);
+    size_t length = 99;
+    char *bytes = lisp_buffer_take(&buffer, &length);
+    CHECK_INT(length, 0);
+    CHECK_STR(bytes, "");
+    free(bytes);
+}
+
 const TestSuite buffer_suite = {"buffer", (const TestCase[]){
     {"appends bytes and strings", t_appends},
     {"grows", t_grows},
     {"formats", t_formats},
     {"appends code points and hands over the bytes", t_code_points_and_take},
+    {"hands over an empty buffer as an empty string", t_take_empty},
     {},
 }};

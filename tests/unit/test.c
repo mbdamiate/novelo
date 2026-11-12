@@ -17,6 +17,7 @@ extern const TestSuite value_suite;
 extern const TestSuite positions_suite;
 extern const TestSuite reader_suite;
 extern const TestSuite printer_suite;
+extern const TestSuite eval_suite;
 
 static const TestSuite *const suites[] = {
     &buffer_suite,
@@ -25,6 +26,7 @@ static const TestSuite *const suites[] = {
     &positions_suite,
     &reader_suite,
     &printer_suite,
+    &eval_suite,
 };
 
 static int failed_checks; /* in the current test */

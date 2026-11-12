@@ -7,7 +7,11 @@
 #include "json.h"
 
 #include "buffer.h"
+#include "error.h"
+#include "io.h"
 #include "positions.h"
+#include "printer.h"
+#include "program.h"
 #include "reader.h"
 #include "value.h"
 
@@ -187,6 +191,104 @@ static Outcome run_read_positions(const Json *test_case, CaseResult *result) {
     return outcome;
 }
 
+/* ---- eval ------------------------------------------------------------------------------ */
+
+typedef struct EvalCall {
+    const Json *test_case;
+    CaseResult *result;
+} EvalCall;
+
+static void describe_value(LispBuffer *output, const Value *value) {
+    lisp_print(output, value, LISP_PRINT_WRITE);
+}
+
+/* Runs on a thread with a large stack (see lisp_run_on_large_stack). */
+static void run_eval_on_thread(void *argument) {
+    EvalCall *call = argument;
+    const Json *test_case = call->test_case;
+    CaseResult *result = call->result;
+
+    const char *program;
+    size_t program_length;
+    if (!source_member(test_case, "program", &program, &program_length)) {
+        failure(result, "no program");
+        return;
+    }
+    const char *input = "";
+    size_t input_length = 0;
+    source_member(test_case, "input", &input, &input_length);
+
+    LispBuffer output;
+    lisp_buffer_init(&output);
+    LispTextInput text_input = {.text = input, .length = input_length};
+    LispStateOptions options = {
+        .output = lisp_output_to_buffer(&output),
+        .input = lisp_input_from_text(&text_input),
+        .stack_limit = lisp_large_stack_limit(),
+    };
+    LispState *state = lisp_state_new(&options);
+    Value *last_value = nullptr;
+    LispReadError read_error;
+    LispRunResult run = lisp_run_source(state, program, program_length, &last_value, &read_error);
+
+    const char *expected_value = string_member(test_case, "value");
+    const char *expected_error = string_member(test_case, "error");
+    const char *expected_output = string_member(test_case, "output");
+    LispBuffer message;
+    lisp_buffer_init(&message);
+
+    if (run == LISP_RUN_READ_ERROR) {
+        failure(result, "program has a read error: %s at %u:%u", lisp_read_error_name(read_error.code),
+                read_error.position.line, read_error.position.column);
+    } else if (expected_error) {
+        Value *kind = run == LISP_RUN_ERROR ? lisp_error_kind(state) : nullptr;
+        LispBuffer actual;
+        lisp_buffer_init(&actual);
+        if (kind) describe_value(&actual, kind);
+        if (run == LISP_RUN_OK) {
+            lisp_buffer_append_string(&message, "finished with ");
+            describe_value(&message, last_value);
+            failure(result, "%s, expected error %s", message.data, expected_error);
+        } else if (!kind || strcmp(actual.data, expected_error) != 0) {
+            lisp_describe_error(&message, state->error);
+            failure(result, "error %s, expected %s", message.data, expected_error);
+        }
+        lisp_buffer_free(&actual);
+    } else if (run == LISP_RUN_ERROR) {
+        lisp_describe_error(&message, state->error);
+        failure(result, "uncaught error %s", message.data);
+    } else if (expected_value) {
+        Value *expected;
+        if (read_or_fail(result, expected_value, strlen(expected_value), &expected) == PASSED) {
+            if (expected == LISP_EMPTY || !lisp_equal(last_value, lisp_first(expected))) {
+                describe_value(&message, last_value);
+                failure(result, "value %s, expected %s", message.data, expected_value);
+            }
+            lisp_release(expected);
+        }
+    }
+
+    const char *actual_output = output.data ? output.data : "";
+    if (result->outcome != FAILED && expected_output
+        && (output.length != strlen(expected_output) || memcmp(actual_output, expected_output, output.length) != 0)) {
+        failure(result, "output \"%s\", expected \"%s\"", actual_output, expected_output);
+    }
+
+    lisp_buffer_free(&message);
+    lisp_release(last_value);
+    lisp_state_free(state);
+    lisp_buffer_free(&output);
+}
+
+static Outcome run_eval(const Json *test_case, CaseResult *result) {
+    const char *program = string_member(test_case, "program");
+    /* include arrives in phase 4. */
+    if (json_member(test_case, "files") || (program && strstr(program, "(include"))) return result->outcome = SKIPPED;
+    EvalCall call = {test_case, result};
+    if (!lisp_run_on_large_stack(run_eval_on_thread, &call)) return failure(result, "cannot create a thread");
+    return result->outcome;
+}
+
 /* ---- driver ------------------------------------------------------------------------------ */
 
 static CaseResult run_case(const Json *test_case) {
@@ -201,7 +303,7 @@ static CaseResult run_case(const Json *test_case) {
     } else if (strcmp(kind, "read-positions") == 0) {
         result.outcome = run_read_positions(test_case, &result);
     } else if (strcmp(kind, "eval") == 0) {
-        result.outcome = SKIPPED; /* evaluation arrives in phase 3 */
+        result.outcome = run_eval(test_case, &result);
     } else {
         failure(&result, "unknown kind %s", kind);
     }
