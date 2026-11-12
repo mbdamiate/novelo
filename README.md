@@ -8,7 +8,7 @@ Every case of both conformance suites passes:
 
 | Suite | Cases |
 | --- | --- |
-| core | 253 |
+| core | 254 |
 | stdlib | 29 |
 
 Those runs report no leaks, and they also pass under AddressSanitizer and UndefinedBehaviorSanitizer.
@@ -25,7 +25,11 @@ Those runs report no leaks, and they also pass under AddressSanitizer and Undefi
 
 ## Building
 
-It needs a C23 compiler, such as clang 18+ or gcc 14+, plus `make`, libc and pthreads. There are no other dependencies.
+It needs a C23 compiler, plus `make`, a POSIX libc and pthreads. There are no other dependencies. It is tested with Apple clang 21 on macOS and with gcc 14 on Linux (glibc), where every test also passes under ASan, UBSan and LeakSanitizer. With gcc, pass the compiler to make:
+
+```bash
+make CC=gcc test
+```
 
 ```bash
 make            # builds build/novelo

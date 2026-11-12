@@ -11,6 +11,10 @@ CC      ?= cc
 BUILD   ?= build
 CFLAGS  ?= -O2 -g
 CFLAGS  += -std=c23 -Wall -Wextra -Wpedantic -Werror -MMD -MP
+# POSIX.1-2008 (getcwd, isatty, mkdtemp, mkstemp, pthreads): strict -std=c23
+# hides them on glibc unless asked for. On macOS, _POSIX_C_SOURCE alone hides
+# mkdtemp, so _DARWIN_C_SOURCE restores the full set; glibc ignores it.
+CFLAGS  += -D_POSIX_C_SOURCE=200809L -D_DARWIN_C_SOURCE
 LDFLAGS += -pthread
 
 ifeq ($(SANITIZE),1)

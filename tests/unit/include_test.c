@@ -51,7 +51,7 @@ typedef struct FileRun {
 static void file_run(FileRun *run, const char *program, size_t file_count, const LispMemoryFile *files) {
     LispMemoryFile *all = calloc(file_count + 1, sizeof(LispMemoryFile));
     all[0] = (LispMemoryFile){"/main.nvl", program, strlen(program)};
-    memcpy(all + 1, files, file_count * sizeof(LispMemoryFile));
+    if (file_count > 0) memcpy(all + 1, files, file_count * sizeof(LispMemoryFile)); /* files may be nullptr */
     run->files = (LispMemoryFiles){all, file_count + 1};
     lisp_buffer_init(&run->output);
     LispStateOptions options = {

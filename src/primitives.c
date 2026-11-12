@@ -12,7 +12,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define PRIMITIVE(name) static Value *name(LispState *state, size_t argument_count, Value *const *arguments)
+/* Every primitive is primitive_<name>, so no name collides with a libc
+ * function such as remainder or raise. */
+#define PRIMITIVE(name) \
+    static Value *primitive_##name(LispState *state, size_t argument_count, Value *const *arguments)
 
 /* ---- argument checks ------------------------------------------------------------- */
 
@@ -218,6 +221,9 @@ PRIMITIVE(count) {
 
 PRIMITIVE(is_empty) {
     (void)argument_count;
+    /* A List is empty exactly when it is (): answer without counting it, or
+     * every traversal that tests empty? at each step would be quadratic. */
+    if (arguments[0]->kind == LISP_KIND_PAIR) return LISP_FALSE;
     size_t size;
     if (!size_of(state, "empty?", arguments[0], &size)) return nullptr;
     return lisp_bool(size == 0);
@@ -423,50 +429,50 @@ PRIMITIVE(catch) {
 /* ---- the table ------------------------------------------------------------------------------------ */
 
 static const LispNativeFunction primitives[] = {
-    {"+", 0, -1, add},
-    {"*", 0, -1, multiply},
-    {"-", 1, -1, subtract},
-    {"quotient", 2, 2, quotient},
-    {"remainder", 2, 2, remainder},
-    {"<", 2, -1, less},
-    {">", 2, -1, greater},
-    {"<=", 2, -1, less_or_equal},
-    {">=", 2, -1, greater_or_equal},
-    {"=", 2, -1, numeric_equal},
-    {"equal?", 2, 2, equal},
-    {"boolean?", 1, 1, is_boolean},
-    {"void?", 1, 1, is_void},
-    {"integer?", 1, 1, is_integer},
-    {"string?", 1, 1, is_string},
-    {"symbol?", 1, 1, is_symbol},
-    {"keyword?", 1, 1, is_keyword},
-    {"list?", 1, 1, is_list},
-    {"map?", 1, 1, is_map},
-    {"function?", 1, 1, is_function},
-    {"list", 0, -1, list},
-    {"prepend", 2, 2, prepend},
-    {"first", 1, 1, first},
-    {"rest", 1, 1, rest},
-    {"count", 1, 1, count},
-    {"empty?", 1, 1, is_empty},
-    {"get", 2, 3, get},
-    {"contains?", 2, 2, contains},
-    {"associate", 3, 3, associate},
-    {"dissociate", 2, 2, dissociate},
-    {"keys", 1, 1, keys},
-    {"concatenate", 0, -1, concatenate},
-    {"string-at", 2, 2, string_at},
-    {"substring", 3, 3, substring},
-    {"to-string", 1, 1, to_string},
-    {"string-to-number", 1, 1, string_to_number},
-    {"string-to-symbol", 1, 1, string_to_symbol},
-    {"symbol-to-string", 1, 1, symbol_to_string},
-    {"generate-symbol", 0, 0, generate_symbol},
-    {"apply", 2, -1, apply},
-    {"not", 1, 1, not},
-    {"error", 1, -1, error},
-    {"raise", 1, 1, raise},
-    {"catch", 2, 2, catch},
+    {"+", 0, -1, primitive_add},
+    {"*", 0, -1, primitive_multiply},
+    {"-", 1, -1, primitive_subtract},
+    {"quotient", 2, 2, primitive_quotient},
+    {"remainder", 2, 2, primitive_remainder},
+    {"<", 2, -1, primitive_less},
+    {">", 2, -1, primitive_greater},
+    {"<=", 2, -1, primitive_less_or_equal},
+    {">=", 2, -1, primitive_greater_or_equal},
+    {"=", 2, -1, primitive_numeric_equal},
+    {"equal?", 2, 2, primitive_equal},
+    {"boolean?", 1, 1, primitive_is_boolean},
+    {"void?", 1, 1, primitive_is_void},
+    {"integer?", 1, 1, primitive_is_integer},
+    {"string?", 1, 1, primitive_is_string},
+    {"symbol?", 1, 1, primitive_is_symbol},
+    {"keyword?", 1, 1, primitive_is_keyword},
+    {"list?", 1, 1, primitive_is_list},
+    {"map?", 1, 1, primitive_is_map},
+    {"function?", 1, 1, primitive_is_function},
+    {"list", 0, -1, primitive_list},
+    {"prepend", 2, 2, primitive_prepend},
+    {"first", 1, 1, primitive_first},
+    {"rest", 1, 1, primitive_rest},
+    {"count", 1, 1, primitive_count},
+    {"empty?", 1, 1, primitive_is_empty},
+    {"get", 2, 3, primitive_get},
+    {"contains?", 2, 2, primitive_contains},
+    {"associate", 3, 3, primitive_associate},
+    {"dissociate", 2, 2, primitive_dissociate},
+    {"keys", 1, 1, primitive_keys},
+    {"concatenate", 0, -1, primitive_concatenate},
+    {"string-at", 2, 2, primitive_string_at},
+    {"substring", 3, 3, primitive_substring},
+    {"to-string", 1, 1, primitive_to_string},
+    {"string-to-number", 1, 1, primitive_string_to_number},
+    {"string-to-symbol", 1, 1, primitive_string_to_symbol},
+    {"symbol-to-string", 1, 1, primitive_symbol_to_string},
+    {"generate-symbol", 0, 0, primitive_generate_symbol},
+    {"apply", 2, -1, primitive_apply},
+    {"not", 1, 1, primitive_not},
+    {"error", 1, -1, primitive_error},
+    {"raise", 1, 1, primitive_raise},
+    {"catch", 2, 2, primitive_catch},
 };
 
 void lisp_install_primitives(LispState *state) {

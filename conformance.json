@@ -1698,6 +1698,14 @@
       "input_hex": "61ff0a620a"
     },
     {
+      "id": "eval-238",
+      "kind": "eval",
+      "section": "8.6",
+      "program": "(define build (lambda (n acc) (if (= n 0) acc otherwise (build (- n 1) (prepend n acc)))))\n(define walk (lambda (items total) (if (empty? items) total otherwise (walk (rest items) (+ total (first items))))))\n(walk (build 1000000 ()) 0)",
+      "value": "500000500000",
+      "output": ""
+    },
+    {
       "id": "catch-001",
       "kind": "eval",
       "section": "8.5",

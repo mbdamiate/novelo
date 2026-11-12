@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-This repository specifies **Novelo**, an immutable Lisp (core v0.2.2, standard library v0.2.1); the name means "ball of yarn" in Portuguese, and source files use `.nvl`, and implements an interpreter for it in **C23**, following `IMPLEMENTATION-PLAN.md` phase by phase. Each phase ends with its tests passing and one commit. All six phases are done: all 253 core and 29 stdlib cases and the unit tests pass, also under `make asan`. `README.md` covers building, running, the source map, the design and the behavior the spec leaves to the implementation. Core 0.2.1 settled the points 0.2.0 left open; when a new gap appears, decide it with the user, write it into the spec and add conformance cases rather than only documenting the choice.
+This repository specifies **Novelo**, an immutable Lisp (core v0.2.2, standard library v0.2.1); the name means "ball of yarn" in Portuguese, and source files use `.nvl`, and implements an interpreter for it in **C23**, following `IMPLEMENTATION-PLAN.md` phase by phase. Each phase ends with its tests passing and one commit. All six phases are done: all 254 core and 29 stdlib cases and the unit tests pass, also under `make asan`. `README.md` covers building, running, the source map, the design and the behavior the spec leaves to the implementation. Core 0.2.1 settled the points 0.2.0 left open; when a new gap appears, decide it with the user, write it into the spec and add conformance cases rather than only documenting the choice.
 
 | File | Role |
 | --- | --- |
 | `core-specification.md` | Normative core: reader (§2–7), positions (§6), read errors (§7), evaluation (§8), primitives (§9), printing (§10), conformance (§12) |
 | `standard-library.md` | Normative stdlib: the libraries `list`, `text`, `function`, whose sources are the `lisp` code blocks of §4.1–4.3 |
-| `conformance.json` | 253 core cases (`read`, `read-error`, `read-positions`, `eval`); programs import at most `io` |
+| `conformance.json` | 254 core cases (`read`, `read-error`, `read-positions`, `eval`); programs import at most `io` |
 | `stdlib-conformance.json` | 29 stdlib `eval` cases; programs import `list`, `text` or `function` |
 | `IMPLEMENTATION-PLAN.md` | Architecture, decisions, file layout, phases, test runners |
 | `README.md` | Building, running, source map, design, implementation-defined behavior |
@@ -42,6 +42,7 @@ The CLI (`main.c`): `build/novelo file.nvl` runs a file, `build/novelo` alone st
 ## Constraints that shape the code
 
 - **No dependencies** beyond libc and pthreads, including in the tests. The conformance runner has its own minimal JSON parser.
+- **Portable to gcc and glibc.** Tested with Apple clang 21 and with gcc 14 on Linux (`docker run gcc:14`, then `make CC=gcc test`). The Makefile defines `_POSIX_C_SOURCE=200809L` and `_DARWIN_C_SOURCE`, because strict `-std=c23` otherwise hides POSIX functions such as `mkdtemp` on glibc. Static functions must not share a name with a libc function: gcc rejects a `static remainder`, which is why primitives are `primitive_<name>`.
 - **C23 idioms:** `nullptr`, `constexpr`, `bool`, `[[nodiscard]]`, and `<stdckdint.h>` (`ckd_add`/`ckd_sub`/`ckd_mul`). Integer overflow is a spec error, both at runtime and in reader literals.
 - **Cite the spec in each file**, e.g. `/* core §8.3 */`.
 - **Memory is reference counted.** The heap is acyclic: values are immutable and recursion goes through global names resolved at call time. Ownership rule: a function returning `Value *` returns a new reference, and arguments are borrowed unless the function name ends in `_take`. Release must be iterative (explicit work stack), because dropping a 1M-element list must not recurse in C. `lisp_live_objects()` counts non-immortal objects, and both runners check that it returns to its baseline after each test or case.
