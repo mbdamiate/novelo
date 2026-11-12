@@ -32,5 +32,16 @@ Value *lisp_context_full_prefix(const Value *context);
  * context on the way out and binds the global with the full prefix. */
 void lisp_context_define(LispState *state, Value *context, Value *name, Value *value, bool is_macro);
 
-/* (include …) at top level. Phase 4. */
+/* (include "path") or (include "path" prefix) at top level (§8.8). Returns
+ * #void, or nullptr with :include-error, :expansion-error or an error of the
+ * included forms pending. */
 [[nodiscard]] Value *lisp_include(LispState *state, Value *form, Value *context);
+
+/* An absolute path with its "." and ".." segments removed (§8.8): `path` as it
+ * is if absolute, otherwise relative to `directory` (an absolute String).
+ * Symbolic links are not resolved. Returns a new String. */
+[[nodiscard]] Value *lisp_path_resolve(const Value *directory, const char *path);
+
+/* The files still being loaded, for cycle detection. */
+void lisp_loading_push(LispState *state, Value *absolute_path);
+void lisp_loading_pop(LispState *state);

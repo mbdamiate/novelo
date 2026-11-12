@@ -22,7 +22,7 @@ static void run_start(Run *run, const char *source, size_t stack_limit) {
     run->state = lisp_state_new(&options);
     run->value = nullptr;
     LispReadError read_error;
-    run->result = lisp_run_source(run->state, source, strlen(source), &run->value, &read_error);
+    run->result = lisp_run_source(run->state, source, strlen(source), nullptr, &run->value, &read_error);
 }
 
 static void run_finish(Run *run) {
@@ -199,7 +199,7 @@ static void run_deep(void *argument) {
     LispState *state = lisp_state_new(&options);
     Value *value = nullptr;
     LispReadError read_error;
-    call->result = lisp_run_source(state, call->source, strlen(call->source), &value, &read_error);
+    call->result = lisp_run_source(state, call->source, strlen(call->source), nullptr, &value, &read_error);
     if (call->result == LISP_RUN_OK && value->kind == LISP_KIND_INTEGER) call->value = lisp_integer_value(value);
     if (call->result == LISP_RUN_ERROR) {
         snprintf(call->kind, sizeof call->kind, "%s", lisp_as_name(lisp_error_kind(state))->text);

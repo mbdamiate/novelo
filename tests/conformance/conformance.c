@@ -218,18 +218,40 @@ static void run_eval_on_thread(void *argument) {
     size_t input_length = 0;
     source_member(test_case, "input", &input, &input_length);
 
+    /* §12.4: the program is main.lisp and the files are relative to its
+     * directory, here the root of an in-memory file system. A path missing
+     * from `files` cannot be opened. */
+    const Json *files = json_member(test_case, "files");
+    size_t file_count = files ? files->count : 0;
+    LispMemoryFile *memory_files = calloc(file_count + 1, sizeof(LispMemoryFile));
+    char **paths = calloc(file_count + 1, sizeof(char *));
+    memory_files[0] = (LispMemoryFile){.path = "/main.lisp", .text = program, .length = program_length};
+    for (size_t index = 0; index < file_count; index++) {
+        size_t length = strlen(files->keys[index]) + 2;
+        paths[index] = malloc(length);
+        snprintf(paths[index], length, "/%s", files->keys[index]);
+        memory_files[index + 1] = (LispMemoryFile){
+            .path = paths[index],
+            .text = files->items[index].string,
+            .length = files->items[index].string_length,
+        };
+    }
+    LispMemoryFiles file_system = {.files = memory_files, .count = file_count + 1};
+
     LispBuffer output;
     lisp_buffer_init(&output);
     LispTextInput text_input = {.text = input, .length = input_length};
     LispStateOptions options = {
         .output = lisp_output_to_buffer(&output),
         .input = lisp_input_from_text(&text_input),
+        .files = lisp_file_system_from_memory(&file_system),
+        .working_directory = "/",
         .stack_limit = lisp_large_stack_limit(),
     };
     LispState *state = lisp_state_new(&options);
     Value *last_value = nullptr;
     LispReadError read_error;
-    LispRunResult run = lisp_run_source(state, program, program_length, &last_value, &read_error);
+    LispRunResult run = lisp_run_source(state, program, program_length, "main.lisp", &last_value, &read_error);
 
     const char *expected_value = string_member(test_case, "value");
     const char *expected_error = string_member(test_case, "error");
@@ -278,12 +300,12 @@ static void run_eval_on_thread(void *argument) {
     lisp_release(last_value);
     lisp_state_free(state);
     lisp_buffer_free(&output);
+    for (size_t index = 0; index < file_count; index++) free(paths[index]);
+    free(paths);
+    free(memory_files);
 }
 
 static Outcome run_eval(const Json *test_case, CaseResult *result) {
-    const char *program = string_member(test_case, "program");
-    /* include arrives in phase 4. */
-    if (json_member(test_case, "files") || (program && strstr(program, "(include"))) return result->outcome = SKIPPED;
     EvalCall call = {test_case, result};
     if (!lisp_run_on_large_stack(run_eval_on_thread, &call)) return failure(result, "cannot create a thread");
     return result->outcome;

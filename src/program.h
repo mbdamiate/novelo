@@ -28,6 +28,10 @@ struct LispState {
     Value *imported;       /* Map: (library full-prefix) → #true (§8.9) */
     LispOutput output;
     LispInput input;
+    LispFileSystem files;
+    Value *working_directory; /* String: absolute; resolves relative paths outside files (§8.8) */
+    Value *loading;        /* List of Strings: absolute paths of the files still loading, innermost first */
+    Value *included;       /* Map: (path full-prefix) → #true, files loaded per context (§8.8) */
     LispBuffer line;       /* scratch line for read-line! */
     const char *stack_base; /* address near the top of the thread's stack */
     size_t stack_limit;     /* bytes of stack evaluation may use */
@@ -36,6 +40,8 @@ struct LispState {
 typedef struct LispStateOptions {
     LispOutput output;
     LispInput input;
+    LispFileSystem files;          /* default: the disk */
+    const char *working_directory; /* absolute; default: the process's current directory */
     /* Bytes of C stack the interpreter may use, counted from the frame that
      * calls lisp_run_source; deeper non-tail recursion raises :stack-overflow.
      * Zero means a conservative default that fits a default thread. */
@@ -52,9 +58,12 @@ typedef enum LispRunResult {
 } LispRunResult;
 
 /* Reads the whole source, then processes each top-level form in turn
- * (§8.7). On LISP_RUN_OK, *last_value (if not null) receives the value of the
- * last form, or #void when there are none. */
-LispRunResult lisp_run_source(LispState *state, const char *source, size_t length,
+ * (§8.7). `path` names the file the source came from, relative to the working
+ * directory; includes resolve against its directory, and including it again
+ * is a cycle. Without a path (the REPL), includes resolve against the working
+ * directory. On LISP_RUN_OK, *last_value (if not null) receives the value of
+ * the last form, or #void when there are none. */
+LispRunResult lisp_run_source(LispState *state, const char *source, size_t length, const char *path,
                               Value **last_value, LispReadError *read_error);
 
 /* Processes one top-level form in a context (nullptr: the empty context).

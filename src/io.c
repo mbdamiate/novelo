@@ -1,6 +1,8 @@
 /* Output and input implementations. */
 #include "io.h"
 
+#include <string.h>
+
 static void write_to_buffer(void *context, const char *bytes, size_t length) {
     lisp_buffer_append((LispBuffer *)context, bytes, length);
 }
@@ -57,3 +59,35 @@ static bool read_nothing(void *, LispBuffer *line) {
 }
 
 LispInput lisp_input_empty(void) { return (LispInput){.read_line = read_nothing, .context = nullptr}; }
+
+static bool read_from_disk(void *, const char *path, LispBuffer *contents) {
+    FILE *file = fopen(path, "rb");
+    if (!file) return false;
+    lisp_buffer_clear(contents);
+    char chunk[65536];
+    size_t length;
+    while ((length = fread(chunk, 1, sizeof chunk, file)) > 0) lisp_buffer_append(contents, chunk, length);
+    bool failed = ferror(file) != 0; /* e.g. the path is a directory */
+    fclose(file);
+    return !failed;
+}
+
+LispFileSystem lisp_file_system_disk(void) {
+    return (LispFileSystem){.read_file = read_from_disk, .context = nullptr};
+}
+
+static bool read_from_memory(void *context, const char *path, LispBuffer *contents) {
+    const LispMemoryFiles *files = context;
+    for (size_t index = 0; index < files->count; index++) {
+        if (strcmp(files->files[index].path, path) == 0) {
+            lisp_buffer_clear(contents);
+            lisp_buffer_append(contents, files->files[index].text, files->files[index].length);
+            return true;
+        }
+    }
+    return false;
+}
+
+LispFileSystem lisp_file_system_from_memory(const LispMemoryFiles *files) {
+    return (LispFileSystem){.read_file = read_from_memory, .context = (void *)files};
+}

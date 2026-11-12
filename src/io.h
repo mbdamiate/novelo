@@ -1,5 +1,6 @@
-/* Interfaces for standard output and standard input, so the interpreter can
- * run against the terminal or against memory (tests, conformance). */
+/* Interfaces for standard output, standard input and the file system, so the
+ * interpreter can run against the real ones or against memory (tests,
+ * conformance). */
 #pragma once
 
 #include "buffer.h"
@@ -41,3 +42,29 @@ LispInput lisp_input_from_stream(FILE *stream);
 
 /* Input that is always at its end. */
 LispInput lisp_input_empty(void);
+
+/* Reads a whole file. read_file stores the contents in *contents and returns
+ * true, or returns false if the file cannot be opened or read. Paths are
+ * absolute and use '/' (core §8.8). */
+typedef struct LispFileSystem {
+    bool (*read_file)(void *context, const char *path, LispBuffer *contents);
+    void *context;
+} LispFileSystem;
+
+/* The disk. */
+LispFileSystem lisp_file_system_disk(void);
+
+/* Files in memory: an array of absolute paths and their texts, which must
+ * outlive the file system. */
+typedef struct LispMemoryFile {
+    const char *path;
+    const char *text;
+    size_t length;
+} LispMemoryFile;
+
+typedef struct LispMemoryFiles {
+    const LispMemoryFile *files;
+    size_t count;
+} LispMemoryFiles;
+
+LispFileSystem lisp_file_system_from_memory(const LispMemoryFiles *files);

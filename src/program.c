@@ -10,6 +10,7 @@
 
 #include <pthread.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 constexpr size_t DEFAULT_STACK_LIMIT = 4u << 20;     /* fits a default 8 MB thread */
 constexpr size_t LARGE_STACK_SIZE = 512u << 20;
@@ -22,6 +23,13 @@ LispState *lisp_state_new(const LispStateOptions *options) {
     state->output = options->output;
     state->input = options->input.read_line ? options->input : lisp_input_empty();
     state->stack_limit = options->stack_limit ? options->stack_limit : DEFAULT_STACK_LIMIT;
+    state->files = options->files.read_file ? options->files : lisp_file_system_disk();
+    char current_directory[4096];
+    const char *directory = options->working_directory;
+    if (!directory) directory = getcwd(current_directory, sizeof current_directory) ? current_directory : "/";
+    state->working_directory = lisp_string_cstr(directory);
+    state->loading = LISP_EMPTY;
+    state->included = lisp_map_new(0);
     state->contexts = lisp_map_new(0);
     state->imported = lisp_map_new(0);
     lisp_buffer_init(&state->line);
@@ -33,6 +41,9 @@ void lisp_state_free(LispState *state) {
     if (!state) return;
     lisp_release(state->error);
     lisp_globals_free(&state->globals);
+    lisp_release(state->working_directory);
+    lisp_release(state->loading);
+    lisp_release(state->included);
     lisp_release(state->contexts);
     lisp_release(state->imported);
     lisp_buffer_free(&state->line);
@@ -145,21 +156,26 @@ Value *lisp_process_top_level(LispState *state, Value *form, Value *context) {
     return process(state, form, context);
 }
 
-LispRunResult lisp_run_source(LispState *state, const char *source, size_t length, Value **last_value,
-                              LispReadError *read_error) {
+LispRunResult lisp_run_source(LispState *state, const char *source, size_t length, const char *path,
+                              Value **last_value, LispReadError *read_error) {
     note_stack_base(state);
     Value *forms;
     if (!lisp_read(source, length, &forms, read_error)) return LISP_RUN_READ_ERROR;
+    /* The program is a file still being loaded while it runs (§8.8, cycles). */
+    if (path) {
+        Value *absolute = lisp_path_resolve(state->working_directory, path);
+        lisp_loading_push(state, absolute);
+        lisp_release(absolute);
+    }
     Value *last = LISP_VOID;
     for (const Value *rest = forms; rest->kind == LISP_KIND_PAIR; rest = lisp_rest(rest)) {
         lisp_release(last);
         last = process(state, lisp_first(rest), nullptr);
-        if (!last) {
-            lisp_release(forms);
-            return LISP_RUN_ERROR;
-        }
+        if (!last) break;
     }
+    if (path) lisp_loading_pop(state);
     lisp_release(forms);
+    if (!last) return LISP_RUN_ERROR;
     if (last_value) {
         *last_value = last;
     } else {
