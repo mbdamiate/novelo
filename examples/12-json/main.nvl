@@ -1,0 +1,384 @@
+; Orders in JSON.
+;
+; Reads one order per line, written in JSON (JSON Lines), checks its shape,
+; prints a line for each, then writes a report as JSON: how many lines were
+; read, which were rejected, and the total spent by each customer. A line
+; that is not JSON, or not an order, is reported with the reason and left
+; out; it does not stop the program.
+;
+;   build/novelo examples/12-json/main.nvl < examples/12-json/input.txt
+;
+; JSON maps onto Novelo directly: an object is a Map with String keys, an
+; array is a List, a string a String, true and false the Booleans, null
+; #void, and a number an Integer or a Float. The program writes a parser
+; and a printer for it with what the earlier examples used: lists and
+; `match` (04, 05), errors (07), the text library (10, 11).
+;
+; Writing it showed where the language is still awkward; the notes marked
+; "friction" say where, and they choose the next extension.
+
+(import io)
+(import list)      ; any?, fold, map, reverse, take
+(import text t)    ; t/digit?, t/format, t/join, t/lowercase, t/pad-left, t/split
+(import number)    ; round
+(import map)       ; map-values
+
+; ---- characters -------------------------------------------------------------
+
+; The parser walks a line one character at a time. There is no character
+; type: a character is a String of length 1. The line becomes a list of
+; them, through its code points.
+;
+; Friction: every program that walks text writes this helper.
+(define characters
+  (lambda (text)
+    (map (lambda (code-point) (code-points-to-string (list code-point)))
+         (string-to-code-points text))))
+
+(define code-point (lambda (character) (first (string-to-code-points character))))
+
+(define whitespace?
+  (lambda (character)
+    (or (equal? character " ") (equal? character "\t") (equal? character "\n") (equal? character "\r"))))
+
+(define skip-space
+  (lambda (text)
+    (if (and (not (empty? text)) (whitespace? (first text))) (skip-space (rest text))
+        otherwise text)))
+
+; ---- parsing ------------------------------------------------------------------
+
+; Each parse function takes the characters left and returns a list of two
+; things: the value it read and the characters after it. A list of
+; characters matches patterns well: ("{" &rest more) is a text that starts
+; with a brace, and more is the rest of it.
+;
+; A problem raises the error :json, whose value is the number of characters
+; left where it was found; the caller turns that into a column.
+(define fail
+  (lambda (message text)
+    (raise {:kind :json :message message :values (list (count text))})))
+
+(define parse-value
+  (lambda (text)
+    (let ((text (skip-space text)))
+      (match text
+        ("{" &rest more) (parse-object (skip-space more) {})
+        ("[" &rest more) (parse-array (skip-space more) ())
+        ("\"" &rest more) (parse-string more ())
+        ("t" "r" "u" "e" &rest more) (list #true more)
+        ("f" "a" "l" "s" "e" &rest more) (list #false more)
+        ("n" "u" "l" "l" &rest more) (list #void more)
+        () (fail "expected a value, found the end" text)
+        otherwise (parse-number text)))))
+
+(define expect
+  (lambda (expected text)
+    (let ((text (skip-space text)))
+      (if (and (not (empty? text)) (equal? (first text) expected)) (rest text)
+          otherwise (fail (concatenate "expected " expected) text)))))
+
+; An object is a key, a colon and a value, then a comma and another, or the
+; closing brace. Each step needs the value and the rest the step before
+; returned, so each step is a `match` inside the one before.
+;
+; Friction: four levels of `match` only to name the two parts of a result.
+; A `let` that took a pattern, (let (((key after-key) (parse-value text)))
+; …), would read in a straight line.
+;
+; A key that appears twice keeps its last value, as most JSON readers do.
+(define parse-object
+  (lambda (text object)
+    (match text
+      ("}" &rest more) (list object more)
+      otherwise
+      (match (parse-value text)
+        (key after-key)
+        (if (not (string? key)) (fail "expected a string as the key" text)
+            otherwise
+            (match (parse-value (expect ":" after-key))
+              (value after-value)
+              (let ((object (associate object key value))
+                    (after (skip-space after-value)))
+                (match after
+                  ("," &rest more) (parse-object (skip-space more) object)
+                  ("}" &rest more) (list object more)
+                  otherwise (fail "expected , or }" after)))))))))
+
+; The elements are gathered newest first, then reversed once at the end.
+(define parse-array
+  (lambda (text elements)
+    (match text
+      ("]" &rest more) (list (reverse elements) more)
+      otherwise
+      (match (parse-value text)
+        (value after-value)
+        (let ((after (skip-space after-value))
+              (elements (prepend value elements)))
+          (match after
+            ("," &rest more) (parse-array (skip-space more) elements)
+            ("]" &rest more) (list (reverse elements) more)
+            otherwise (fail "expected , or ]" after)))))))
+
+; ---- strings ------------------------------------------------------------------
+
+(define escapes {"\"" "\"" "\\" "\\" "/" "/" "b" "\u{8}" "f" "\u{C}" "n" "\n" "r" "\r" "t" "\t"})
+
+; Friction: there is no way to read a number in another base, so the digits
+; of \u escapes go through a Map.
+(define hexadecimal-digits
+  {"0" 0 "1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6 "7" 7 "8" 8 "9" 9
+   "a" 10 "b" 11 "c" 12 "d" 13 "e" 14 "f" 15 "A" 10 "B" 11 "C" 12 "D" 13 "E" 14 "F" 15})
+
+(define hexadecimal-value
+  (lambda (digits text)
+    (fold (lambda (total digit)
+            (if (contains? hexadecimal-digits digit) (+ (* total 16) (get hexadecimal-digits digit))
+                otherwise (fail "invalid \\u escape" text)))
+          0 digits)))
+
+; \uXXXX names a UTF-16 unit. A character above U+FFFF is written as two:
+; a high surrogate, from D800 to DBFF, then a low one, from DC00 to DFFF,
+; which together give the code point. A surrogate alone is not a character,
+; and `code-points-to-string` rejects it with :invalid-code-point.
+(define surrogate-pair
+  (lambda (high low)
+    (+ 65536 (* (- high 55296) 1024) (- low 56320))))
+
+(define parse-string
+  (lambda (text gathered)
+    (match text
+      ("\"" &rest more) (list (apply concatenate (reverse gathered)) more)
+      ("\\" "u" a b c d "\\" "u" e f g h &rest more)
+      (let ((high (hexadecimal-value (list a b c d) text))
+            (low (hexadecimal-value (list e f g h) text)))
+        (if (and (<= 55296 high 56319) (<= 56320 low 57343))
+            (parse-string more (prepend (code-points-to-string (list (surrogate-pair high low))) gathered))
+            otherwise (parse-unit high text (drop 6 text) gathered)))
+      ("\\" "u" a b c d &rest more) (parse-unit (hexadecimal-value (list a b c d) text) text more gathered)
+      ("\\" escape &rest more)
+      (if (contains? escapes escape) (parse-string more (prepend (get escapes escape) gathered))
+          otherwise (fail "invalid escape" text))
+      ("\\") (fail "unterminated string" text)
+      (character &rest more)
+      (if (< (code-point character) 32) (fail "control character in a string" text)
+          otherwise (parse-string more (prepend character gathered)))
+      otherwise (fail "unterminated string" text))))
+
+; One \uXXXX on its own, at the start of text: any code point but a
+; surrogate.
+(define parse-unit
+  (lambda (unit text more gathered)
+    (if (<= 55296 unit 57343) (fail "unpaired surrogate" text)
+        otherwise (parse-string more (prepend (code-points-to-string (list unit)) gathered)))))
+
+; ---- numbers ------------------------------------------------------------------
+
+; A JSON number is an optional minus, then 0 or digits that do not start
+; with 0, then optionally a point and digits, then optionally e or E, a
+; sign and digits. Each step below takes the characters left and returns
+; those after its part, or fails.
+(define digits
+  (lambda (text)
+    (if (and (not (empty? text)) (t/digit? (first text))) (digits (rest text))
+        otherwise text)))
+
+(define some-digits
+  (lambda (text)
+    (if (and (not (empty? text)) (t/digit? (first text))) (digits text)
+        otherwise (fail "expected a digit" text))))
+
+(define integer-part
+  (lambda (text)
+    (match text
+      ("0" &rest more) more
+      otherwise (some-digits text))))
+
+(define fraction-part
+  (lambda (text)
+    (match text
+      ("." &rest more) (some-digits more)
+      otherwise text)))
+
+(define exponent-part
+  (lambda (text)
+    (match text
+      ("e" &rest more) (exponent-digits more)
+      ("E" &rest more) (exponent-digits more)
+      otherwise text)))
+
+(define exponent-digits
+  (lambda (text)
+    (match text
+      ("+" &rest more) (some-digits more)
+      ("-" &rest more) (some-digits more)
+      otherwise (some-digits text))))
+
+(define number-end
+  (lambda (text)
+    (exponent-part
+      (fraction-part
+        (integer-part (match text ("-" &rest more) more otherwise text))))))
+
+; The text is then read with `string-to-number`, but Novelo's syntax is not
+; JSON's: Novelo wants a point before the exponent, a lowercase e and no +
+; sign, so 1e3 becomes 1.0e3, 2E-1 becomes 2.0e-1 and 0.5e+1 becomes 0.5e1.
+; A number too large for an Integer or a Float is an error, and so is
+; reported here.
+;
+; Friction: a second number syntax, close to Novelo's but not the same.
+(define novelo-number
+  (lambda (number-text)
+    (match (t/split "e" (t/lowercase number-text))
+      (mantissa exponent)
+      (concatenate mantissa
+                   (if (any? (lambda (character) (equal? character ".")) (characters mantissa)) ""
+                       otherwise ".0")
+                   "e"
+                   (match (characters exponent)
+                     ("+" &rest digits) (apply concatenate digits)
+                     otherwise exponent))
+      otherwise number-text)))
+
+(define parse-number
+  (lambda (text)
+    (if (not (or (equal? (first text) "-") (t/digit? (first text))))
+        (fail (concatenate "unexpected " (first text)) text)
+        otherwise
+        (let ((after (number-end text)))
+          (let ((number-text (apply concatenate (take (- (count text) (count after)) text))))
+            (let ((number (catch (lambda () (string-to-number (novelo-number number-text)))
+                                 (lambda (problem) (fail (concatenate "number out of range: " number-text) text)))))
+              (if (void? number) (fail (concatenate "invalid number: " number-text) text)
+                  otherwise (list number after))))))))
+
+; A line holds one value and nothing after it but spaces.
+(define parse
+  (lambda (line)
+    (match (parse-value (characters line))
+      (value more)
+      (if (empty? (skip-space more)) value
+          otherwise (fail "text after the value" (skip-space more))))))
+
+; ---- printing JSON --------------------------------------------------------------
+
+; Friction: there is no way to write a number in another base either.
+(define hexadecimal
+  (lambda (number)
+    (if (< number 16) (string-at "0123456789abcdef" number)
+        otherwise (concatenate (hexadecimal (quotient number 16)) (hexadecimal (remainder number 16))))))
+
+; Quotes and backslashes are escaped, and so is every control character,
+; which JSON does not allow inside a string: with a short escape when there
+; is one, as \u00XX otherwise.
+(define short-escapes {"\"" "\\\"" "\\" "\\\\" "\n" "\\n" "\r" "\\r" "\t" "\\t" "\u{8}" "\\b" "\u{C}" "\\f"})
+
+(define escape
+  (lambda (character)
+    (if (contains? short-escapes character) (get short-escapes character)
+        (< (code-point character) 32) (concatenate "\\u" (t/pad-left 4 "0" (hexadecimal (code-point character))))
+        otherwise character)))
+
+(define json-string
+  (lambda (text)
+    (concatenate "\"" (apply concatenate (map escape (characters text))) "\"")))
+
+; It takes the values the parser builds; anything else, such as a Map with
+; a Keyword key, is an error.
+;
+; Floats print the shortest digits that read back, such as 13.5 or 6.0e-5,
+; which JSON reads as well. A Map keeps its keys in insertion order, so an
+; object comes out in the order it was built.
+(define to-json
+  (lambda (value)
+    (if (void? value) "null"
+        (equal? value #true) "true"
+        (equal? value #false) "false"
+        (or (integer? value) (float? value)) (to-string value)
+        (string? value) (json-string value)
+        (list? value) (concatenate "[" (t/join ", " (map to-json value)) "]")
+        (map? value)
+        (concatenate "{"
+                     (t/join ", " (map (lambda (key)
+                                         (if (string? key) (concatenate (json-string key) ": " (to-json (get value key)))
+                                             otherwise (error "a JSON key must be a String" key)))
+                                       (keys value)))
+                     "}")
+        otherwise (error "no JSON form for" value))))
+
+; ---- orders -------------------------------------------------------------------
+
+; An order is an object with a "customer" string and "items", a list of
+; objects with a "price" (any number) and a "quantity" (a whole number).
+; Other fields are allowed and ignored. A map pattern matches a Map that
+; has the keys it names, whatever else it has.
+(define as-float
+  (lambda (number)
+    (if (integer? number) (integer-to-float number)
+        (float? number) number
+        otherwise #void)))
+
+(define item-total
+  (lambda (item)
+    (match item
+      {"price" price "quantity" quantity}
+      (if (and (not (void? (as-float price))) (integer? quantity) (>= quantity 0))
+          (* (as-float price) (integer-to-float quantity))
+          otherwise (error "an item needs a price and a whole quantity" (to-json item)))
+      otherwise (error "an item needs a price and a quantity" (to-json item)))))
+
+(define order-total
+  (lambda (order)
+    (match order
+      {"customer" customer "items" items}
+      (if (not (string? customer)) (error "the customer must be a string")
+          (not (list? items)) (error "the items must be a list")
+          otherwise (list customer (count items) (fold + 0.0 (map item-total items))))
+      otherwise (error "an order needs a customer and items"))))
+
+; Money is shown with two decimals; the report keeps the total rounded to
+; cents as a Float.
+(define cents (lambda (amount) (/ (integer-to-float (round (* amount 100.0))) 100.0)))
+
+; ---- the report -----------------------------------------------------------------
+
+; The state carried from line to line: the totals per customer and the
+; numbers of the lines rejected. A JSON error gives a column; any other
+; error, from checking the order, gives its message and values.
+(define reason
+  (lambda (problem line)
+    (match problem
+      {:kind :json :values (left)}
+      (t/format "column {}: {}" (+ 1 (- (count (characters line)) left)) (get problem :message))
+      otherwise (t/join " " (prepend (get problem :message) (map to-string (get problem :values ())))))))
+
+(define record
+  (lambda (state number line)
+    (catch (lambda ()
+             (match (order-total (parse line))
+               (customer item-count total)
+               (sequence
+                 (display! (t/format "{}: {}, {} {}, {}\n" number (json-string customer) item-count
+                                     (if (= item-count 1) "item" otherwise "items") (float-to-fixed total 2)))
+                 (associate state :totals
+                            (associate (get state :totals) customer
+                                       (+ total (get (get state :totals) customer 0.0)))))))
+           (lambda (problem)
+             (sequence
+               (display! (t/format "{}: rejected, {}\n" number (reason problem line)))
+               (associate state :rejected (prepend number (get state :rejected))))))))
+
+(define read-orders
+  (lambda (state number)
+    (let ((line (read-line!)))
+      (if (void? line) (associate state :lines (- number 1))
+          (empty? (skip-space (characters line))) (read-orders state (+ number 1))
+          otherwise (read-orders (record state number line) (+ number 1))))))
+
+(define state (read-orders {:totals {} :rejected ()} 1))
+
+(display! "\n")
+(display! (to-json {"lines" (get state :lines)
+                    "rejected" (reverse (get state :rejected))
+                    "totals" (map-values cents (get state :totals))}))
+(display! "\n")

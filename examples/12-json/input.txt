@@ -1,0 +1,32 @@
+{"customer": "Ana", "items": [{"name": "café", "price": 4.5, "quantity": 2}, {"name": "pão", "price": 0.75, "quantity": 6}]}
+{"customer": "Bruno \"B\"", "items": [], "note": null, "vip": true, "tags": ["new", false]}
+{"customer": "Carla", "items": [{"name": "chá\tverde", "price": 1.2e1, "quantity": 1}]}
+  {"customer":"Élis 😀!!","items":[{"name":"éclair","price":3,"quantity":1}]}  
+{"customer": "Ana", "items": [{"price": 2.5E-1, "quantity": 4}, {"price": 0.5e+1, "quantity": 0}]}
+
+{"customer": "Ivo\u001b\/", "items": [{"price": -0.0, "quantity": 3}]}
+{"customer": "Ana", "items": [{"price": 1, "quantity": 1}], "customer": "Zoe"}
+{"customer": "Eva", "items": [{"name": "bolo", "price": 10.0, "quantity": 1}
+{"customer": "Fábio" "items": []}
+[1, 2, 3]
+{"customer": "Gil", "items": [{"price": 1.5, "quantity": 1.5}]}
+{"customer": "Gil", "items": [7]}
+{"customer": 5, "items": []}
+{"customer": "Gil", "items": {}}
+{"customer": "Hana", "items": [{"price": 01, "quantity": 1}]}
+{"customer": "Hana", "items": [{"price": -, "quantity": 1}]}
+{"customer": "Hana", "items": [{"price": 1e999, "quantity": 1}]}
+{"customer": "Hana", "items": [{"price": 1., "quantity": 1}]}
+{"customer": "Ivo", "items": [{"price": 1e, "quantity": 1}]}
+{"customer": "\ud800A", "items": []}
+{"customer": "\u12G4", "items": []}
+{"customer": "\q", "items": []}
+{"customer": "	tab", "items": []}
+{"customer": "Joana
+{"customer": "\
+{"customer": tru, "items": []}
+{1: 2}
+{"customer": "Kim", "items": []} x
+{"customer":
+{"customer" "Lia", "items": []}
+   
