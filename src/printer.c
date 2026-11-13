@@ -115,6 +115,59 @@ void lisp_format_float(double number, char text[static LISP_FLOAT_TEXT_SIZE]) {
     }
 }
 
+/* ---- fixed decimals (§9, float-to-fixed) --------------------------------------- */
+
+/* How many digits the exact decimal expansion of a finite `number` has after
+ * the point. A binary fraction with k bits after the point, m / 2^k with m
+ * odd, has exactly k decimal digits after it, since 1 / 2^k = 5^k / 10^k. */
+static int exact_decimals(double number) {
+    if (number == 0.0) return 0;
+    int exponent;
+    double fraction = frexp(fabs(number), &exponent); /* number = fraction × 2^exponent, 0.5 ≤ fraction < 1 */
+    uint64_t mantissa = (uint64_t)ldexp(fraction, 53); /* exact: a binary64 has at most 53 significant bits */
+    int bits_after_point = 53 - exponent;
+    while (bits_after_point > 0 && (mantissa & 1) == 0) {
+        mantissa >>= 1;
+        bits_after_point--;
+    }
+    return bits_after_point > 0 ? bits_after_point : 0;
+}
+
+/* printf is asked for every digit of the exact value, so it never rounds:
+ * the result does not depend on how a libc breaks ties. The rounding to
+ * `decimals` places, ties away from zero, is done here on the digits. */
+void lisp_format_fixed(double number, int decimals, char text[static LISP_FIXED_TEXT_SIZE]) {
+    int exact = exact_decimals(number);
+    int precision = exact > decimals ? exact : decimals;
+    char *start = text + 2; /* room for a carry digit and a sign in front */
+    snprintf(start, LISP_FIXED_TEXT_SIZE - 2, "%.*f", precision, fabs(number));
+
+    if (precision > decimals) {
+        char *point = strchr(start, '.');
+        char *end = decimals == 0 ? point : point + 1 + decimals;
+        char first_dropped = point[1 + decimals];
+        /* A first dropped digit of 5 or more rounds the magnitude up: either
+         * the dropped part is above one half, or it is exactly one half, a
+         * tie, which goes away from zero. */
+        if (first_dropped >= '5') {
+            char *cursor = end - 1;
+            for (; cursor >= start; cursor--) {
+                if (*cursor == '.') continue;
+                if (*cursor != '9') {
+                    (*cursor)++;
+                    break;
+                }
+                *cursor = '0';
+            }
+            if (cursor < start) *--start = '1'; /* 9.996 → 10.00 */
+        }
+        *end = '\0';
+    }
+
+    if (signbit(number) && strpbrk(start, "123456789")) *--start = '-';
+    memmove(text, start, strlen(start) + 1);
+}
+
 /* ---- values ---------------------------------------------------------------------- */
 
 static void print_string_literal(LispBuffer *output, const LispString *string) {

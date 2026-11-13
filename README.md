@@ -1,6 +1,6 @@
 # Novelo
 
-An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.9.0) and the standard library (`standard-library.md`, v0.6.0).
+An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.10.0) and the standard library (`standard-library.md`, v0.6.0).
 
 *Novelo* is Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as Novelo's lists are. Source files end in `.nvl`.
 
@@ -8,7 +8,7 @@ Every case of both conformance suites passes:
 
 | Suite | Cases |
 | --- | --- |
-| core | 422 |
+| core | 461 |
 | stdlib | 85 |
 
 Those runs report no leaks, and they also pass under AddressSanitizer and UndefinedBehaviorSanitizer.
@@ -166,6 +166,7 @@ make examples
 
 - Reading checks the grammar of §4.2 first and then calls `strtod`, which rounds correctly on glibc and macOS. The interpreter never calls `setlocale`, so the decimal point is always `.`.
 - Printing finds the shortest digits that read back. For each length from 1 to 17, `printf("%.*e")` gives the closest digits of that length, and `strtod` checks whether they read back. Next to a power of two, the closest digits can miss while their neighbor of the same length reads back, so both neighbors are tried too.
+- `float-to-fixed` asks `printf("%.*f")` for every digit of the exact value: a Float with k bits after the binary point has exactly k decimal digits after the point, at most 1074. Since nothing is left to round, `printf` cannot round, and the rounding to the requested decimals, ties away from zero, is done on the digit text. glibc and macOS both print the exact digits, but they could break ties differently if asked to round.
 - `sqrt` is the only libm function used, because IEEE 754 requires it to be correctly rounded, so every platform prints the same digits.
 
 **Positions** live in a side table keyed by node address. Freeing a node removes its entry, so a reused address never inherits a stale position (core §6.4). Each entry also names its file, as an index into a list of file names that the reader fills.

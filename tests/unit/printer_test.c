@@ -132,6 +132,83 @@ static void t_float_round_trip(void) {
     }
 }
 
+static void check_fixed(int line, double number, int decimals, const char *expected) {
+    char text[LISP_FIXED_TEXT_SIZE];
+    lisp_format_fixed(number, decimals, text);
+    if (strcmp(text, expected) != 0) {
+        test_fail(__FILE__, line, "fixed %.17g with %d decimals: \"%s\" != \"%s\"", number, decimals, text,
+                  expected);
+    }
+}
+
+static void t_fixed(void) {
+    check_fixed(__LINE__, 20.1, 2, "20.10");
+    check_fixed(__LINE__, 2.6, 0, "3");
+    check_fixed(__LINE__, 3.0, 0, "3");
+    check_fixed(__LINE__, 2.5, 0, "3");     /* ties away from zero */
+    check_fixed(__LINE__, -2.5, 0, "-3");
+    check_fixed(__LINE__, 0.125, 2, "0.13");
+    check_fixed(__LINE__, 1.005, 2, "1.00"); /* the nearest Float is below 1.005 */
+    check_fixed(__LINE__, 9.996, 2, "10.00"); /* a carry into a new digit */
+    check_fixed(__LINE__, -99.5, 0, "-100");
+    check_fixed(__LINE__, 0.96, 1, "1.0");
+    check_fixed(__LINE__, -0.001, 2, "0.00"); /* no sign when every digit is zero */
+    check_fixed(__LINE__, -0.0, 0, "0");
+    check_fixed(__LINE__, -0.005, 2, "-0.01"); /* -0.005000000000000000104… */
+    check_fixed(__LINE__, 0x1p-1074, 20, "0.00000000000000000000");
+    check_fixed(__LINE__, 0x1p-1074, 0, "0");
+    check_fixed(__LINE__, 0.1, 20, "0.10000000000000000555");
+    check_fixed(__LINE__, 1e21, 1, "1000000000000000000000.0");
+
+    char text[LISP_FIXED_TEXT_SIZE];
+    lisp_format_fixed(-0x1.fffffffffffffp1023, 20, text); /* the longest text */
+    CHECK(strlen(text) == 1 + 309 + 1 + 20);
+    CHECK(strncmp(text, "-17976931348623157081", 21) == 0);
+}
+
+/* Away from ties, the rounding agrees with printf, which rounds the exact
+ * value too. A tie is a value whose exact digits stop one place after the
+ * last written one, with a 5 there. */
+static void t_fixed_against_printf(void) {
+    uint64_t state = 0x2545F4914F6CDD1DULL;
+    for (int iteration = 0; iteration < 100000; iteration++) {
+        state ^= state << 13; /* xorshift64 */
+        state ^= state >> 7;
+        state ^= state << 17;
+        /* Numbers with a few digits after the point, where ties and carries
+         * happen, and random bit patterns of every magnitude. */
+        double number;
+        if (iteration % 2 == 0) {
+            number = (double)(int64_t)(state % 2000001) / 1000.0 - 1000.0;
+        } else {
+            uint64_t bits = state & 0x7FEFFFFFFFFFFFFFULL; /* finite */
+            memcpy(&number, &bits, sizeof number);
+            if (state >> 63) number = -number;
+        }
+        int decimals = (int)((state >> 40) % (LISP_FIXED_MAXIMUM_DECIMALS + 1));
+
+        char text[LISP_FIXED_TEXT_SIZE];
+        lisp_format_fixed(number, decimals, text);
+        char exact[LISP_FIXED_TEXT_SIZE];
+        snprintf(exact, sizeof exact, "%.1074f", fabs(number));
+        char *last = exact + strlen(exact) - 1;
+        while (*last == '0') last--;
+        const char *point = strchr(exact, '.');
+        bool tie = *last == '5' && last - point == decimals + 1;
+        if (tie) continue;
+
+        char expected[LISP_FIXED_TEXT_SIZE];
+        snprintf(expected, sizeof expected, "%.*f", decimals, number);
+        const char *compared = expected;
+        if (expected[0] == '-' && !strpbrk(expected, "123456789")) compared++; /* "-0.00" */
+        if (strcmp(text, compared) != 0) {
+            test_fail(__FILE__, __LINE__, "fixed %.17g with %d decimals: \"%s\", printf \"%s\"", number,
+                      decimals, text, expected);
+            return;
+        }
+    }
+}
+
 static void t_functions(void) {
     Value *primitive = lisp_primitive("dummy", 0, 0, dummy_primitive);
     LispBuffer output;
@@ -168,6 +245,8 @@ const TestSuite printer_suite = {"printer", (const TestCase[]){
     {"lists and maps", t_collections},
     {"floats", t_floats},
     {"every Float reads back from the shortest digits", t_float_round_trip},
+    {"fixed decimals", t_fixed},
+    {"fixed decimals agree with printf away from ties", t_fixed_against_printf},
     {"functions", t_functions},
     {"printed text reads back", t_round_trip},
     {},

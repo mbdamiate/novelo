@@ -279,6 +279,21 @@ PRIMITIVE(sqrt) {
     return lisp_float(sqrt(number));
 }
 
+/* The digits come from printer.c, which rounds the exact binary value. */
+PRIMITIVE(float_to_fixed) {
+    (void)argument_count;
+    if (!lisp_expect_kind(state, "float-to-fixed", arguments[0], LISP_KIND_FLOAT, "Float")) return nullptr;
+    if (!lisp_expect_kind(state, "float-to-fixed", arguments[1], LISP_KIND_INTEGER, "Integer")) return nullptr;
+    int64_t decimals = lisp_integer_value(arguments[1]);
+    if (decimals < 0 || decimals > LISP_FIXED_MAXIMUM_DECIMALS) {
+        return lisp_error(state, "domain-error", LISP_LIST(arguments[1]),
+                          "float-to-fixed: the decimals must be from 0 to %d", LISP_FIXED_MAXIMUM_DECIMALS);
+    }
+    char text[LISP_FIXED_TEXT_SIZE];
+    lisp_format_fixed(lisp_float_value(arguments[0]), (int)decimals, text);
+    return lisp_string(text, strlen(text));
+}
+
 PRIMITIVE(equal) {
     (void)state;
     (void)argument_count;
@@ -668,6 +683,7 @@ static const LispNativeFunction primitives[] = {
     {"integer-to-float", 1, 1, primitive_integer_to_float},
     {"truncate", 1, 1, primitive_truncate},
     {"sqrt", 1, 1, primitive_sqrt},
+    {"float-to-fixed", 2, 2, primitive_float_to_fixed},
     {"equal?", 2, 2, primitive_equal},
     {"boolean?", 1, 1, primitive_is_boolean},
     {"void?", 1, 1, primitive_is_void},

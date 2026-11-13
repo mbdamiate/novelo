@@ -1,5 +1,5 @@
 {
-  "spec": "Core Specification — Novelo, version 0.9.0",
+  "spec": "Core Specification — Novelo, version 0.10.0",
   "format": {
     "read": "Read 'input' (UTF-8). With 'equivalent': also read that text and compare the two datum sequences with equal?. With 'types': the sequence read has exactly these types, in order.",
     "read-error": "Read 'input' (or the bytes of 'input_hex'). Reading MUST fail with the code 'error' at position [line, column].",
@@ -3736,6 +3736,318 @@
       "section": "8.4",
       "program": "(define sum (lambda (n total) (if (= n 0) total otherwise (sum (- n 1) (+ total 0.5)))))\n(sum 1000000 0.0)",
       "value": "500000.0",
+      "output": ""
+    },
+    {
+      "id": "fixed-001",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 21.8375 2)",
+      "value": "\"21.84\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-002",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 20.1 2)",
+      "value": "\"20.10\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-003",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 3.0 0)",
+      "value": "\"3\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-004",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 2.6 0)",
+      "value": "\"3\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-005",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 123.456 1)",
+      "value": "\"123.5\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-006",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed -123.456 1)",
+      "value": "\"-123.5\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-007",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 2.5 0)",
+      "value": "\"3\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-008",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed -2.5 0)",
+      "value": "\"-3\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-009",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 0.125 2)",
+      "value": "\"0.13\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-010",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed -0.125 2)",
+      "value": "\"-0.13\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-011",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 0.5 0)",
+      "value": "\"1\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-012",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 1.5 0)",
+      "value": "\"2\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-013",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 2251799813685248.5 0)",
+      "value": "\"2251799813685249\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-014",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 1.005 2)",
+      "value": "\"1.00\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-015",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 2.675 2)",
+      "value": "\"2.67\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-016",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 0.045 2)",
+      "value": "\"0.04\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-017",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 0.49999999999999994 0)",
+      "value": "\"0\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-018",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 0.1 20)",
+      "value": "\"0.10000000000000000555\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-019",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 9.996 2)",
+      "value": "\"10.00\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-020",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 99.5 0)",
+      "value": "\"100\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-021",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 9.995 2)",
+      "value": "\"9.99\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-022",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed -0.001 2)",
+      "value": "\"0.00\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-023",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed -0.0 1)",
+      "value": "\"0.0\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-024",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed -0.0 0)",
+      "value": "\"0\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-025",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 0.0 3)",
+      "value": "\"0.000\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-026",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed -0.4 0)",
+      "value": "\"0\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-027",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 1.0e21 2)",
+      "value": "\"1000000000000000000000.00\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-028",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 5.0e-324 20)",
+      "value": "\"0.00000000000000000000\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-029",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 1.0 20)",
+      "value": "\"1.00000000000000000000\"",
+      "output": ""
+    },
+    {
+      "id": "fixed-030",
+      "kind": "eval",
+      "section": "9",
+      "program": "(count (float-to-fixed 1.7976931348623157e308 0))",
+      "value": "309",
+      "output": ""
+    },
+    {
+      "id": "fixed-031",
+      "kind": "eval",
+      "section": "9",
+      "program": "(equal? (float-to-fixed 1.7976931348623157e308 1) (concatenate \"17976931348623157\" (substring (float-to-fixed 1.7976931348623157e308 0) 17 309) \".0\"))",
+      "value": "#true",
+      "output": ""
+    },
+    {
+      "id": "fixed-032",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(display! (concatenate \"mean: \" (float-to-fixed 21.837500000000002 2) \"\\n\"))",
+      "value": "#void",
+      "output": "mean: 21.84\n"
+    },
+    {
+      "id": "fixed-033",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 3 2)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "fixed-034",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 3.0 2.0)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "fixed-035",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed \"3.0\" 2)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "fixed-036",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 3.0 21)",
+      "error": ":domain-error",
+      "output": ""
+    },
+    {
+      "id": "fixed-037",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 3.0 -1)",
+      "error": ":domain-error",
+      "output": ""
+    },
+    {
+      "id": "fixed-038",
+      "kind": "eval",
+      "section": "9",
+      "program": "(float-to-fixed 3.0)",
+      "error": ":wrong-arguments",
+      "output": ""
+    },
+    {
+      "id": "fixed-039",
+      "kind": "eval",
+      "section": "9",
+      "program": "(catch (lambda () (float-to-fixed 3.0 25)) (lambda (problem) (get problem :values)))",
+      "value": "(25)",
       "output": ""
     }
   ]
