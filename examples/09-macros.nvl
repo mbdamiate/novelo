@@ -1,0 +1,100 @@
+; Macros: extending the language from inside it.
+;
+; A macro is a function that runs before evaluation. It receives the code of
+; its arguments as data, unevaluated, and returns new code, which takes its
+; place. This file builds `when`, `unless`, a `cond` for the else-if chains
+; of 02-fizzbuzz, and shows the one trap of macros, name capture.
+;
+;   build/novelo examples/09-macros.nvl
+
+(import io)
+(import list)      ; map
+
+(define show!
+  (lambda (label value)
+    (display! label)
+    (display! ": ")
+    (write! value)
+    (display! "\n")))
+
+; ---- quasiquote: templates of code --------------------------------------------
+
+; A backquote ` writes a list like a quote does, but a comma , inside it
+; evaluates one part, and ,@ splices a list in. Code is made of lists, so
+; this is how macros build the code they return.
+(define x 2)
+(show! "template" `(1 ,x ,(+ x 1) ,@(list 4 5) six))
+
+; ---- when and unless --------------------------------------------------------------
+
+; (when test body …) runs the body only if the test holds. `if` cannot do
+; this alone, because its branches take a single expression each; the macro
+; wraps the body in a `sequence`.
+(define-macro when
+  (lambda (test &rest body)
+    `(if ,test (sequence ,@body) otherwise #void)))
+
+(define-macro unless
+  (lambda (test &rest body)
+    `(when (not ,test) ,@body)))   ; a macro may expand into another macro
+
+; A macro must be defined before its first use in the text.
+(when (> x 1)
+  (display! "x is greater than 1, ")
+  (display! "so both lines run\n"))
+(unless (> x 1)
+  (display! "this never prints\n"))
+
+; ---- cond -------------------------------------------------------------------------
+
+; (cond (test result) … (otherwise result)) tries each test in turn. The
+; transformer is an ordinary function, so it can be defined, called and
+; inspected like any other before it becomes a macro.
+(define cond-expansion
+  (lambda (&rest clauses)
+    (if (empty? clauses) #void
+        otherwise
+        (let ((test (first (first clauses)))
+              (result (first (rest (first clauses)))))
+          (if (equal? test 'otherwise) result
+              otherwise `(if ,test ,result otherwise (cond ,@(rest clauses))))))))
+
+(define-macro cond cond-expansion)
+
+; What the macro turns a `cond` into: an `if` whose other branch is a smaller
+; `cond`, which expands again in turn.
+(show! "expansion" (cond-expansion '((= n 0) "zero") '(otherwise "many")))
+
+; FizzBuzz again, now without the staircase of nested `if`s.
+(define fizzbuzz
+  (lambda (number)
+    (cond ((= (remainder number 15) 0) "FizzBuzz")
+          ((= (remainder number 3) 0) "Fizz")
+          ((= (remainder number 5) 0) "Buzz")
+          (otherwise number))))
+(show! "fizzbuzz" (map fizzbuzz (range 9 16)))
+
+; ---- capture, and generate-symbol --------------------------------------------------
+
+; (either a b) is `a`, or `b` when `a` is #false. A naive version stores `a`
+; in a local named `value`, so that `a` is evaluated only once...
+(define-macro naive-either
+  (lambda (a b)
+    `(let ((value ,a))
+       (if value value otherwise ,b))))
+
+; ...but the caller may use `value` too. Macros are not hygienic: the `value`
+; the caller passed in `b` now names the macro's local, which is #false.
+(let ((value 5))
+  (show! "naive" (naive-either #false value)))     ; #false, not 5
+
+; `generate-symbol` makes a fresh symbol that no other code can mention, so
+; the local can never capture a name of the caller.
+(define-macro either
+  (lambda (a b)
+    (let ((value (generate-symbol)))
+      `(let ((,value ,a))
+         (if ,value ,value otherwise ,b)))))
+
+(let ((value 5))
+  (show! "either" (either #false value)))          ; 5
