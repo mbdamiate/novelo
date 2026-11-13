@@ -1,5 +1,5 @@
 {
-  "spec": "Core Specification — Novelo, version 0.6.0",
+  "spec": "Core Specification — Novelo, version 0.7.0",
   "format": {
     "read": "Read 'input' (UTF-8). With 'equivalent': also read that text and compare the two datum sequences with equal?. With 'types': the sequence read has exactly these types, in order.",
     "read-error": "Read 'input' (or the bytes of 'input_hex'). Reading MUST fail with the code 'error' at position [line, column].",
@@ -2775,6 +2775,290 @@
       "kind": "eval",
       "section": "8.5",
       "program": "(define g (lambda ()\n  (if #true 1\n      #false 2\n      3)))",
+      "error": ":expansion-error",
+      "error_position": [
+        2,
+        3
+      ],
+      "output": ""
+    },
+    {
+      "id": "match-001",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(list (match 0 0 :zero otherwise :other) (match \"a\" \"a\" :string otherwise :other) (match :k :k :keyword otherwise :other)\n      (match #void #void :void otherwise :other) (match () () :empty otherwise :other) (match #false #false :false otherwise :other)\n      (match 1 0 :zero otherwise :other))",
+      "value": "(:zero :string :keyword :void :empty :false :other)",
+      "output": ""
+    },
+    {
+      "id": "match-002",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(list (match 5 _ :any) (match 5 x (+ x 1)) (match (list 1 2) _ :list))",
+      "value": "(:any 6 :list)",
+      "output": ""
+    },
+    {
+      "id": "match-003",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(define f (lambda (v) (match v 'end 1 '(1 2) 2 '#{2 1} 3 '{:a 1} 4 otherwise 5)))\n(list (f 'end) (f (list 1 2)) (f #{1 2}) (f {:a 1}) (f 'other) (f \"end\"))",
+      "value": "(1 2 3 4 5 5)",
+      "output": ""
+    },
+    {
+      "id": "match-004",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(define f (lambda (v) (match v (a) (list a) (a b) (list b a) otherwise :no)))\n(list (f '(1)) (f '(1 2)) (f '(1 2 3)) (f ()) (f \"ab\") (f {:a 1}))",
+      "value": "((1) (2 1) :no :no :no :no)",
+      "output": ""
+    },
+    {
+      "id": "match-005",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(define f (lambda (v) (match v (a b &rest more) (list a b more) otherwise :no)))\n(list (f '(1 2)) (f '(1 2 3 4)) (f '(1)) (match '(1 2) (&rest all) all) (match '(1 2) (a &rest (b)) (+ a b)))",
+      "value": "((1 2 ()) (1 2 (3 4)) :no (1 2) 3)",
+      "output": ""
+    },
+    {
+      "id": "match-006",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(define f (lambda (v) (match v {:name n :age a} (list n a) {:name n} (list n) otherwise :no)))\n(list (f {:name \"ana\" :age 3 :x 1}) (f {:name \"bo\"}) (f {:age 3}) (f '(:name \"x\")) (match {\"k\" 1 2 :two} {\"k\" a 2 b} (list a b)))",
+      "value": "((\"ana\" 3) (\"bo\") :no :no (1 :two))",
+      "output": ""
+    },
+    {
+      "id": "match-007",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(list (match {:position {:line 3 :column 7}} {:position {:line line}} line)\n      (match '({:a 1} ({:b 2})) ({:a x} ({:b y})) (+ x y))\n      (match {:a '(1 2)} {:a (x y)} (- y x)))",
+      "value": "(3 3 1)",
+      "output": ""
+    },
+    {
+      "id": "match-008",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(list (match '(1 2) (a b) :pair (a &rest r) :rest) (match '(1 2) (a &rest r) :rest (a b) :pair))",
+      "value": "(:pair :rest)",
+      "output": ""
+    },
+    {
+      "id": "match-009",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(import io)\n(match (sequence (display! \"s\") '(1 2))\n  (a) 1\n  (a b) 2\n  otherwise 3)",
+      "value": "2",
+      "output": "s"
+    },
+    {
+      "id": "match-010",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(define x 10)\n(define y :global)\n(list (match 1 x x) x (match '(1) (y 2) y otherwise y))",
+      "value": "(1 10 :global)",
+      "output": ""
+    },
+    {
+      "id": "match-011",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(match '(1 2 3) (a b) (+ a b))",
+      "error": ":no-match",
+      "output": ""
+    },
+    {
+      "id": "match-012",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(catch (lambda () (match '(1 2) (a) a)) (lambda (problem) (list (get problem :kind) (get problem :values))))",
+      "value": "(:no-match ((1 2)))",
+      "output": ""
+    },
+    {
+      "id": "match-013",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define f (lambda (v)\n  (match v\n    0 :zero)))\n(f 1)",
+      "error": ":no-match",
+      "error_position": [
+        2,
+        3
+      ],
+      "output": ""
+    },
+    {
+      "id": "match-014",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define f (lambda (v)\n  (match v\n    (x) (first x)\n    otherwise 0)))\n(f '(()))",
+      "error": ":wrong-type",
+      "error_position": [
+        3,
+        9
+      ],
+      "output": ""
+    },
+    {
+      "id": "match-015",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(define count-all (lambda (xs n) (match xs () n (_ &rest more) (count-all more (+ n 1)))))\n(define build (lambda (n acc) (if (= n 0) acc otherwise (build (- n 1) (prepend n acc)))))\n(count-all (build 1000000 ()) 0)",
+      "value": "1000000",
+      "output": ""
+    },
+    {
+      "id": "match-016",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(define first (lambda (x) :broken))\n(define get 5)\n(define equal? (lambda (a b) #false))\n(define list? (lambda (x) #false))\n(list (match '(1 2) (a b) a) (match {:k 1} {:k v} v) (match \"s\" \"s\" :yes otherwise :no))",
+      "value": "(1 1 :yes)",
+      "output": ""
+    },
+    {
+      "id": "match-017",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(let ((first 0) (rest 0) (empty? 0) (not 0)) (match '(7 8) (x y) (+ x y)))",
+      "value": "15",
+      "output": ""
+    },
+    {
+      "id": "match-018",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(match)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "match-019",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(match 1)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "match-020",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(match 1 2)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "match-021",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(match 1 x 1 y)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "match-022",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(match 1 otherwise 2)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "match-023",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(match 1 x 1 otherwise)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "match-024",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(match 1 x 1 otherwise 2 3)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "match-025",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(match 1 x otherwise)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "match-026",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(match '(1 1) (x x) x)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "match-027",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(match '(1 (2 1)) (x (y x)) x)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "match-028",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(match '(1) (a &rest) a)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "match-029",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(match '(1 2) (a &rest b c) a)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "match-030",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(match 1 &rest 1)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "match-031",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(match '(1) (otherwise) 1)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "match-032",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(match {:a 1} {a 1} a)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "match-033",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(match #{1} #{1} 1)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "match-034",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define g (lambda ()\n  (match 1\n    (x x) x)))",
       "error": ":expansion-error",
       "error_position": [
         2,

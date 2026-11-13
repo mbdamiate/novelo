@@ -23,25 +23,25 @@
       (if (void? number) (error "not an integer" text)
           otherwise number))))
 
-; `raise` stops the evaluation with a descriptor the program built itself,
-; which may use its own :kind.
-(define two-fields
+(define fields
   (lambda (line)
-    (let ((fields (filter (lambda (field) (not (empty? field)))
-                          (t/split " " line))))
-      (if (= (count fields) 2) fields
-          otherwise (raise {:kind :bad-line
-                            :message "expected two integers"
-                            :values (list line)})))))
+    (filter (lambda (field) (not (empty? field)))
+            (t/split " " line))))
 
+; `match` checks that the line has exactly two fields and names them. Any
+; other shape falls to `otherwise`, where `raise` stops the evaluation with
+; a descriptor the program built itself, with its own :kind.
+;
 ; Errors raised by primitives have kinds of their own: `quotient` by zero
 ; raises :division-by-zero, and `string-to-number` of a number too large for
 ; 64 bits raises :integer-overflow.
 (define divide-line
   (lambda (line)
-    (let ((fields (two-fields line)))
-      (quotient (parse-integer (first fields))
-                (parse-integer (first (rest fields)))))))
+    (match (fields line)
+      (numerator divisor) (quotient (parse-integer numerator) (parse-integer divisor))
+      otherwise (raise {:kind :bad-line
+                        :message "expected two integers"
+                        :values (list line)}))))
 
 ; ---- catching ----------------------------------------------------------------
 
@@ -50,24 +50,27 @@
 ; descriptor; whatever the handler returns becomes the value of `catch`.
 ;
 ; Errors raised while the program runs also carry :position, the line and
-; column of the innermost form that failed.
+; column of the innermost form that failed. A map pattern names the parts of
+; the descriptor it needs, even inside the nested :position map.
 (define describe
   (lambda (problem)
-    (concatenate "line " (to-string (get (get problem :position) :line))
-                 " of the program, " (to-string (get problem :kind))
-                 ": " (get problem :message)
-                 " " (to-string (get problem :values)))))
+    (match problem
+      {:kind kind :message message :values values :position {:line line}}
+      (concatenate "line " (to-string line) " of the program, " (to-string kind)
+                   ": " message " " (to-string values)))))
 
 ; A handler can deal with one kind and pass the others on: `raise` of the
 ; descriptor it received sends it, unchanged and with its position, to the
 ; next `catch` outward. Here a zero divisor is not a failure: the result is
-; just "undefined".
+; just "undefined". In a pattern, a literal such as :division-by-zero only
+; matches an equal value.
 (define undefined-on-zero
   (lambda (thunk)
     (catch thunk
       (lambda (problem)
-        (if (equal? (get problem :kind) :division-by-zero) "undefined"
-            otherwise (raise problem))))))
+        (match problem
+          {:kind :division-by-zero} "undefined"
+          otherwise (raise problem))))))
 
 (define report!
   (lambda (line)

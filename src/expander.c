@@ -13,6 +13,7 @@
 #include "eval.h"
 #include "include.h"
 #include "node.h"
+#include "primitives.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -43,6 +44,8 @@ const LispSymbols *lisp_symbols(void) {
             .import = lisp_symbol_cstr("import"),
             .declare = lisp_symbol_cstr("declare"),
             .declare_type = lisp_symbol_cstr("declare-type"),
+            .match = lisp_symbol_cstr("match"),
+            .wildcard = lisp_symbol_cstr("_"),
         };
         ready = true;
     }
@@ -371,6 +374,242 @@ static Value *expand_or(LispState *state, Value *arguments, const Scope *scope, 
     return apply_node(lambda, 1, &first);
 }
 
+/* ---- match (§8.3) ------------------------------------------------------------------------------ */
+
+/* match is rewritten into datums and expanded again:
+ *
+ *   (match s p1 r1 p2 r2 otherwise b)
+ *   ≡ (let ((g s))
+ *       (if (and tests of p1 on g) (let (bindings of p1) r1)
+ *           otherwise (if (and tests of p2 on g) (let (bindings of p2) r2)
+ *                         otherwise b)))
+ *
+ * where g is a generated symbol. Without otherwise, the last branch raises
+ * :no-match. The tests call primitive values embedded in the datums, which
+ * expand to constants, so rebinding `first` or `get` does not change match. */
+
+typedef struct MatchPrimitives {
+    Value *is_list, *is_empty, *not_, *first, *rest, *is_map, *contains, *get, *equal, *no_match;
+} MatchPrimitives;
+
+static void match_primitives_init(MatchPrimitives *primitives) {
+    *primitives = (MatchPrimitives){
+        .is_list = lisp_primitive_value("list?"),
+        .is_empty = lisp_primitive_value("empty?"),
+        .not_ = lisp_primitive_value("not"),
+        .first = lisp_primitive_value("first"),
+        .rest = lisp_primitive_value("rest"),
+        .is_map = lisp_primitive_value("map?"),
+        .contains = lisp_primitive_value("contains?"),
+        .get = lisp_primitive_value("get"),
+        .equal = lisp_primitive_value("equal?"),
+        .no_match = lisp_no_match_primitive(),
+    };
+}
+
+static void match_primitives_release(MatchPrimitives *primitives) {
+    Value *all[] = {primitives->is_list, primitives->is_empty, primitives->not_,   primitives->first,
+                    primitives->rest,    primitives->is_map,   primitives->contains, primitives->get,
+                    primitives->equal,   primitives->no_match};
+    for (size_t index = 0; index < sizeof all / sizeof all[0]; index++) lisp_release(all[index]);
+}
+
+/* What walking a pattern collects: the tests, in order, and the bindings
+ * (name access), plus the names bound so far, to reject repeats. */
+typedef struct MatchWalk {
+    const MatchPrimitives *primitives;
+    LispListBuilder tests;
+    LispListBuilder bindings;
+    Value *names; /* List of Symbols */
+} MatchWalk;
+
+static void add_test(MatchWalk *walk, Value *test) { lisp_list_append_take(&walk->tests, test); }
+
+/* (equal? 'datum access) */
+static void add_literal_test(MatchWalk *walk, Value *datum, Value *access) {
+    Value *quoted = LISP_LIST(lisp_symbols()->quote, datum);
+    add_test(walk, LISP_LIST(walk->primitives->equal, quoted, access));
+    lisp_release(quoted);
+}
+
+static const char *walk_pattern(MatchWalk *walk, Value *pattern, Value *access);
+
+/* (p …) or (p … &rest r): one element after another, from `access`. */
+static const char *walk_list_pattern(MatchWalk *walk, Value *pattern, Value *access) {
+    const MatchPrimitives *primitives = walk->primitives;
+    add_test(walk, LISP_LIST(primitives->is_list, access));
+    Value *current = lisp_retain(access);
+    const char *problem = nullptr;
+    const Value *rest = pattern;
+    for (; rest->kind == LISP_KIND_PAIR && !problem; rest = lisp_rest(rest)) {
+        Value *element_pattern = lisp_first(rest);
+        if (element_pattern == lisp_symbols()->rest_marker) {
+            bool exactly_one_after = lisp_rest(rest)->kind == LISP_KIND_PAIR && lisp_rest(lisp_rest(rest)) == LISP_EMPTY;
+            problem = exactly_one_after ? walk_pattern(walk, lisp_first(lisp_rest(rest)), current)
+                                        : "&rest must be followed by exactly one pattern";
+            lisp_release(current);
+            return problem;
+        }
+        Value *is_empty = LISP_LIST(primitives->is_empty, current);
+        add_test(walk, LISP_LIST(primitives->not_, is_empty));
+        lisp_release(is_empty);
+        Value *head = LISP_LIST(primitives->first, current);
+        problem = walk_pattern(walk, element_pattern, head);
+        lisp_release(head);
+        Value *next = LISP_LIST(primitives->rest, current);
+        lisp_release(current);
+        current = next;
+    }
+    if (!problem) add_test(walk, LISP_LIST(primitives->is_empty, current)); /* no elements left over */
+    lisp_release(current);
+    return problem;
+}
+
+/* {key p …}: each key present, each value matching its pattern. */
+static const char *walk_map_pattern(MatchWalk *walk, Value *pattern, Value *access) {
+    const MatchPrimitives *primitives = walk->primitives;
+    add_test(walk, LISP_LIST(primitives->is_map, access));
+    size_t cursor = 0;
+    Value *key, *value_pattern;
+    while (lisp_map_next(pattern, &cursor, &key, &value_pattern)) {
+        if (key->kind == LISP_KIND_SYMBOL) return "the keys of a map pattern must not be symbols";
+        Value *quoted = LISP_LIST(lisp_symbols()->quote, key);
+        add_test(walk, LISP_LIST(primitives->contains, access, quoted));
+        Value *value_access = LISP_LIST(primitives->get, access, quoted);
+        lisp_release(quoted);
+        const char *problem = walk_pattern(walk, value_pattern, value_access);
+        lisp_release(value_access);
+        if (problem) return problem;
+    }
+    return nullptr;
+}
+
+/* Adds the tests and bindings that match `pattern` against the value of
+ * the datum `access`. Returns the reason the pattern is invalid, or nullptr. */
+static const char *walk_pattern(MatchWalk *walk, Value *pattern, Value *access) {
+    const LispSymbols *symbols = lisp_symbols();
+    switch (pattern->kind) {
+    case LISP_KIND_SYMBOL:
+        if (pattern == symbols->wildcard) return nullptr;
+        if (pattern == symbols->otherwise || pattern == symbols->rest_marker) {
+            return "otherwise and &rest are not patterns";
+        }
+        for (const Value *names = walk->names; names->kind == LISP_KIND_PAIR; names = lisp_rest(names)) {
+            if (lisp_first(names) == pattern) return "a name is bound twice in one pattern";
+        }
+        walk->names = lisp_prepend_take(lisp_retain(pattern), walk->names);
+        lisp_list_append_take(&walk->bindings, LISP_LIST(pattern, access));
+        return nullptr;
+    case LISP_KIND_PAIR:
+        if (lisp_first(pattern) == symbols->quote) {
+            if (lisp_list_length(pattern) != 2) return "quote takes exactly one datum";
+            add_literal_test(walk, element(pattern, 1), access);
+            return nullptr;
+        }
+        return walk_list_pattern(walk, pattern, access);
+    case LISP_KIND_MAP:
+        return walk_map_pattern(walk, pattern, access);
+    case LISP_KIND_SET:
+        return "a set has no order to match; quote it to match an equal set";
+    default: /* Integer, String, Keyword, Boolean, Void, () */
+        add_literal_test(walk, pattern, access);
+        return nullptr;
+    }
+}
+
+/* One pattern and its result, with `otherwise_branch` for when it fails.
+ * Returns the new datum, or nullptr with *problem set. */
+static Value *match_clause(const MatchPrimitives *primitives, Value *subject_name, Value *pattern, Value *result,
+                           Value *otherwise_branch, const char **problem) {
+    const LispSymbols *symbols = lisp_symbols();
+    MatchWalk walk = {.primitives = primitives, .names = LISP_EMPTY};
+    lisp_list_builder_init(&walk.tests);
+    lisp_list_builder_init(&walk.bindings);
+    *problem = walk_pattern(&walk, pattern, subject_name);
+    lisp_release(walk.names);
+    Value *tests = lisp_list_builder_finish(&walk.tests);
+    Value *bindings = lisp_list_builder_finish(&walk.bindings);
+    Value *clause = nullptr;
+    if (!*problem) {
+        Value *body = bindings == LISP_EMPTY ? lisp_retain(result) : LISP_LIST(symbols->let, bindings, result);
+        if (tests == LISP_EMPTY) {
+            clause = body; /* the pattern matches anything */
+        } else {
+            Value *condition = lisp_prepend(symbols->and_, tests);
+            clause = LISP_LIST(symbols->if_, condition, body, symbols->otherwise, otherwise_branch);
+            lisp_release(condition);
+            lisp_release(body);
+        }
+    }
+    lisp_release(tests);
+    lisp_release(bindings);
+    return clause;
+}
+
+/* (match subject p1 r1 p2 r2 …), optionally ending with otherwise and one
+ * expression. `otherwise` may appear only right before the last one. */
+static Value *expand_match(LispState *state, Value *form, const Scope *scope, Value *context) {
+    size_t length = lisp_list_length(form);
+    if (length < 2) return lisp_expansion_error(state, form, "match needs a subject, then pattern and result pairs");
+    const Value *arguments = lisp_rest(lisp_rest(form)); /* after the subject */
+    size_t count = length - 2;
+    size_t index = 0;
+    size_t otherwise_index = SIZE_MAX;
+    bool valid = true;
+    for (const Value *rest = arguments; rest->kind == LISP_KIND_PAIR; rest = lisp_rest(rest), index++) {
+        if (lisp_first(rest) != lisp_symbols()->otherwise) continue;
+        if (otherwise_index != SIZE_MAX || index + 2 != count) valid = false;
+        otherwise_index = index;
+    }
+    bool has_otherwise = otherwise_index != SIZE_MAX;
+    size_t paired = has_otherwise ? count - 2 : count;
+    if (!valid || paired == 0 || paired % 2 != 0) {
+        return lisp_expansion_error(
+            state, form, "match must be (match subject p1 r1 p2 r2 …), optionally ending with otherwise and one expression");
+    }
+
+    size_t pairs = paired / 2;
+    Value **patterns = lisp_xcalloc(pairs, sizeof(Value *));
+    Value **results = lisp_xcalloc(pairs, sizeof(Value *));
+    const Value *rest = arguments;
+    for (size_t pair = 0; pair < pairs; pair++) {
+        patterns[pair] = lisp_first(rest);
+        results[pair] = lisp_first(lisp_rest(rest));
+        rest = lisp_rest(lisp_rest(rest));
+    }
+
+    MatchPrimitives primitives;
+    match_primitives_init(&primitives);
+    Value *subject_name = lisp_generate_symbol();
+    Value *branch = has_otherwise ? lisp_retain(lisp_first(lisp_rest(rest)))
+                                  : LISP_LIST(primitives.no_match, subject_name);
+    const char *problem = nullptr;
+    for (size_t pair = pairs; pair > 0 && branch; pair--) {
+        Value *clause = match_clause(&primitives, subject_name, patterns[pair - 1], results[pair - 1], branch, &problem);
+        lisp_release(branch);
+        branch = clause;
+    }
+
+    Value *node = nullptr;
+    if (problem) {
+        lisp_expansion_error(state, form, problem);
+    } else {
+        Value *binding = LISP_LIST(subject_name, element(form, 1));
+        Value *bindings = LISP_LIST(binding);
+        Value *rewritten = LISP_LIST(lisp_symbols()->let, bindings, branch);
+        node = expand(state, rewritten, scope, context);
+        lisp_release(rewritten);
+        lisp_release(bindings);
+        lisp_release(binding);
+    }
+    lisp_release(branch);
+    lisp_release(subject_name);
+    match_primitives_release(&primitives);
+    free(patterns);
+    free(results);
+    return node;
+}
+
 /* ---- quasiquote (§8.3) ----------------------------------------------------------------------- */
 
 static bool is_marker_form(const Value *form, const Value *marker) {
@@ -624,6 +863,7 @@ static Value *expand_form(LispState *state, Value *form, const Scope *scope, Val
     if (head == symbols->sequence) return expand_sequence(state, form, scope, context);
     if (head == symbols->and_) return expand_and(state, lisp_rest(form), scope, context);
     if (head == symbols->or_) return expand_or(state, lisp_rest(form), scope, context);
+    if (head == symbols->match) return expand_match(state, form, scope, context);
     if (head == symbols->quasiquote) {
         if (lisp_list_length(form) != 2) return lisp_expansion_error(state, form, "quasiquote takes one argument");
         return quasi(state, element(form, 1), 1, scope, context);

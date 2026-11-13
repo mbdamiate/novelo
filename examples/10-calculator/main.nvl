@@ -9,7 +9,7 @@
 ;   build/novelo examples/10-calculator/main.nvl < examples/10-calculator/input.txt
 ;
 ; It brings together the earlier examples: reading input (01), tail-call
-; loops (02, 03), lists and fold (04), maps (05), errors (07).
+; loops (02, 03), lists and fold (04), maps and match (05), errors (07).
 
 (import io)
 (import list)      ; fold, filter, map
@@ -18,7 +18,12 @@
 ; ---- the stack ------------------------------------------------------------------
 
 ; The stack is a plain list with its top first. It is never changed: pushing
-; with `prepend` makes a new stack, and `rest` gives the stack below the top.
+; with `prepend` makes a new stack.
+;
+; `match` reads the top of the stack: the pattern (top &rest below) matches
+; a stack with at least one value, naming the top and the stack under it,
+; and (right left &rest below) one with at least two. A stack too short for
+; the pattern falls to `otherwise`.
 
 ; Every word is a function from a stack to a new stack. `binary` turns a
 ; function of two integers into such a word: it takes the top two values,
@@ -26,21 +31,21 @@
 (define binary
   (lambda (operation)
     (lambda (stack)
-      (if (< (count stack) 2) (error "not enough values for an operator" stack)
-          otherwise (let ((right (first stack))
-                          (left (first (rest stack))))
-                      (prepend (operation left right) (rest (rest stack))))))))
+      (match stack
+        (right left &rest below) (prepend (operation left right) below)
+        otherwise (error "not enough values for an operator" stack)))))
 
 (define duplicate
   (lambda (stack)
-    (if (empty? stack) (error "nothing to duplicate")
-        otherwise (prepend (first stack) stack))))
+    (match stack
+      (top &rest _) (prepend top stack)
+      otherwise (error "nothing to duplicate"))))
 
 (define swap
   (lambda (stack)
-    (if (< (count stack) 2) (error "not enough values to swap" stack)
-        otherwise (prepend (first (rest stack))
-                           (prepend (first stack) (rest (rest stack)))))))
+    (match stack
+      (top next &rest below) (prepend next (prepend top below))
+      otherwise (error "not enough values to swap" stack))))
 
 ; The dictionary: a map from the text of a word to its function. Adding a
 ; word is adding an entry; nothing else in the program changes.
@@ -71,12 +76,14 @@
             (t/split " " line))))
 
 ; `fold` threads the stack through the tokens, left to right, starting
-; from the empty stack.
+; from the empty stack. The line is valid when one value is left: the
+; pattern (value) matches a list of exactly one element.
 (define evaluate
   (lambda (line)
     (let ((stack (fold step () (tokens line))))
-      (if (= (count stack) 1) (first stack)
-          otherwise (error "expected one value at the end, found" stack)))))
+      (match stack
+        (value) value
+        otherwise (error "expected one value at the end, found" stack)))))
 
 ; ---- the loop -----------------------------------------------------------------------
 

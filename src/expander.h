@@ -10,6 +10,7 @@ typedef struct LispSymbols {
     Value *define, *define_macro, *let, *sequence, *and_, *or_;
     Value *quasiquote, *unquote, *unquote_splicing;
     Value *include, *import, *declare, *declare_type;
+    Value *match, *wildcard;
 } LispSymbols;
 
 const LispSymbols *lisp_symbols(void);

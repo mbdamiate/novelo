@@ -22,7 +22,9 @@ The core is a three-stage pipeline:
 
 **Normative terms.** MUST indicates a mandatory requirement. MUST NOT indicates a prohibition. MAY indicates implementation freedom that does not affect observable behavior.
 
-**Version:** core 0.6.0, draft.
+**Version:** core 0.7.0, draft.
+
+**Changes since 0.6.0.** A new derived form, `match`, takes a value apart by patterns: literals, `_`, names, lists with an optional `&rest`, and maps by key (8.3). When no pattern matches and there is no `otherwise`, the result is the new error `:no-match` (8.5). `match` is now the name of a derived form, so it cannot name a function called as `(match …)`. Section 5.3 no longer says that `#{` is reserved, since 0.5.0 gave it to sets.
 
 **Changes since 0.5.0.** `if` accepts several test and result pairs, with an optional `otherwise` at the end: `(if c1 a1 c2 a2 otherwise b)` (8.2). The two forms that existed keep their meaning, and every other shape is still an expansion error. Each result is in tail position (8.4).
 
@@ -235,7 +237,7 @@ A set opens with `#{`, with no atmosphere between `#` and `{`, and holds any num
 
 ### 5.3 Reserved characters
 
-`[` and `]` neither open nor close any collection in the core. Outside strings and comments, each one MUST produce `reserved-character` at its own position. `#{` also has no meaning and produces `unknown-dispatch` (5.5). This reserves the syntax for future collections, such as vectors and sets.
+`[` and `]` neither open nor close any collection in the core. Outside strings and comments, each one MUST produce `reserved-character` at its own position. This reserves the syntax for future collections, such as vectors.
 
 ### 5.4 Prefixes
 
@@ -388,7 +390,7 @@ The tests are evaluated in order, and the first one that is not `#false` selects
 
 ### 8.3 Derived forms
 
-Every implementation MUST provide `let`, `sequence`, `and`, `or` and `quasiquote`. They are defined by rewriting into the special forms; the implementation MAY implement them differently, as long as the behavior is the same.
+Every implementation MUST provide `let`, `sequence`, `and`, `or`, `quasiquote` and `match`. They are defined by rewriting into the special forms; the implementation MAY implement them differently, as long as the behavior is the same.
 
 **`let`** has the form `(let ((name value) …) body …)`. Bindings are sequential: each value sees the previous names, and a repeated name shadows the previous one. The rewrite is:
 
@@ -421,6 +423,30 @@ In the `or` rewrite, `t` is a symbol created by `generate-symbol`, so that it do
   `(a ,x ,@xs))                   ; → (a 1 2 3)
 ```
 
+**`match`** chooses a result by the shape of a value. It has the form `(match subject pattern result …)`, with one or more pairs of a pattern and a result, optionally followed by `otherwise` and one expression, like `if` (8.2). `subject` is evaluated once. The patterns are then tried in order, and the first one that matches the value selects its result, which is evaluated with the names the pattern binds; the patterns after it are not tried. When none matches, the value is that of the expression after `otherwise`; without `otherwise`, the result is the error `:no-match`, whose `:values` are `(value)`.
+
+| Pattern | Matches | Binds |
+| --- | --- | --- |
+| `_` | any value | nothing |
+| a symbol `x` | any value | `x` to the value |
+| an Integer, String, Keyword, `#true`, `#false`, `#void` or `()` | a value `equal?` to it | nothing |
+| `(quote datum)`, written `'datum` | a value `equal?` to the datum | nothing |
+| a list `(p …)` | a List with exactly one element per pattern, each element matching its pattern | the names of its patterns |
+| a list `(p … &rest r)` | a List with at least one element per pattern before `&rest`, matching them, whose remaining elements, as a List, match `r` | the names of its patterns |
+| a map `{key p …}` | a Map that has every key of the pattern, each with a value that matches its pattern; other keys are allowed | the names of its patterns |
+
+Patterns nest, so `{:position {:line line}}` binds `line` to the line of a position inside a map. A quote is the only way to match a symbol, a list or a set as a whole: `'end` matches the symbol `end`, and `'(1 2)` the list `(1 2)`. The keys of a map pattern are taken literally, as in a quoted map; they are not patterns.
+
+```lisp
+(match stack
+  (right left &rest below) (prepend (+ left right) below)
+  otherwise (error "not enough values" stack))
+```
+
+The names bound by a pattern are visible only in its result, as with `let`, and shadow outer names there. Each result is in tail position when the `match` is (8.4). The tests a pattern makes use the behavior of the primitives `equal?`, `list?`, `empty?`, `first`, `rest`, `map?`, `contains?` and `get`, not the current values of those global names: redefining `first` does not change `match`.
+
+These are expansion errors: no pattern and result pair; a pattern without a result; `otherwise` anywhere but right before the last expression, or followed by none or more than one expression; the same name bound twice in one pattern; `otherwise` or `&rest` used as a pattern; `&rest` not followed by exactly one pattern; a symbol as a key of a map pattern; and a set pattern `#{…}`, since sets have no order to match by. A quoted set, `'#{1 2}`, matches an equal set.
+
 ### 8.4 General rules
 
 **Falsity.** Only `#false` is false. `()`, `0`, `""` and `#void` are true; the empty list is tested with `empty?`.
@@ -429,7 +455,7 @@ In the `or` rewrite, `t` is a symbol created by `generate-symbol`, so that it do
 
 **Set literals** evaluate their elements, left to right: `#{(+ 1 2) x}` is a set with `3` and the value of `x`. For the literal datum, use `quote`. Elements that only repeat after evaluation, as in `#{a b}` with `a` and `b` equal, MUST produce `:duplicate-element`.
 
-**Tail calls are guaranteed.** A call in tail position MUST NOT use more space than the call it replaces, so that tail recursion runs in constant memory. It is the only looping mechanism. The tail positions are the last expression of a `lambda` body and every result of an `if` that is itself in tail position, including the expression after `otherwise`. Through rewriting, the following inherit the position of the form that contains them: the body of a `let`, the last expression of a `sequence`, and the last argument of an `and` or an `or`.
+**Tail calls are guaranteed.** A call in tail position MUST NOT use more space than the call it replaces, so that tail recursion runs in constant memory. It is the only looping mechanism. The tail positions are the last expression of a `lambda` body and every result of an `if` that is itself in tail position, including the expression after `otherwise`. Through rewriting, the following inherit the position of the form that contains them: the body of a `let`, the last expression of a `sequence`, the last argument of an `and` or an `or`, and each result of a `match`.
 
 ```lisp
 (define numbers-from
@@ -459,7 +485,7 @@ In the `or` rewrite, `t` is a symbol created by `generate-symbol`, so that it do
     (display! (concatenate "Hello, " name "\n"))))
 ```
 
-**Error descriptor.** Every error carries a descriptor: a Map with `:kind` (Keyword), `:message` (String) and `:values` (List), and, once the error has left an expression with a known position, `:position` (below). `(error message value …)` creates a descriptor with `:kind :error`. The `:kind`s of core errors are `:unbound-symbol`, `:not-a-function`, `:wrong-arguments`, `:wrong-type`, `:index-out-of-range`, `:missing-key`, `:integer-overflow`, `:division-by-zero`, `:duplicate-key`, `:duplicate-element`, `:expansion-error`, `:stack-overflow` (8.4), `:io-error` (section 9, `read-line!`), `:include-error` (8.8) and `:import-error` (8.9).
+**Error descriptor.** Every error carries a descriptor: a Map with `:kind` (Keyword), `:message` (String) and `:values` (List), and, once the error has left an expression with a known position, `:position` (below). `(error message value …)` creates a descriptor with `:kind :error`. The `:kind`s of core errors are `:unbound-symbol`, `:not-a-function`, `:wrong-arguments`, `:wrong-type`, `:index-out-of-range`, `:missing-key`, `:integer-overflow`, `:division-by-zero`, `:duplicate-key`, `:duplicate-element`, `:no-match` (8.3), `:expansion-error`, `:stack-overflow` (8.4), `:io-error` (section 9, `read-line!`), `:include-error` (8.8) and `:import-error` (8.9).
 
 **Positions in errors.** When an error leaves the expansion or the evaluation of an expression that has a source position, and its descriptor has no key `:position` yet, the descriptor gains `:position`: a Map with `:line` and `:column`, Integers with the coordinates of 6.1, and, when the expression was read from a file, `:file`, a String that names that file. The text of `:file` is implementation-defined; it names the program, the included file (8.8) or the source of a library (8.9).
 
@@ -770,18 +796,18 @@ An implementation is conformant when it passes all the cases below. Results are 
 
 ### 12.4 Conformance file
 
-The file `conformance.json` has 308 cases, each with an `id`, the section it tests and a kind:
+The file `conformance.json` has 342 cases, each with an `id`, the section it tests and a kind:
 
 | Kind | Cases | What it checks |
 | --- | --- | --- |
 | `read` | 22 | `input` produces the same sequence of datums as `equivalent`, or datums with the types in `types` |
 | `read-error` | 45 | reading `input`, or the bytes of `input_hex`, fails with the code `error` at `position` |
 | `read-positions` | 3 | the node indicated by each `path` is in the position table with the expected `position` |
-| `eval` | 238 | `program` runs as a file, with `input` (or the bytes of `input_hex`) on standard input; it imports at most the library `io`; the output is exactly `output`, and the program ends with the value `value` or with an uncaught error of the `:kind` given in `error`; with `error_position`, the descriptor of that error has a `:position` whose `:line` and `:column` are the given pair, or, when `error_position` is `null`, no `:position` |
+| `eval` | 272 | `program` runs as a file, with `input` (or the bytes of `input_hex`) on standard input; it imports at most the library `io`; the output is exactly `output`, and the program ends with the value `value` or with an uncaught error of the `:kind` given in `error`; with `error_position`, the descriptor of that error has a `:position` whose `:line` and `:column` are the given pair, or, when `error_position` is `null`, no `:position` |
 
 An `eval` case that tests `include` (8.8) also has `files`, an object that maps each relative path, with `/` as separator, to the text of that file. The program is the file `main.nvl`, and the paths are relative to its directory. A path missing from `files` cannot be opened.
 
-The `eval` cases cover the special and derived forms, including `if` with several pairs, tail calls with one million iterations, a traversal of a list of one million elements with `empty?`, `first` and `rest` (8.6), a map of one million keys built with `associate`, persistence and `dissociate` on large maps, keys whose hashes may collide (8.6), sets: reading, literals, equality, printing, quasiquote, the primitives and a set of one million elements, 10,000 nested non-tail calls and `:stack-overflow`, equality, arithmetic and overflows, primitives, `read-line!` with invalid UTF-8, printing (including `display!` of strings inside collections), `catch` and `raise`, the positions in errors (8.5), both callback patterns, `include` with and without prefixes, and `import` (8.9). Some cases check that what was removed from the core does not exist: `/`, `same?`, named `lambda`, the names without `!`, the standard library functions without `import`, and the `io` functions without `import`. The library has its own cases, in the file `stdlib-conformance.json`.
+The `eval` cases cover the special and derived forms, including `if` with several pairs and `match`, tail calls with one million iterations, a traversal of a list of one million elements with `empty?`, `first` and `rest` (8.6), a map of one million keys built with `associate`, persistence and `dissociate` on large maps, keys whose hashes may collide (8.6), sets: reading, literals, equality, printing, quasiquote, the primitives and a set of one million elements, 10,000 nested non-tail calls and `:stack-overflow`, equality, arithmetic and overflows, primitives, `read-line!` with invalid UTF-8, printing (including `display!` of strings inside collections), `catch` and `raise`, the positions in errors (8.5), both callback patterns, `include` with and without prefixes, and `import` (8.9). Some cases check that what was removed from the core does not exist: `/`, `same?`, named `lambda`, the names without `!`, the standard library functions without `import`, and the `io` functions without `import`. The library has its own cases, in the file `stdlib-conformance.json`.
 
 **Behaviors fixed by the tests.** While writing the cases, these points needed an answer that the text above does not give yet:
 
@@ -790,4 +816,4 @@ The `eval` cases cover the special and derived forms, including `if` with severa
 - `dissociate` of a missing key returns the map unchanged.
 - A `raise` with a valid descriptor and a custom `:kind`, such as `:custom`, terminates the program with that `:kind`.
 
-Version 0.2.1 settled the remaining points in the text (see its list of changes), and the cases cover them. Version 0.3.0 added the positions in errors, version 0.4.0 the persistent maps, version 0.5.0 the type Set and version 0.6.0 the `if` with several pairs; their cases cover them too.
+Version 0.2.1 settled the remaining points in the text (see its list of changes), and the cases cover them. Version 0.3.0 added the positions in errors, version 0.4.0 the persistent maps, version 0.5.0 the type Set and version 0.6.0 the `if` with several pairs and version 0.7.0 `match`; their cases cover them too.

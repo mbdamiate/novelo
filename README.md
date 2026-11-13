@@ -1,6 +1,6 @@
 # Novelo
 
-An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.6.0) and the standard library (`standard-library.md`, v0.4.0).
+An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.7.0) and the standard library (`standard-library.md`, v0.4.0).
 
 *Novelo* is Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as Novelo's lists are. Source files end in `.nvl`.
 
@@ -8,7 +8,7 @@ Every case of both conformance suites passes:
 
 | Suite | Cases |
 | --- | --- |
-| core | 308 |
+| core | 342 |
 | stdlib | 46 |
 
 Those runs report no leaks, and they also pass under AddressSanitizer and UndefinedBehaviorSanitizer.
@@ -135,7 +135,7 @@ make examples
 1. The reader turns the whole source into datums plus a position table.
 2. Each top-level form is then expanded and evaluated before the next one, so a macro applies to the forms that follow it.
 3. The expander resolves local variables to `(depth, index)` addresses.
-4. It also reduces the derived forms (`let`, `sequence`, `and`, `or`, `quasiquote`) and macro calls to a few node kinds.
+4. It also reduces the derived forms (`let`, `sequence`, `and`, `or`, `quasiquote`, `match`) and macro calls to a few node kinds. `match` is rewritten into a `let` of the subject and a chain of `if`s whose tests call primitive values embedded in the code, so redefining `first` or `get` cannot change what a pattern means.
 5. Globals are looked up when a call happens, so the order of definitions does not matter.
 
 **Memory: reference counting, no tracing collector.**

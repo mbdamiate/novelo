@@ -511,6 +511,25 @@ static const LispNativeFunction primitives[] = {
     {"catch", 2, 2, primitive_catch},
 };
 
+/* §8.3 — the error of a match that no pattern matches. Not in the table:
+ * only match uses it. */
+PRIMITIVE(no_match) {
+    (void)argument_count;
+    return lisp_error(state, "no-match", LISP_LIST(arguments[0]), "no pattern matches the value");
+}
+
+Value *lisp_primitive_value(const char *name) {
+    for (size_t index = 0; index < sizeof primitives / sizeof primitives[0]; index++) {
+        const LispNativeFunction *entry = &primitives[index];
+        if (strcmp(entry->name, name) == 0) {
+            return lisp_primitive(entry->name, entry->minimum_arguments, entry->maximum_arguments, entry->function);
+        }
+    }
+    return nullptr;
+}
+
+Value *lisp_no_match_primitive(void) { return lisp_primitive("no-match", 1, 1, primitive_no_match); }
+
 void lisp_install_primitives(LispState *state) {
     for (size_t index = 0; index < sizeof primitives / sizeof primitives[0]; index++) {
         const LispNativeFunction *entry = &primitives[index];

@@ -36,21 +36,26 @@
       (if (void? line) counts
           otherwise (read-counts! (fold count-word counts (words line)))))))
 
-; `entries` turns the map into a list of (word count) lists. Taking the parts
-; of an entry apart needs first and rest by hand.
-(define entry-word (lambda (entry) (first entry)))
-(define entry-count (lambda (entry) (first (rest entry))))
+; `entries` turns the map into a list of (word count) lists. `match` takes an
+; entry apart: the pattern (word count) matches a list of two elements and
+; names them. `_` matches a part without naming it.
+(define more-frequent?
+  (lambda (a b)
+    (match (list a b)
+      ((_ count-a) (_ count-b)) (> count-a count-b))))
 
 ; Most frequent first. The library's merge sort is stable, so words with the
 ; same count keep the order in which they first appeared.
 (define ranked
   (lambda (counts)
-    (sort (lambda (a b) (> (entry-count a) (entry-count b)))
-          (entries counts))))
+    (sort more-frequent? (entries counts))))
 
+; Inside the result, `count` is the entry's count: a name bound by a
+; pattern hides a global of the same name, here the primitive `count`.
 (define show!
   (lambda (entry)
-    (display! (concatenate (to-string (entry-count entry)) " " (entry-word entry) "\n"))))
+    (match entry
+      (word count) (display! (concatenate (to-string count) " " word "\n")))))
 
 ; Prints each entry; `fold` is used only to walk the list in order.
 (define show-all!
