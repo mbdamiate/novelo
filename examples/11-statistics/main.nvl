@@ -1,0 +1,109 @@
+; Statistics over measurements.
+;
+; Reads one temperature in degrees Celsius per line and prints how many
+; there are, the lowest and highest, the mean and the standard deviation,
+; then the mean in Fahrenheit. Blank lines are skipped, and a line that is
+; not a number is reported and left out.
+;
+;   build/novelo examples/11-statistics/main.nvl < examples/11-statistics/input.txt
+
+(import io)
+(import list)      ; fold, map, reverse
+(import number)    ; max, min, round
+(import text t)    ; t/join
+
+; ---- two kinds of numbers ---------------------------------------------------
+
+; A number written with a point, such as 21.5, is a Float; one without, such
+; as 21, is an Integer. They never mix: (+ 21 0.5) is the error :wrong-type.
+; A Float can lose precision and an Integer cannot, so the language makes
+; every crossing explicit, with `integer-to-float` one way and `truncate`,
+; `floor`, `ceiling` or `round` the other.
+;
+; Floats are binary fractions, so most decimals are only approximated:
+; (+ 0.1 0.2) prints 0.30000000000000004. The printer shows the shortest
+; digits that read back as the same Float, which is why 0.1 alone prints 0.1.
+
+; ---- reading ------------------------------------------------------------------
+
+; `string-to-number` reads a whole line as the reader would read a literal:
+; "21.5" gives the Float 21.5, "20" the Integer 20, and "warm" #void. Every
+; measurement here is a Float, so an Integer line becomes one too.
+(define measurement
+  (lambda (line)
+    (let ((number (string-to-number line)))
+      (if (float? number) number
+          (integer? number) (integer-to-float number)
+          otherwise #void))))
+
+; Collects the measurements, newest first, and complains about bad lines
+; on the way. `prepend` builds the list backwards; the end of the program
+; reverses it into reading order.
+(define read-measurements!
+  (lambda (collected)
+    (let ((line (read-line!)))
+      (if (void? line) collected
+          (empty? line) (read-measurements! collected)
+          otherwise
+          (let ((number (measurement line)))
+            (if (void? number)
+                (sequence
+                  (display! (concatenate "skipped: \"" line "\" is not a number\n"))
+                  (read-measurements! collected))
+                otherwise (read-measurements! (prepend number collected))))))))
+
+; ---- statistics -----------------------------------------------------------------
+
+; The sum starts from 0.0, not 0: `fold` adds every Float to it, and the
+; Integer 0 would be a mix. Each addition rounds to the nearest Float, and
+; the errors add up: these temperatures sum to 174.7 exactly, but the
+; running sum ends at 174.70000000000002, so the mean prints as
+; 21.837500000000002 instead of 21.8375.
+(define sum (lambda (numbers) (fold + 0.0 numbers)))
+
+; `count` is an Integer, so it crosses over before the division. `/` divides
+; Floats only; Integers are divided with `quotient`.
+(define mean
+  (lambda (numbers)
+    (/ (sum numbers) (integer-to-float (count numbers)))))
+
+; The standard deviation: the square root of the mean of the squared
+; distances from the mean. `sqrt` takes a Float.
+(define deviation
+  (lambda (numbers)
+    (let ((center (mean numbers)))
+      (sqrt (mean (map (lambda (x) (* (- x center) (- x center))) numbers))))))
+
+; ---- presenting -------------------------------------------------------------------
+
+; There is no way yet to print a Float with a fixed number of decimals. This
+; rounds to two: the deviation 2.249965277509856 times 100 rounds to the
+; Integer 225, which divided by 100.0 is 2.25. Trailing zeros still disappear, since
+; 20.10 and 20.1 are the same Float.
+(define two-decimals
+  (lambda (x)
+    (/ (integer-to-float (round (* x 100.0))) 100.0)))
+
+; Fahrenheit is Celsius times 1.8 plus 32. The constants are written 1.8 and
+; 32.0, because 32 would be an Integer.
+(define fahrenheit (lambda (celsius) (+ (* celsius 1.8) 32.0)))
+
+(define line
+  (lambda (label value)
+    (concatenate label ": " (to-string value) "\n")))
+
+(define report
+  (lambda (numbers)
+    (let ((center (mean numbers)))
+      (t/join "" (list (line "count" (count numbers))
+                       (line "lowest" (apply min numbers))
+                       (line "highest" (apply max numbers))
+                       (line "mean" center)
+                       (line "mean, two decimals" (two-decimals center))
+                       (line "mean, whole degrees" (round center))
+                       (line "deviation" (two-decimals (deviation numbers)))
+                       (line "mean in Fahrenheit" (two-decimals (fahrenheit center))))))))
+
+(define numbers (reverse (read-measurements! ())))
+(if (empty? numbers) (display! "no measurements\n")
+    otherwise (display! (report numbers)))
