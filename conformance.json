@@ -1,5 +1,5 @@
 {
-  "spec": "Core Specification — Novelo, version 0.10.1",
+  "spec": "Core Specification — Novelo, version 0.11.0",
   "format": {
     "read": "Read 'input' (UTF-8). With 'equivalent': also read that text and compare the two datum sequences with equal?. With 'types': the sequence read has exactly these types, in order.",
     "read-error": "Read 'input' (or the bytes of 'input_hex'). Reading MUST fail with the code 'error' at position [line, column].",
@@ -4218,7 +4218,7 @@
       "kind": "eval",
       "section": "8.2",
       "program": "(let ((1 2)) 1)",
-      "error": ":expansion-error",
+      "error": ":no-match",
       "output": ""
     },
     {
@@ -4354,6 +4354,158 @@
       "kind": "eval",
       "section": "8.8",
       "program": "(include \"a.nvl\" \"prefix\")",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-276",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(let (((a b) (list 1 2)) (c (+ a b)) ({:k k} {:k 9})) (list a b c k))",
+      "value": "(1 2 3 9)",
+      "output": ""
+    },
+    {
+      "id": "eval-277",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(import io)\n(let ((_ (display! \"side\")) ((x &rest xs) '(1 2 3))) (list x xs))",
+      "value": "(1 (2 3))",
+      "output": "side"
+    },
+    {
+      "id": "eval-278",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(define pair (list 1))\n(let (((a b) pair)) a)",
+      "error": ":no-match",
+      "error_position": [
+        2,
+        1
+      ],
+      "output": ""
+    },
+    {
+      "id": "eval-279",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(catch (lambda () (let (((a b) (list 1))) a)) (lambda (e) (get e :values)))",
+      "value": "((1))",
+      "output": ""
+    },
+    {
+      "id": "eval-280",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(let ((1 1) (:k :k) (\"s\" \"s\") (() ())) :ok)",
+      "value": ":ok",
+      "output": ""
+    },
+    {
+      "id": "eval-281",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(let ((x 1) ((y) (list x)) (x 5)) (list x y))",
+      "value": "(5 1)",
+      "output": ""
+    },
+    {
+      "id": "eval-282",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(let (('a 'a) ({:p {:line l}} {:p {:line 3} :q 4})) l)",
+      "value": "3",
+      "output": ""
+    },
+    {
+      "id": "eval-283",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(let ((_ 1)) _)",
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "eval-284",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(let (((a) (first ()))) a)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "eval-285",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(let ((first 0) (rest 0) (empty? 0)) (let (((a b) (list 7 8))) (+ a b)))",
+      "value": "15",
+      "output": ""
+    },
+    {
+      "id": "eval-286",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(define loop (lambda (n total) (let (((left sum) (list n total))) (if (= left 0) sum otherwise (loop (- left 1) (+ sum 1))))))\n(loop 1000000 0)",
+      "value": "1000000",
+      "output": ""
+    },
+    {
+      "id": "eval-287",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(let ((otherwise 1)) otherwise)",
+      "value": "1",
+      "output": ""
+    },
+    {
+      "id": "eval-288",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(let (((a a) (list 1 1))) a)",
+      "error": ":expansion-error",
+      "error_position": [
+        1,
+        1
+      ],
+      "output": ""
+    },
+    {
+      "id": "eval-289",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(let ((#{1} #{1})) 1)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-290",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(let (((otherwise) (list 1))) 1)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-291",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(let (((a &rest) (list 1))) a)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-292",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(let (((a b))) a)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-293",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(let (((a) (list 1)) (b (let))) a)",
       "error": ":expansion-error",
       "output": ""
     }

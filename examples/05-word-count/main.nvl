@@ -53,17 +53,18 @@
       (if (void? line) counts
           otherwise (read-counts! (fold count-word counts (words line)))))))
 
-; `entries` turns the map into a list of (word count) lists. `match` takes
-; two entries apart at once: the pattern ((word-a count-a) (word-b count-b))
-; matches a list of two lists of two elements and names all four parts.
+; `entries` turns the map into a list of (word count) lists. A `let`
+; binding may be a pattern instead of a name, which takes a value apart:
+; (word-a count-a) matches a list of two elements and names both. A value
+; of another shape would be the error :no-match.
 ;
 ; The higher count comes first; on equal counts, `t/precedes?` puts the
 ; words in order. It compares code points, which for lowercase ASCII letters
 ; is alphabetical order.
 (define comes-before?
   (lambda (a b)
-    (match (list a b)
-      ((word-a count-a) (word-b count-b))
+    (let (((word-a count-a) a)
+          ((word-b count-b) b))
       (if (> count-a count-b) #true
           (< count-a count-b) #false
           otherwise (t/precedes? word-a word-b)))))
@@ -74,13 +75,13 @@
 
 ; One line of the report: the word, filled with spaces up to `width`
 ; characters by `t/pad-right`, then the count. `t/format` puts each value
-; into the template at a `{}`. Inside the result, `count` is the entry's
+; into the template at a `{}`. Inside the `let`, `count` is the entry's
 ; count: a name bound by a pattern hides a global of the same name, here the
 ; primitive `count`.
 (define report-line
   (lambda (width entry)
-    (match entry
-      (word count) (t/format "{} {}\n" (t/pad-right width " " word) count))))
+    (let (((word count) entry))
+      (t/format "{} {}\n" (t/pad-right width " " word) count))))
 
 ; The column of counts starts after the longest word shown. `max` takes its
 ; arguments one by one, so the list of lengths goes through `apply`; it needs

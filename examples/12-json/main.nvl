@@ -15,7 +15,9 @@
 ; `match` (04, 05), errors (07), the text library (10, 11).
 ;
 ; Writing it showed where the language is still awkward; the notes marked
-; "friction" say where, and they choose the next extension.
+; "friction" say where, and they choose the next extension. The first one
+; it found, naming the parts of a result, became the patterns of `let`
+; (core 0.11.0).
 
 (import io)
 (import list)      ; any?, fold, map, reverse, take
@@ -79,12 +81,14 @@
           otherwise (fail (concatenate "expected " expected) text)))))
 
 ; An object is a key, a colon and a value, then a comma and another, or the
-; closing brace. Each step needs the value and the rest the step before
-; returned, so each step is a `match` inside the one before.
+; closing brace. Each step starts where the step before stopped, so each
+; needs both parts of the result before it.
 ;
-; Friction: four levels of `match` only to name the two parts of a result.
-; A `let` that took a pattern, (let (((key after-key) (parse-value text)))
-; …), would read in a straight line.
+; A `let` binding takes a pattern, as `match` does: (key after-key) names
+; the two elements of the list `parse-key` returns. The bindings are
+; sequential, so the next one already sees `after-key`. A result of another
+; shape would be the error :no-match; here every parse function returns a
+; pair or raises :json.
 ;
 ; A key that appears twice keeps its last value, as most JSON readers do.
 (define parse-object
@@ -92,18 +96,20 @@
     (match text
       ("}" &rest more) (list object more)
       otherwise
-      (match (parse-value text)
-        (key after-key)
-        (if (not (string? key)) (fail "expected a string as the key" text)
-            otherwise
-            (match (parse-value (expect ":" after-key))
-              (value after-value)
-              (let ((object (associate object key value))
-                    (after (skip-space after-value)))
-                (match after
-                  ("," &rest more) (parse-object (skip-space more) object)
-                  ("}" &rest more) (list object more)
-                  otherwise (fail "expected , or }" after)))))))))
+      (let (((key after-key) (parse-key text))
+            ((value after-value) (parse-value (expect ":" after-key)))
+            (object (associate object key value))
+            (after (skip-space after-value)))
+        (match after
+          ("," &rest more) (parse-object (skip-space more) object)
+          ("}" &rest more) (list object more)
+          otherwise (fail "expected , or }" after))))))
+
+(define parse-key
+  (lambda (text)
+    (match text
+      ("\"" &rest more) (parse-string more ())
+      otherwise (fail "expected a string as the key" text))))
 
 ; The elements are gathered newest first, then reversed once at the end.
 (define parse-array
@@ -111,14 +117,13 @@
     (match text
       ("]" &rest more) (list (reverse elements) more)
       otherwise
-      (match (parse-value text)
-        (value after-value)
-        (let ((after (skip-space after-value))
-              (elements (prepend value elements)))
-          (match after
-            ("," &rest more) (parse-array (skip-space more) elements)
-            ("]" &rest more) (list (reverse elements) more)
-            otherwise (fail "expected , or ]" after)))))))
+      (let (((value after-value) (parse-value text))
+            (elements (prepend value elements))
+            (after (skip-space after-value)))
+        (match after
+          ("," &rest more) (parse-array (skip-space more) elements)
+          ("]" &rest more) (list (reverse elements) more)
+          otherwise (fail "expected , or ]" after))))))
 
 ; ---- strings ------------------------------------------------------------------
 
@@ -255,10 +260,10 @@
 ; A line holds one value and nothing after it but spaces.
 (define parse
   (lambda (line)
-    (match (parse-value (characters line))
-      (value more)
-      (if (empty? (skip-space more)) value
-          otherwise (fail "text after the value" (skip-space more))))))
+    (let (((value after) (parse-value (characters line)))
+          (after (skip-space after)))
+      (if (empty? after) value
+          otherwise (fail "text after the value" after)))))
 
 ; ---- printing JSON --------------------------------------------------------------
 
@@ -355,14 +360,11 @@
 (define record
   (lambda (state number line)
     (catch (lambda ()
-             (match (order-total (parse line))
-               (customer item-count total)
-               (sequence
-                 (display! (t/format "{}: {}, {} {}, {}\n" number (json-string customer) item-count
-                                     (if (= item-count 1) "item" otherwise "items") (float-to-fixed total 2)))
-                 (associate state :totals
-                            (associate (get state :totals) customer
-                                       (+ total (get (get state :totals) customer 0.0)))))))
+             (let (((customer item-count total) (order-total (parse line)))
+                   (totals (get state :totals)))
+               (display! (t/format "{}: {}, {} {}, {}\n" number (json-string customer) item-count
+                                   (if (= item-count 1) "item" otherwise "items") (float-to-fixed total 2)))
+               (associate state :totals (associate totals customer (+ total (get totals customer 0.0))))))
            (lambda (problem)
              (sequence
                (display! (t/format "{}: rejected, {}\n" number (reason problem line)))

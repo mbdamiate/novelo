@@ -282,8 +282,15 @@ static Value *apply_node(Value *operator_node, size_t argument_count, Value *con
     return node;
 }
 
+static Value *expand_match(LispState *state, Value *form, const Scope *scope, Value *context);
+static const char *pattern_problem(Value *pattern);
+
 /* (let ((x v) more …) body …) ≡ ((lambda (x) (let (more …) body …)) v)
- * When `more` is empty, the inner let is just the body. */
+ * When `more` is empty, the inner let is just the body.
+ *
+ * core 0.11.0 — any other pattern, `_` included, takes the value apart as
+ * match does: (let ((p v) more …) body …) ≡ (match v p (let (more …) body …)),
+ * so a value that does not match is :no-match. */
 static Value *expand_let_bindings(LispState *state, Value *bindings, Value *body, const Scope *scope,
                                   Value *context, Value *whole) {
     if (bindings == LISP_EMPTY) { /* (let () body …) ≡ ((lambda () body …)) */
@@ -292,11 +299,23 @@ static Value *expand_let_bindings(LispState *state, Value *bindings, Value *body
         return lambda ? apply_node(lambda, 0, nullptr) : nullptr;
     }
     Value *binding = lisp_first(bindings);
-    if (binding->kind != LISP_KIND_PAIR || lisp_list_length(binding) != 2
-        || lisp_first(binding)->kind != LISP_KIND_SYMBOL) {
-        return lisp_expansion_error(state, whole, "each let binding must be (name value)");
+    if (binding->kind != LISP_KIND_PAIR || lisp_list_length(binding) != 2) {
+        return lisp_expansion_error(state, whole, "each let binding must be (pattern value)");
     }
     Value *name = lisp_first(binding);
+    if (name->kind != LISP_KIND_SYMBOL || name == lisp_symbols()->wildcard) {
+        /* checked here, so that an invalid pattern names the let, not its rewrite */
+        const char *problem = pattern_problem(name);
+        if (problem) return lisp_expansion_error(state, whole, problem);
+        const LispSymbols *symbols = lisp_symbols();
+        Value *inner_let = lisp_prepend_take(lisp_retain(symbols->let),
+                                             lisp_prepend_take(lisp_retain(lisp_rest(bindings)), lisp_retain(body)));
+        Value *rewritten = LISP_LIST(symbols->match, element(binding, 1), name, inner_let);
+        Value *node = expand_match(state, rewritten, scope, context);
+        lisp_release(rewritten);
+        lisp_release(inner_let);
+        return node;
+    }
     Value *value_node = expand(state, element(binding, 1), scope, context);
     if (!value_node) return nullptr;
 
@@ -322,7 +341,7 @@ static Value *expand_let_bindings(LispState *state, Value *bindings, Value *body
 
 static Value *expand_let(LispState *state, Value *form, const Scope *scope, Value *context) {
     if (lisp_list_length(form) < 3 || !lisp_is_list(element(form, 1))) {
-        return lisp_expansion_error(state, form, "let must be (let ((name value) …) body …)");
+        return lisp_expansion_error(state, form, "let must be (let ((pattern value) …) body …)");
     }
     return expand_let_bindings(state, element(form, 1), lisp_rest(lisp_rest(form)), scope, context, form);
 }
@@ -515,6 +534,21 @@ static const char *walk_pattern(MatchWalk *walk, Value *pattern, Value *access) 
         add_literal_test(walk, pattern, access);
         return nullptr;
     }
+}
+
+/* Why a pattern is invalid, or nullptr. */
+static const char *pattern_problem(Value *pattern) {
+    MatchPrimitives primitives;
+    match_primitives_init(&primitives);
+    MatchWalk walk = {.primitives = &primitives, .names = LISP_EMPTY};
+    lisp_list_builder_init(&walk.tests);
+    lisp_list_builder_init(&walk.bindings);
+    const char *problem = walk_pattern(&walk, pattern, lisp_symbols()->wildcard);
+    lisp_release(walk.names);
+    lisp_list_builder_discard(&walk.tests);
+    lisp_list_builder_discard(&walk.bindings);
+    match_primitives_release(&primitives);
+    return problem;
 }
 
 /* One pattern and its result, with `otherwise_branch` for when it fails.

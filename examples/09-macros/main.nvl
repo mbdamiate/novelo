@@ -58,8 +58,7 @@
   (lambda (&rest clauses)
     (if (empty? clauses) #void
         otherwise
-        (let ((test (first (first clauses)))
-              (result (first (rest (first clauses)))))
+        (let (((test result) (first clauses)))
           (if (equal? test 'otherwise) result
               otherwise `(if ,test ,result otherwise (cond ,@(rest clauses))))))))
 
