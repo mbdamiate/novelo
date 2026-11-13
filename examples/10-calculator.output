@@ -1,0 +1,11 @@
+3 4 +  →  7
+5 1 2 + 4 * + 3 -  →  14
+2 3 4 * + dup *  →  196
+10 3 /  →  3
+10 3 %  →  1
+1 2 swap -  →  1
+-3 4 *  →  -12
+7 0 /  →  error: quotient: division by zero
+1 +  →  error: not enough values for an operator (1)
+2 x  →  error: unknown word x
+1 2  →  error: expected one value at the end, found (2 1)
