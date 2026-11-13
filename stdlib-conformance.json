@@ -1,5 +1,5 @@
 {
-  "spec": "Standard Library — Novelo, version 0.8.0",
+  "spec": "Standard Library — Novelo, version 0.9.0",
   "format": {
     "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text, function, map, set and number available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
   },
@@ -885,6 +885,70 @@
       "section": "4.6",
       "program": "(import number n)\n(list (n/digits-to-integer (n/integer-to-digits 3000 36) 36) (n/integer-to-digits (n/digits-to-integer \"DeadBeef\" 16) 16))",
       "value": "(3000 \"deadbeef\")",
+      "output": ""
+    },
+    {
+      "id": "library-111",
+      "kind": "eval",
+      "section": "4.1",
+      "program": "(import list)\n(list (span (lambda (n) (< n 5)) '(1 3 5 2)) (span (lambda (n) (< n 5)) ()) (span (lambda (n) #true) '(1 2)) (span (lambda (n) #false) '(1 2)))",
+      "value": "(((1 3) (5 2)) (() ()) ((1 2) ()) (() (1 2)))",
+      "output": ""
+    },
+    {
+      "id": "library-112",
+      "kind": "eval",
+      "section": "4.1",
+      "program": "(import io)\n(import list)\n(span (lambda (n) (sequence (display! (to-string n)) (< n 3))) '(1 2 3 4 5))",
+      "value": "((1 2) (3 4 5))",
+      "output": "123"
+    },
+    {
+      "id": "library-113",
+      "kind": "eval",
+      "section": "4.1",
+      "program": "(import list)\n(import text)\n(let (((digits after) (span digit? (characters \"42+x\"))))\n  (list (string-to-number (apply concatenate digits)) after))",
+      "value": "(42 (\"+\" \"x\"))",
+      "output": ""
+    },
+    {
+      "id": "library-114",
+      "kind": "eval",
+      "section": "4.1",
+      "program": "(import list)\n(span (lambda (n) (< n 5)) 7)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-115",
+      "kind": "eval",
+      "section": "4.1",
+      "program": "(import list)\n(list (zip '(1 2 3) '(:a :b :c)) (zip '(1 2 3) '(:a :b)) (zip '(1) '(:a :b)) (zip () '(1)) (zip '(1) ()))",
+      "value": "(((1 :a) (2 :b) (3 :c)) ((1 :a) (2 :b)) ((1 :a)) () ())",
+      "output": ""
+    },
+    {
+      "id": "library-116",
+      "kind": "eval",
+      "section": "4.1",
+      "program": "(import map)\n(from-entries (zip '(\"w\" \"h\") '(3 4)))",
+      "value": "{\"w\" 3 \"h\" 4}",
+      "output": ""
+    },
+    {
+      "id": "library-117",
+      "kind": "eval",
+      "section": "4.1",
+      "program": "(import list)\n(zip '(1 2) \"ab\")",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-118",
+      "kind": "eval",
+      "section": "4.1",
+      "program": "(import list)\n(let ((numbers (range 0 100000))\n      ((small large) (span (lambda (n) (< n 60000)) numbers))\n      (pairs (zip numbers (rest numbers))))\n  (list (count small) (first large) (count pairs) (first pairs) (fold (lambda (total pair) (+ total (- (first (rest pair)) (first pair)))) 0 pairs)))",
+      "value": "(60000 60000 99999 (0 1) 99999)",
       "output": ""
     }
   ]

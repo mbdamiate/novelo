@@ -16,10 +16,11 @@
 ; evaluator turns a tree into a value. A fourth step prints a tree back as
 ; text, with only the parentheses it needs.
 ;
-; The notes marked "friction" say where the language is still awkward.
+; The notes marked "friction" say where the language was awkward, and what
+; changed it, or where it still is.
 
 (import io)
-(import list)      ; any?, every?, filter, fold, map, reverse, sort
+(import list)      ; any?, filter, map, reverse, sort, span, zip
 (import text t)    ; t/characters, t/digit?, t/join, t/letter?, t/pad-left, t/precedes?
 (import map)       ; from-entries, merge
 
@@ -47,21 +48,13 @@
   (lambda (character)
     (or (t/digit? character) (equal? character "."))))
 
-; The characters at the front of a list that satisfy keep?, and the rest.
+; A number or a name is a run of characters: `span` splits the list where
+; they stop, and a `let` pattern names the run and what follows it.
 ;
-; Friction: the library list has take and drop by count, and filter over
+; Friction: the library list had take and drop by count, and filter over
 ; the whole list, but nothing that splits a list where a test stops
-; holding. The tokenizer needs it twice.
-(define span
-  (lambda (keep? elements)
-    (span-step keep? elements ())))
-
-(define span-step
-  (lambda (keep? elements taken)
-    (if (and (not (empty? elements)) (keep? (first elements)))
-        (span-step keep? (rest elements) (prepend (first elements) taken))
-        otherwise (list (reverse taken) elements))))
-
+; holding; the tokenizer needed it twice. It became `span` of the library
+; list (stdlib 0.9.0).
 (define tokenize
   (lambda (characters column tokens)
     (match characters
@@ -336,17 +329,9 @@
                             scope column))))))
 
 ; Friction: binding each parameter to its argument needs the two lists
-; side by side, and the library list has no function that walks two lists
-; at once; `pairs` does it here.
-(define pairs
-  (lambda (lefts rights)
-    (reverse (pairs-step lefts rights ()))))
-
-(define pairs-step
-  (lambda (lefts rights gathered)
-    (if (or (empty? lefts) (empty? rights)) gathered
-        otherwise (pairs-step (rest lefts) (rest rights) (prepend (list (first lefts) (first rights)) gathered)))))
-
+; side by side, and the library list had no function that walks two lists
+; at once; it became `zip` of the library list (stdlib 0.9.0), whose pairs
+; are what `from-entries` takes.
 (define call
   (lambda (function name values scope column)
     (let (({:parameters parameters :tree tree} function))
@@ -354,7 +339,7 @@
           (fail (t/format "{} takes {} arguments, given {}" name (count parameters) (count values)) column)
           otherwise
           (evaluate tree (associate scope :variables
-                                    (merge (get scope :variables) (from-entries (pairs parameters values)))))))))
+                                    (merge (get scope :variables) (from-entries (zip parameters values)))))))))
 
 ; ---- statements ---------------------------------------------------------------------
 
@@ -424,16 +409,14 @@
   (lambda (table)
     (sort t/precedes? (keys table))))
 
-; Each list is printed one name to a line, under its title.
-;
-; Friction: printing each name is done for its effect alone, but the
-; library list only has `map`, which also builds a list of the results,
-; thrown away here.
+; Each list is printed one name to a line, under its title. The lines are
+; built first and joined, then printed at once: the effect stays at the
+; edge of the program, as everywhere else in it.
 (define list-names
   (lambda (title table describe-entry)
-    (display! (concatenate "\n" title ":\n"))
-    (map (lambda (name) (display! (concatenate "  " (describe-entry name (get table name)) "\n")))
-         (sorted-names table))))
+    (display! (concatenate "\n" title ":\n"
+                           (t/join "" (map (lambda (name) (concatenate "  " (describe-entry name (get table name)) "\n"))
+                                           (sorted-names table)))))))
 
 (list-names "variables" (get scope :variables) (lambda (name value) (t/format "{} = {}" name value)))
 (list-names "functions" (get scope :functions) show-function)

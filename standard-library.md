@@ -10,7 +10,9 @@ The standard library is made of six libraries, in the sense of core section 8.9:
 
 The reference definitions in section 4 are normative. The implementation MAY replace any of them with a native version, as long as the observable behavior is identical, including errors and the names each library binds.
 
-**Version:** 0.8.0, draft, on top of core 0.11.0.
+**Version:** 0.9.0, draft, on top of core 0.11.0.
+
+**Changes since 0.8.0.** Two functions in `list` that example 13-expressions, an infix calculator, had to write by hand. `span` splits a list where a test stops holding, as a tokenizer reads a run of digits; `zip` pairs the elements of two lists, as a call pairs parameters with arguments, in the shape `from-entries` takes (sections 3 and 4.1). The other functions are unchanged.
 
 **Changes since 0.7.1.** Three functions that example 12-json, a JSON parser, had to write by hand. In `text`, `characters` turns a text into the list of its characters, the form a parser walks with `match`. In `number`, `digits-to-integer` reads an Integer written in a base from 2 to 36, and `integer-to-digits` writes one, as the `\u` escapes of JSON need in base 16 (sections 3, 4.2 and 4.6). The definitions bind the first item of a `let` to `_` to check an argument, which needs the patterns of `let` of core 0.11.0. The other functions are unchanged.
 
@@ -36,7 +38,7 @@ The reference definitions in section 4 are normative. The implementation MAY rep
 - **The function comes first and the collection last**, as in `(map f xs)` and `(map-values f m)`. This makes partial application with `partial` easier. `merge` takes two maps and `update` takes the key, the function and then the map.
 - **Evaluation is eager.** Every function traverses the whole list and returns the finished result.
 - **Constant memory.** Every function that traverses a list does so by tail recursion, so lists of any size are traversed in constant memory.
-- **Helpers.** Since the core has no local recursion, some functions use helpers defined at the top level of their library: `take-step`, `range-step`, `merge-sorted`, `split-step`, `precedes-step`, `padding`, `repeat-step`, `format-step`, `check-base`, `digit-value`, `digits-step`, `letter-code-point?`, `uppercase-code-point` and `lowercase-code-point`. They are bound by `import` like the other names, but they are not part of the interface: a program should not rely on them, and a native implementation MAY omit them.
+- **Helpers.** Since the core has no local recursion, some functions use helpers defined at the top level of their library: `take-step`, `span-step`, `range-step`, `zip-step`, `merge-sorted`, `split-step`, `precedes-step`, `padding`, `repeat-step`, `format-step`, `check-base`, `digit-value`, `digits-step`, `letter-code-point?`, `uppercase-code-point` and `lowercase-code-point`. They are bound by `import` like the other names, but they are not part of the interface: a program should not rely on them, and a native implementation MAY omit them.
 - **Dependencies.** `text`, `function`, `map`, `set` and `number` import `list` (core 8.9). Importing any of them therefore also binds the names of `list` in the same context. The names of all the libraries are different, so they can be imported together without a prefix.
 - **Letters and case.** `text` knows two ranges of letters: ASCII, `A` to `Z` and `a` to `z`, and Latin-1, U+00C0 to U+00FF without U+00D7 `×` and U+00F7 `÷`, which covers the accented letters of Portuguese and the other languages of Western Europe, such as `á`, `ç`, `ê` and `õ`. `uppercase` and `lowercase` pair `A`–`Z` with `a`–`z` and U+00C0–U+00DE with U+00E0–U+00FE; `ß` (U+00DF) and `ÿ` (U+00FF) have no pair in these ranges and stay as they are. Every other character, in any script, is not a letter and keeps its case. `digit?` knows only `0` to `9`, the digits `string-to-number` reads.
 - **Order of text.** `precedes?` orders by code point, not as a dictionary does: every uppercase ASCII letter comes before every lowercase one, so `"Zebra"` precedes `"apple"`, and accented letters come after `z`. To ignore case, compare the `lowercase` of both.
@@ -51,7 +53,9 @@ The reference definitions in section 4 are normative. The implementation MAY rep
 | `list` | `fold` | `(fold f initial xs)` | combines from first to last, calling `(f accumulator element)` |
 | `list` | `append` | `(append xs ys)` | the elements of `xs` followed by those of `ys` |
 | `list` | `take`, `drop` | `(take n xs)`, `(drop n xs)` | the first `n` elements, or what remains without them; negative `n` is an error |
+| `list` | `span` | `(span keep? xs)` | a List of two lists: the elements at the front of `xs` for which `keep?` is true, and the rest, from the first element for which it is false; `keep?` is not called after that element: `(span (lambda (n) (< n 5)) '(1 3 5 2))` is `((1 3) (5 2))` |
 | `list` | `range` | `(range start end)` | the integers from `start` up to before `end`; `()` if `start` is not less than `end` |
+| `list` | `zip` | `(zip xs ys)` | List of the pairs `(x y)` of the elements of `xs` and `ys` at the same position, in order; it stops at the end of the shorter list: `(zip '(1 2 3) '(:a :b))` is `((1 :a) (2 :b))` |
 | `list` | `any?`, `every?` | `(any? matches? xs)` | `#true` if any, or all, satisfy it; they stop as soon as the answer is decided |
 | `list` | `sort` | `(sort less? xs)` | the elements ordered by `less?`, stably |
 | `text` | `split` | `(split separator text)` | List of the parts of `text`; an empty separator is an error |
@@ -136,6 +140,15 @@ The source of each library is the concatenation, in order, of the `lisp` code bl
         otherwise (if (or (= wanted 0) (empty? xs)) xs
                       otherwise (drop (- wanted 1) (rest xs))))))
 
+(define span
+  (lambda (keep? xs)
+    (span-step keep? xs ())))
+
+(define span-step
+  (lambda (keep? xs acc)
+    (if (and (not (empty? xs)) (keep? (first xs))) (span-step keep? (rest xs) (prepend (first xs) acc))
+        otherwise (list (reverse acc) xs))))
+
 (define range
   (lambda (start end)
     (range-step start end ())))
@@ -144,7 +157,18 @@ The source of each library is the concatenation, in order, of the `lisp` code bl
   (lambda (start n acc)
     (if (<= n start) acc
         otherwise (range-step start (- n 1) (prepend (- n 1) acc)))))
+
+(define zip
+  (lambda (xs ys)
+    (reverse (zip-step xs ys ()))))
+
+(define zip-step
+  (lambda (xs ys acc)
+    (if (or (empty? xs) (empty? ys)) acc
+        otherwise (zip-step (rest xs) (rest ys) (prepend (list (first xs) (first ys)) acc)))))
 ```
+
+`span` returns both parts at once, for a `let` pattern to name them (core 8.3): `(let (((digits after) (span digit? characters))) …)`. `zip` stops at the shorter list, so `(zip names (range 0 (count names)))` numbers the names; a program that needs both lists to have the same length checks their `count` first.
 
 #### Search and sorting
 
@@ -491,6 +515,6 @@ The functions build on `elements`, `adjoin`, `disjoin` and `contains?`, which ar
 
 ## 5. Conformance
 
-The file `stdlib-conformance.json` has 110 cases, in the same format as the core `eval` cases, with one difference: the libraries `list`, `text`, `function`, `map`, `set` and `number` are available to `import`. Each program imports what it uses. An implementation that provides the library MUST pass all of them, in addition to the core cases.
+The file `stdlib-conformance.json` has 118 cases, in the same format as the core `eval` cases, with one difference: the libraries `list`, `text`, `function`, `map`, `set` and `number` are available to `import`. Each program imports what it uses. An implementation that provides the library MUST pass all of them, in addition to the core cases.
 
-The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that imports a library, a traversal of one hundred thousand elements, which only passes if the functions run in constant memory, every function of `map` with its errors, a map of one hundred thousand keys built with `from-entries` and reduced with `filter-entries`, every function of `set`, sets of one hundred thousand elements, the order of `precedes?` and its stable use in `sort`, `uppercase`, `lowercase`, `letter?` and `digit?` at the edges of the ASCII and Latin-1 ranges, `pad-left` and `pad-right` with texts wider than the width, accented fills and fills of the wrong length, `format` with values of every type, braces outside `{}` and too few or too many values, `join` of a single part that is returned as it is, and `join` of two hundred thousand parts and `format` of ten thousand values, which only pass in reasonable time if they grow linearly, `max` and `min` with Integers, with Floats, with their errors and over one hundred thousand arguments, `abs`, `floor`, `ceiling` and `round` at negative numbers, `-0.0`, halfway values, Floats above 2^52 and the edges of the range of Integer, `characters` of accented letters, of characters outside the BMP and of the empty text, and its use with `match`, `digits-to-integer` and `integer-to-digits` in bases 2, 8, 10, 16 and 36, with uppercase digits, signs, texts that are not numbers, the smallest and largest Integer, overflow, every base error and a round trip in every base, and `import` itself: names unbound without it, prefixes, the dependencies of `text`, `function`, `map`, `set` and `number` on `list`, and repeated imports.
+The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that imports a library, a traversal of one hundred thousand elements, which only passes if the functions run in constant memory, every function of `map` with its errors, a map of one hundred thousand keys built with `from-entries` and reduced with `filter-entries`, every function of `set`, sets of one hundred thousand elements, the order of `precedes?` and its stable use in `sort`, `uppercase`, `lowercase`, `letter?` and `digit?` at the edges of the ASCII and Latin-1 ranges, `pad-left` and `pad-right` with texts wider than the width, accented fills and fills of the wrong length, `format` with values of every type, braces outside `{}` and too few or too many values, `join` of a single part that is returned as it is, and `join` of two hundred thousand parts and `format` of ten thousand values, which only pass in reasonable time if they grow linearly, `max` and `min` with Integers, with Floats, with their errors and over one hundred thousand arguments, `abs`, `floor`, `ceiling` and `round` at negative numbers, `-0.0`, halfway values, Floats above 2^52 and the edges of the range of Integer, `characters` of accented letters, of characters outside the BMP and of the empty text, and its use with `match`, `digits-to-integer` and `integer-to-digits` in bases 2, 8, 10, 16 and 36, with uppercase digits, signs, texts that are not numbers, the smallest and largest Integer, overflow, every base error and a round trip in every base, `span` with a test that always or never holds and a test it stops calling, and with a `let` pattern, `zip` of lists of different lengths and as the input of `from-entries`, both over one hundred thousand elements, and `import` itself: names unbound without it, prefixes, the dependencies of `text`, `function`, `map`, `set` and `number` on `list`, and repeated imports.

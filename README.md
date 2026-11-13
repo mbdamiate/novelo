@@ -1,6 +1,6 @@
 # Novelo
 
-An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.11.0) and the standard library (`standard-library.md`, v0.8.0).
+An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.11.0) and the standard library (`standard-library.md`, v0.9.0).
 
 *Novelo* is Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as Novelo's lists are. Source files end in `.nvl`.
 
@@ -9,7 +9,7 @@ Every case of both conformance suites passes:
 | Suite | Cases |
 | --- | --- |
 | core | 517 |
-| stdlib | 110 |
+| stdlib | 118 |
 
 Those runs report no leaks, and they also pass under AddressSanitizer and UndefinedBehaviorSanitizer.
 
