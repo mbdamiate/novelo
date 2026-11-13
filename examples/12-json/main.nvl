@@ -12,10 +12,11 @@
 ; what the earlier examples used: lists and `match` (04, 05), errors (07),
 ; modules (08), the text library (10, 11). This file is only about orders.
 ;
-; Writing it showed where the language is still awkward; the notes marked
-; "friction" in json.nvl say where, and they choose the next extension. The
-; first one it found, naming the parts of a result, became the patterns of
-; `let` (core 0.11.0).
+; Writing it showed where the language was awkward; the notes marked
+; "friction" in json.nvl say where. Naming the parts of a result became the
+; patterns of `let` (core 0.11.0); splitting a text into characters and
+; reading and writing hexadecimal became `characters`, `digits-to-integer`
+; and `integer-to-digits` (stdlib 0.8.0).
 
 (import io)
 (import list)      ; fold, map, reverse

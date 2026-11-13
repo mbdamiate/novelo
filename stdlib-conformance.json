@@ -1,5 +1,5 @@
 {
-  "spec": "Standard Library — Novelo, version 0.7.1",
+  "spec": "Standard Library — Novelo, version 0.8.0",
   "format": {
     "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text, function, map, set and number available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
   },
@@ -789,6 +789,102 @@
       "section": "4.2",
       "program": "(import list)\n(import text)\n(define joined (join \", \" (map to-string (range 0 200000))))\n(list (count joined) (substring joined 0 10) (count (split \", \" joined)) (count (apply format (prepend (join \"\" (map (lambda (n) \"{}\") (range 0 10000))) (range 0 10000)))))",
       "value": "(1488888 \"0, 1, 2, 3\" 200000 38890)",
+      "output": ""
+    },
+    {
+      "id": "library-099",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text)\n(list (characters \"aé\\n😀\") (characters \"\") (count (characters \"ação\")))",
+      "value": "((\"a\" \"é\" \"\\n\" \"😀\") () 4)",
+      "output": ""
+    },
+    {
+      "id": "library-100",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text)\n(match (characters \"{\\\"k\\\"}\")\n  (\"{\" &rest more) (count more)\n  otherwise 0)",
+      "value": "4",
+      "output": ""
+    },
+    {
+      "id": "library-101",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text)\n(characters 'abc)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-102",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(list (digits-to-integer \"ff\" 16) (digits-to-integer \"FF\" 16) (digits-to-integer \"-101\" 2) (digits-to-integer \"Zz\" 36) (digits-to-integer \"0777\" 8) (digits-to-integer \"-0\" 10) (digits-to-integer \"9223372036854775807\" 10))",
+      "value": "(255 255 -5 1295 511 0 9223372036854775807)",
+      "output": ""
+    },
+    {
+      "id": "library-103",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import list)\n(import number)\n(append (map (lambda (text) (digits-to-integer text 16)) (list \"\" \"-\" \"fg\" \"+1\" \" 1\" \"1 \" \"1.0\" \"é\" \"--1\" \"1-\" \"ffffffffffffffffffffg\"))\n        (list (digits-to-integer \"2\" 2) (digits-to-integer \"a\" 10) (digits-to-integer \"z\" 35)))",
+      "value": "(#void #void #void #void #void #void #void #void #void #void #void #void #void #void)",
+      "output": ""
+    },
+    {
+      "id": "library-104",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(define kind (lambda (thunk) (catch thunk (lambda (problem) (list (get problem :kind) (get problem :values))))))\n(list (digits-to-integer \"7fffffffffffffff\" 16) (digits-to-integer \"-8000000000000000\" 16) (digits-to-integer \"-1000000000000000000000000000000000000000000000000000000000000000\" 2)\n      (first (kind (lambda () (digits-to-integer \"8000000000000000\" 16)))) (first (kind (lambda () (digits-to-integer \"-8000000000000001\" 16)))))",
+      "value": "(9223372036854775807 -9223372036854775808 -9223372036854775808 :integer-overflow :integer-overflow)",
+      "output": ""
+    },
+    {
+      "id": "library-105",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(define kind (lambda (thunk) (catch thunk (lambda (problem) (list (get problem :kind) (get problem :values))))))\n(list (kind (lambda () (digits-to-integer \"1\" 37))) (kind (lambda () (digits-to-integer \"1\" 1))) (kind (lambda () (digits-to-integer \"1\" -16)))\n      (kind (lambda () (digits-to-integer \"1\" 16.0))) (kind (lambda () (digits-to-integer \"1\" \"16\"))) (first (kind (lambda () (digits-to-integer 255 16)))))",
+      "value": "((:domain-error (37)) (:domain-error (1)) (:domain-error (-16)) (:wrong-type (16.0)) (:wrong-type (\"16\")) :wrong-type)",
+      "output": ""
+    },
+    {
+      "id": "library-106",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(digits-to-integer \"10\" 37)",
+      "error": ":domain-error",
+      "output": ""
+    },
+    {
+      "id": "library-107",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(list (integer-to-digits 255 16) (integer-to-digits -5 2) (integer-to-digits 0 2) (integer-to-digits 35 36) (integer-to-digits 123 10) (integer-to-digits 9223372036854775807 16) (integer-to-digits -9223372036854775808 16) (integer-to-digits -9223372036854775808 10) (integer-to-digits -9223372036854775808 2))",
+      "value": "(\"ff\" \"-101\" \"0\" \"z\" \"123\" \"7fffffffffffffff\" \"-8000000000000000\" \"-9223372036854775808\" \"-1000000000000000000000000000000000000000000000000000000000000000\")",
+      "output": ""
+    },
+    {
+      "id": "library-108",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(define kind (lambda (thunk) (catch thunk (lambda (problem) (list (get problem :kind) (get problem :values))))))\n(list (kind (lambda () (integer-to-digits 1.5 10))) (kind (lambda () (integer-to-digits \"1\" 10))) (kind (lambda () (integer-to-digits 1 37))) (kind (lambda () (integer-to-digits 1 1))) (kind (lambda () (integer-to-digits 1 2.0))))",
+      "value": "((:wrong-type (1.5)) (:wrong-type (\"1\")) (:domain-error (37)) (:domain-error (1)) (:wrong-type (2.0)))",
+      "output": ""
+    },
+    {
+      "id": "library-109",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(every? (lambda (n) (every? (lambda (base) (= n (digits-to-integer (integer-to-digits n base) base))) (range 2 37)))\n        (append (list 9223372036854775807 -9223372036854775808 -9223372036854775807 4294967296 -4294967296) (range -1000 1000)))",
+      "value": "#true",
+      "output": ""
+    },
+    {
+      "id": "library-110",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number n)\n(list (n/digits-to-integer (n/integer-to-digits 3000 36) 36) (n/integer-to-digits (n/digits-to-integer \"DeadBeef\" 16) 16))",
+      "value": "(3000 \"deadbeef\")",
       "output": ""
     }
   ]

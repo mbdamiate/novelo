@@ -10,23 +10,20 @@
 
 (import io)        ; display!, read-line!
 (import list)      ; fold, filter, map, sort, take, ...
-(import text t)    ; t/split, t/join, t/lowercase, t/letter?, t/precedes?, ...
+(import text t)    ; t/characters, t/split, t/join, t/lowercase, t/letter?, ...
 (import map)       ; entries
 (import number)    ; max
 
 (define how-many 6)
 
-; Text is made of code points, the numbers of its characters:
-; `string-to-code-points` gives them as a list of Integers, and
-; `code-points-to-string` turns such a list back into text. Converting a
-; line once and working on the list is how a program looks at every
-; character. Here each character that is not a letter becomes a space.
-(define space 32)
-
+; `t/characters` splits a line into its characters, each a String of one
+; character, and `t/join` with "" puts them back together. Working on that
+; list is how a program looks at every character. Here each character that
+; is not a letter becomes a space.
 (define letter-or-space
-  (lambda (code-point)
-    (if (t/letter? (code-points-to-string (list code-point))) code-point
-        otherwise space)))
+  (lambda (character)
+    (if (t/letter? character) character
+        otherwise " ")))
 
 ; The words of one line: punctuation turned into spaces, everything in
 ; lowercase, split on single spaces, then the empty strings that runs of
@@ -34,7 +31,7 @@
 ; a word with an apostrophe, such as "don't", becomes "don" and "t".
 (define words
   (lambda (line)
-    (let ((letters (code-points-to-string (map letter-or-space (string-to-code-points line)))))
+    (let ((letters (t/join "" (map letter-or-space (t/characters line)))))
       (filter (lambda (word) (not (empty? word)))
               (t/split " " (t/lowercase letters))))))
 

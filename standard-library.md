@@ -10,7 +10,9 @@ The standard library is made of six libraries, in the sense of core section 8.9:
 
 The reference definitions in section 4 are normative. The implementation MAY replace any of them with a native version, as long as the observable behavior is identical, including errors and the names each library binds.
 
-**Version:** 0.7.1, draft, on top of core 0.10.1.
+**Version:** 0.8.0, draft, on top of core 0.11.0.
+
+**Changes since 0.7.1.** Three functions that example 12-json, a JSON parser, had to write by hand. In `text`, `characters` turns a text into the list of its characters, the form a parser walks with `match`. In `number`, `digits-to-integer` reads an Integer written in a base from 2 to 36, and `integer-to-digits` writes one, as the `\u` escapes of JSON need in base 16 (sections 3, 4.2 and 4.6). The definitions bind the first item of a `let` to `_` to check an argument, which needs the patterns of `let` of core 0.11.0. The other functions are unchanged.
 
 **Changes since 0.7.0.** No observable change. `join` and `format` gather their pieces and call `concatenate` once, so their time grows with the length of the result; the reference definitions of 0.7.0 copied the text built so far at every part, which took seconds to join a hundred thousand words (section 4.2).
 
@@ -34,7 +36,7 @@ The reference definitions in section 4 are normative. The implementation MAY rep
 - **The function comes first and the collection last**, as in `(map f xs)` and `(map-values f m)`. This makes partial application with `partial` easier. `merge` takes two maps and `update` takes the key, the function and then the map.
 - **Evaluation is eager.** Every function traverses the whole list and returns the finished result.
 - **Constant memory.** Every function that traverses a list does so by tail recursion, so lists of any size are traversed in constant memory.
-- **Helpers.** Since the core has no local recursion, some functions use helpers defined at the top level of their library: `take-step`, `range-step`, `merge-sorted`, `split-step`, `precedes-step`, `padding`, `repeat-step`, `format-step`, `letter-code-point?`, `uppercase-code-point` and `lowercase-code-point`. They are bound by `import` like the other names, but they are not part of the interface: a program should not rely on them, and a native implementation MAY omit them.
+- **Helpers.** Since the core has no local recursion, some functions use helpers defined at the top level of their library: `take-step`, `range-step`, `merge-sorted`, `split-step`, `precedes-step`, `padding`, `repeat-step`, `format-step`, `check-base`, `digit-value`, `digits-step`, `letter-code-point?`, `uppercase-code-point` and `lowercase-code-point`. They are bound by `import` like the other names, but they are not part of the interface: a program should not rely on them, and a native implementation MAY omit them.
 - **Dependencies.** `text`, `function`, `map`, `set` and `number` import `list` (core 8.9). Importing any of them therefore also binds the names of `list` in the same context. The names of all the libraries are different, so they can be imported together without a prefix.
 - **Letters and case.** `text` knows two ranges of letters: ASCII, `A` to `Z` and `a` to `z`, and Latin-1, U+00C0 to U+00FF without U+00D7 `×` and U+00F7 `÷`, which covers the accented letters of Portuguese and the other languages of Western Europe, such as `á`, `ç`, `ê` and `õ`. `uppercase` and `lowercase` pair `A`–`Z` with `a`–`z` and U+00C0–U+00DE with U+00E0–U+00FE; `ß` (U+00DF) and `ÿ` (U+00FF) have no pair in these ranges and stay as they are. Every other character, in any script, is not a letter and keeps its case. `digit?` knows only `0` to `9`, the digits `string-to-number` reads.
 - **Order of text.** `precedes?` orders by code point, not as a dictionary does: every uppercase ASCII letter comes before every lowercase one, so `"Zebra"` precedes `"apple"`, and accented letters come after `z`. To ignore case, compare the `lowercase` of both.
@@ -58,6 +60,7 @@ The reference definitions in section 4 are normative. The implementation MAY rep
 | `text` | `uppercase`, `lowercase` | `(uppercase text)` | `text` with each letter that has a pair in section 2 changed to the other case |
 | `text` | `pad-left`, `pad-right` | `(pad-left width fill text)` | `text` with copies of the one-character String `fill` before it, or after it, until it has `width` characters; a `text` of `width` characters or more comes back unchanged; a `fill` of another length is the error `:error` |
 | `text` | `format` | `(format template value …)` | `template` with each `{}`, from left to right, replaced by the `to-string` of the next value, so a String goes in without quotes; there is no escape, and a `{` or `}` not part of a `{}` stays as it is; a number of values different from the number of `{}` is the error `:error` |
+| `text` | `characters` | `(characters text)` | List of the characters of `text`, each a String of one code point, in order; `()` for `""` |
 | `text` | `letter?`, `digit?` | `(letter? text)` | `#true` if `text` is not empty and every one of its characters is a letter, or a digit, in the sense of section 2 |
 | `function` | `partial` | `(partial f a …)` | the function that calls `f` with `a …` before the arguments it receives |
 | `map` | `values` | `(values m)` | List of the values, in the order of `(keys m)` |
@@ -76,6 +79,8 @@ The reference definitions in section 4 are normative. The implementation MAY rep
 | `number` | `max`, `min` | `(max n …)` | the largest, or smallest, of one or more numbers, all Integers or all Floats; with no argument, `:wrong-arguments`; an argument that is not a number, or a mix of Integers and Floats, `:wrong-type`. For a list, `(apply max xs)` |
 | `number` | `abs` | `(abs n)` | the absolute value of an Integer or a Float, of the same type; `(abs -0.0)` is `0.0`, and the smallest Integer gives `:integer-overflow` |
 | `number` | `floor`, `ceiling` | `(floor x)` | the largest Integer not greater than the Float `x`, or the smallest not less than it: `(floor -2.5)` is `-3`, `(ceiling 2.1)` is `3`; an Integer gives `:wrong-type`, a result outside the range of Integer `:integer-overflow` |
+| `number` | `digits-to-integer` | `(digits-to-integer text base)` | the Integer that `text` writes in `base`, from 2 to 36, with the digits `0`–`9` and then the letters `a`–`z`, in either case, and an optional `-` before them: `(digits-to-integer "ff" 16)` is `255`, `(digits-to-integer "-101" 2)` is `-5`; a text with no digit, or with any character that is not a digit of `base`, including a `+`, a space or a point, gives `#void`, as `string-to-number` does; a value outside the range of Integer is `:integer-overflow`; a `text` that is not a String or a `base` that is not an Integer is `:wrong-type`, and an Integer outside 2 to 36 is `:domain-error`, with `:values` `(base)` |
+| `number` | `integer-to-digits` | `(integer-to-digits number base)` | the String that writes the Integer `number` in `base`, from 2 to 36, with lowercase letters, no leading zero, and `-` before a negative number: `(integer-to-digits 255 16)` is `"ff"`, `(integer-to-digits 0 2)` is `"0"`; `digits-to-integer` reads it back as `number`, for every Integer; errors as `digits-to-integer` |
 | `number` | `round` | `(round x)` | the Integer nearest to the Float `x`; exactly halfway, the one farther from zero: `(round 2.5)` is `3`, `(round -2.5)` is `-3`; errors as `floor` |
 
 There is no `find`. To get the first element that satisfies a predicate, take `first` of the `filter` result after checking that it is not empty; to only ask whether such an element exists, use `any?`. To combine from last to first, `fold` the `reverse` of the list.
@@ -205,7 +210,7 @@ The source of each library is the concatenation, in order, of the `lisp` code bl
 
 `join` gathers the parts and separators in a list and calls `concatenate` once, so its time grows with the length of the result; concatenating step by step would copy the text built so far at every part. A single part comes back as it is.
 
-The functions that look at characters convert the text to its code points once (core section 9), instead of reading it one `string-at` at a time.
+The functions that look at characters convert the text to its code points once (core section 9), instead of reading it one `string-at` at a time. `characters` gives a program the same list, with each code point back as a String of one character, which `match` compares with literals such as `"{"`.
 
 ```lisp
 (define precedes?
@@ -219,6 +224,10 @@ The functions that look at characters convert the text to its code points once (
         (< (first xs) (first ys)) #true
         (> (first xs) (first ys)) #false
         otherwise (precedes-step (rest xs) (rest ys)))))
+
+(define characters
+  (lambda (text)
+    (map (lambda (code-point) (code-points-to-string (list code-point))) (string-to-code-points text))))
 
 (define letter-code-point?
   (lambda (n)
@@ -430,8 +439,58 @@ The functions build on `elements`, `adjoin`, `disjoin` and `contains?`, which ar
             otherwise whole)))))
 ```
 
+`digits-to-integer` and `integer-to-digits` check the base with `check-base`, bound to `_` in a `let` (core 8.3) only for its error. `digit-value` gives the value of a digit's code point, and 36, a digit of no base, for any other character.
+
+`digits-to-integer` checks every digit before adding any, so a text with a character that is not a digit is `#void` even when its digits would overflow. It accumulates the value as a negative number, whose range reaches one further than the positive one, so the smallest Integer reads without overflow, and changes its sign at the end, where a positive value too large overflows.
+
+```lisp
+(define check-base
+  (lambda (name base)
+    (if (not (integer? base))
+        (raise {:kind :wrong-type :message (concatenate name ": the base must be an Integer") :values (list base)})
+        (or (< base 2) (> base 36))
+        (raise {:kind :domain-error :message (concatenate name ": the base must be from 2 to 36") :values (list base)})
+        otherwise base)))
+
+(define digit-value
+  (lambda (code-point)
+    (if (<= 48 code-point 57) (- code-point 48)
+        (<= 97 code-point 122) (- code-point 87)
+        (<= 65 code-point 90) (- code-point 55)
+        otherwise 36)))
+
+(define digits-to-integer
+  (lambda (text base)
+    (let ((code-points (string-to-code-points text))
+          (_ (check-base "digits-to-integer" base))
+          (negative? (and (not (empty? code-points)) (= (first code-points) 45)))
+          (digits (map digit-value (if negative? (rest code-points) otherwise code-points))))
+      (if (or (empty? digits) (any? (lambda (digit) (>= digit base)) digits)) #void
+          otherwise (let ((magnitude (fold (lambda (total digit) (- (* total base) digit)) 0 digits)))
+                      (if negative? magnitude otherwise (- magnitude)))))))
+```
+
+`integer-to-digits` works on the number made negative, for the same reason: `quotient` and `remainder` truncate toward zero (core section 9), so the remainder of a negative number is zero or negative, and its opposite is the last digit. `digits-step` gathers the digits from the last, so the list ends up in reading order.
+
+```lisp
+(define integer-to-digits
+  (lambda (number base)
+    (if (not (integer? number))
+        (raise {:kind :wrong-type :message "integer-to-digits: expected an Integer" :values (list number)})
+        otherwise (let ((_ (check-base "integer-to-digits" base))
+                        (digits (digits-step (if (> number 0) (- number) otherwise number) base ())))
+                    (code-points-to-string (if (< number 0) (prepend 45 digits) otherwise digits))))))
+
+(define digits-step
+  (lambda (negative base code-points)
+    (let ((digit (- (remainder negative base)))
+          (more (quotient negative base))
+          (gathered (prepend (if (< digit 10) (+ 48 digit) otherwise (+ 87 digit)) code-points)))
+      (if (= more 0) gathered otherwise (digits-step more base gathered)))))
+```
+
 ## 5. Conformance
 
-The file `stdlib-conformance.json` has 98 cases, in the same format as the core `eval` cases, with one difference: the libraries `list`, `text`, `function`, `map`, `set` and `number` are available to `import`. Each program imports what it uses. An implementation that provides the library MUST pass all of them, in addition to the core cases.
+The file `stdlib-conformance.json` has 110 cases, in the same format as the core `eval` cases, with one difference: the libraries `list`, `text`, `function`, `map`, `set` and `number` are available to `import`. Each program imports what it uses. An implementation that provides the library MUST pass all of them, in addition to the core cases.
 
-The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that imports a library, a traversal of one hundred thousand elements, which only passes if the functions run in constant memory, every function of `map` with its errors, a map of one hundred thousand keys built with `from-entries` and reduced with `filter-entries`, every function of `set`, sets of one hundred thousand elements, the order of `precedes?` and its stable use in `sort`, `uppercase`, `lowercase`, `letter?` and `digit?` at the edges of the ASCII and Latin-1 ranges, `pad-left` and `pad-right` with texts wider than the width, accented fills and fills of the wrong length, `format` with values of every type, braces outside `{}` and too few or too many values, `join` of a single part that is returned as it is, and `join` of two hundred thousand parts and `format` of ten thousand values, which only pass in reasonable time if they grow linearly, `max` and `min` with Integers, with Floats, with their errors and over one hundred thousand arguments, `abs`, `floor`, `ceiling` and `round` at negative numbers, `-0.0`, halfway values, Floats above 2^52 and the edges of the range of Integer, and `import` itself: names unbound without it, prefixes, the dependencies of `text`, `function`, `map`, `set` and `number` on `list`, and repeated imports.
+The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that imports a library, a traversal of one hundred thousand elements, which only passes if the functions run in constant memory, every function of `map` with its errors, a map of one hundred thousand keys built with `from-entries` and reduced with `filter-entries`, every function of `set`, sets of one hundred thousand elements, the order of `precedes?` and its stable use in `sort`, `uppercase`, `lowercase`, `letter?` and `digit?` at the edges of the ASCII and Latin-1 ranges, `pad-left` and `pad-right` with texts wider than the width, accented fills and fills of the wrong length, `format` with values of every type, braces outside `{}` and too few or too many values, `join` of a single part that is returned as it is, and `join` of two hundred thousand parts and `format` of ten thousand values, which only pass in reasonable time if they grow linearly, `max` and `min` with Integers, with Floats, with their errors and over one hundred thousand arguments, `abs`, `floor`, `ceiling` and `round` at negative numbers, `-0.0`, halfway values, Floats above 2^52 and the edges of the range of Integer, `characters` of accented letters, of characters outside the BMP and of the empty text, and its use with `match`, `digits-to-integer` and `integer-to-digits` in bases 2, 8, 10, 16 and 36, with uppercase digits, signs, texts that are not numbers, the smallest and largest Integer, overflow, every base error and a round trip in every base, and `import` itself: names unbound without it, prefixes, the dependencies of `text`, `function`, `map`, `set` and `number` on `list`, and repeated imports.

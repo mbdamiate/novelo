@@ -19,14 +19,15 @@
 20: rejected, column 43: expected a digit
 21: rejected, column 15: unpaired surrogate
 22: rejected, column 15: invalid \u escape
-23: rejected, column 15: invalid escape
-24: rejected, column 15: control character in a string
-25: rejected, column 20: unterminated string
-26: rejected, column 15: unterminated string
-27: rejected, column 14: unexpected t
-28: rejected, column 2: expected a string as the key
-29: rejected, column 34: text after the value
-30: rejected, column 13: expected a value, found the end
-31: rejected, column 13: expected :
+23: rejected, column 15: invalid \u escape
+24: rejected, column 15: invalid escape
+25: rejected, column 15: control character in a string
+26: rejected, column 20: unterminated string
+27: rejected, column 15: unterminated string
+28: rejected, column 14: unexpected t
+29: rejected, column 2: expected a string as the key
+30: rejected, column 34: text after the value
+31: rejected, column 13: expected a value, found the end
+32: rejected, column 13: expected :
 
-{"lines": 32, "rejected": [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31], "totals": {"Ana": 14.5, "Bruno \"B\"": 0.0, "Carla": 12.0, "Élis 😀!!": 3.0, "Ivo\u001b/": 0.0, "Zoe": 1.0}}
+{"lines": 33, "rejected": [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32], "totals": {"Ana": 14.5, "Bruno \"B\"": 0.0, "Carla": 12.0, "Élis 😀!!": 3.0, "Ivo\u001b/": 0.0, "Zoe": 1.0}}

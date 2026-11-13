@@ -13,22 +13,22 @@
 ;   (string text)  the text as a JSON string, quoted and escaped
 ;   (blank? text)  whether the text is only spaces
 ;
-; The notes marked "friction" say where the language is still awkward.
+; The notes marked "friction" say where the language was awkward, and what
+; changed it.
 
-(import list)      ; any?, drop, fold, map, reverse, take
-(import text t)    ; t/digit?, t/join, t/lowercase, t/pad-left, t/split
+(import list)      ; any?, drop, map, reverse, take
+(import text t)    ; t/characters, t/digit?, t/join, t/lowercase, t/pad-left, t/split
+(import number)    ; digits-to-integer, integer-to-digits
 
 ; ---- characters -------------------------------------------------------------
 
 ; The parser walks a line one character at a time. There is no character
-; type: a character is a String of length 1. The line becomes a list of
-; them, through its code points.
+; type: a character is a String of length 1, and `t/characters` turns the
+; line into a list of them.
 ;
-; Friction: every program that walks text writes this helper.
-(define characters
-  (lambda (text)
-    (map (lambda (code-point) (code-points-to-string (list code-point)))
-         (string-to-code-points text))))
+; Friction: every program that walked text wrote this helper itself, from
+; the code points of the text; it became `characters` of the library text
+; (stdlib 0.8.0).
 
 (define code-point (lambda (character) (first (string-to-code-points character))))
 
@@ -122,18 +122,18 @@
 
 (define escapes {"\"" "\"" "\\" "\\" "/" "/" "b" "\u{8}" "f" "\u{C}" "n" "\n" "r" "\r" "t" "\t"})
 
-; Friction: there is no way to read a number in another base, so the digits
-; of \u escapes go through a Map.
-(define hexadecimal-digits
-  {"0" 0 "1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6 "7" 7 "8" 8 "9" 9
-   "a" 10 "b" 11 "c" 12 "d" 13 "e" 14 "f" 15 "A" 10 "B" 11 "C" 12 "D" 13 "E" 14 "F" 15})
-
+; \u is followed by four hexadecimal digits, which `digits-to-integer`
+; reads. It would also take a sign before them, which JSON does not allow.
+;
+; Friction: there was no way to read a number in another base, so the
+; digits went through a Map of the sixteen digits in both cases; it became
+; `digits-to-integer` of the library number (stdlib 0.8.0).
 (define hexadecimal-value
   (lambda (digits text)
-    (fold (lambda (total digit)
-            (if (contains? hexadecimal-digits digit) (+ (* total 16) (get hexadecimal-digits digit))
-                otherwise (fail "invalid \\u escape" text)))
-          0 digits)))
+    (let ((value (if (equal? (first digits) "-") #void
+                     otherwise (digits-to-integer (apply concatenate digits) 16))))
+      (if (void? value) (fail "invalid \\u escape" text)
+          otherwise value))))
 
 ; \uXXXX names a UTF-16 unit. A character above U+FFFF is written as two:
 ; a high surrogate, from D800 to DBFF, then a low one, from DC00 to DFFF,
@@ -225,15 +225,18 @@
 ; reported here.
 ;
 ; Friction: a second number syntax, close to Novelo's but not the same.
+; This one stays: Novelo never writes a + sign, and a Float always has
+; digits on both sides of its point. Reading another syntax is the work of
+; its parser, and this is where it is done.
 (define novelo-number
   (lambda (number-text)
     (match (t/split "e" (t/lowercase number-text))
       (mantissa exponent)
       (concatenate mantissa
-                   (if (any? (lambda (character) (equal? character ".")) (characters mantissa)) ""
+                   (if (any? (lambda (character) (equal? character ".")) (t/characters mantissa)) ""
                        otherwise ".0")
                    "e"
-                   (match (characters exponent)
+                   (match (t/characters exponent)
                      ("+" &rest digits) (apply concatenate digits)
                      otherwise exponent))
       otherwise number-text)))
@@ -257,7 +260,7 @@
 ; is known, that becomes the column of the problem.
 (define read
   (lambda (text)
-    (let ((characters-of-text (characters text)))
+    (let ((characters-of-text (t/characters text)))
       (catch (lambda ()
                (let (((value after) (parse-value characters-of-text))
                      (after (skip-space after)))
@@ -274,30 +277,28 @@
 ; A text of spaces alone, which holds no value.
 (define blank?
   (lambda (text)
-    (empty? (skip-space (characters text)))))
+    (empty? (skip-space (t/characters text)))))
 
 ; ---- printing JSON --------------------------------------------------------------
 
-; Friction: there is no way to write a number in another base either.
-(define hexadecimal
-  (lambda (number)
-    (if (< number 16) (string-at "0123456789abcdef" number)
-        otherwise (concatenate (hexadecimal (quotient number 16)) (hexadecimal (remainder number 16))))))
-
 ; Quotes and backslashes are escaped, and so is every control character,
 ; which JSON does not allow inside a string: with a short escape when there
-; is one, as \u00XX otherwise.
+; is one, as \u00XX otherwise, with `integer-to-digits` in base 16.
+;
+; Friction: writing a number in another base was a recursion over
+; `quotient` and `remainder`; it became `integer-to-digits` of the library
+; number (stdlib 0.8.0).
 (define short-escapes {"\"" "\\\"" "\\" "\\\\" "\n" "\\n" "\r" "\\r" "\t" "\\t" "\u{8}" "\\b" "\u{C}" "\\f"})
 
 (define escape
   (lambda (character)
     (if (contains? short-escapes character) (get short-escapes character)
-        (< (code-point character) 32) (concatenate "\\u" (t/pad-left 4 "0" (hexadecimal (code-point character))))
+        (< (code-point character) 32) (concatenate "\\u" (t/pad-left 4 "0" (integer-to-digits (code-point character) 16)))
         otherwise character)))
 
 (define string
   (lambda (text)
-    (concatenate "\"" (apply concatenate (map escape (characters text))) "\"")))
+    (concatenate "\"" (apply concatenate (map escape (t/characters text))) "\"")))
 
 ; It takes the values the parser builds; anything else, such as a Map with
 ; a Keyword key, is an error.

@@ -20,6 +20,7 @@
 {"customer": "Ivo", "items": [{"price": 1e, "quantity": 1}]}
 {"customer": "\ud800A", "items": []}
 {"customer": "\u12G4", "items": []}
+{"customer": "\u-041", "items": []}
 {"customer": "\q", "items": []}
 {"customer": "	tab", "items": []}
 {"customer": "Joana
