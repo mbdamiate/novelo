@@ -1,6 +1,6 @@
 # Novelo
 
-An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.12.0) and the standard library (`standard-library.md`, v0.9.1).
+An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.13.0) and the standard library (`standard-library.md`, v0.9.1).
 
 *Novelo* is Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as Novelo's lists are. Source files end in `.nvl`.
 
@@ -8,7 +8,7 @@ Every case of both conformance suites passes:
 
 | Suite | Cases |
 | --- | --- |
-| core | 528 |
+| core | 551 |
 | stdlib | 118 |
 
 Those runs report no leaks, and they also pass under AddressSanitizer and UndefinedBehaviorSanitizer.
@@ -237,7 +237,7 @@ Most of the branches left are null checks and the other side of `assert`s.
 1. The reader turns the whole source into datums plus a position table.
 2. Each top-level form is then expanded and evaluated before the next one, so a macro applies to the forms that follow it.
 3. The expander resolves local variables to `(depth, index)` addresses.
-4. It also reduces the derived forms (`let`, `sequence`, `and`, `or`, `quasiquote`, `match`) and macro calls to a few node kinds. `match` is rewritten into a `let` of the subject and a chain of `if`s whose tests call primitive values embedded in the code, so redefining `first` or `get` cannot change what a pattern means.
+4. It also reduces the derived forms (`let`, `sequence`, `and`, `or`, `quasiquote`, `match`, `try`) and macro calls to a few node kinds. `match` is rewritten into a `let` of the subject and a chain of `if`s whose tests call primitive values embedded in the code, so redefining `first` or `get` cannot change what a pattern means. `try` is rewritten the same way, into a `catch` whose handler is a `match` on the descriptor that ends in `otherwise` and a `raise`, with `catch` and `raise` embedded as primitive values too.
 5. Globals are looked up when a call happens, so the order of definitions does not matter.
 
 **Memory: reference counting, no tracing collector.**

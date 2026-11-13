@@ -377,7 +377,7 @@ static const char *const awkward_fragments[] = {
     "\xc3", "\xc3\x28", "\xe2\x82", "\xed\xa0\x80", "\xf4\x90\x80\x80", "\xc0\xaf", "\xff", "\xfe\xff",
     "\"\\u{110000}\"", "\"\\u{D800}\"", "\"\\u{", "\"\\u{41}\"", "\"\\u{0}\"", "\"\\q\"", "\"\\", "#\\",
     "#{", "#{}", "{}", "#void", "#true", "#false", "#(", "#x", ":", "::", "'", "`", ",", ",@", "&rest",
-    "otherwise", "(quote)", "(lambda)", "(define)", "(if)", "(let)", "(match)", "(catch)", "(raise)",
+    "otherwise", "(quote)", "(lambda)", "(define)", "(if)", "(let)", "(match)", "(try)", "(catch)", "(raise)",
     "\"\xe2\x82\xac\"", "\xc2\xa0", "\xe3\x81\x82", "(import io)", "(import list)", "(import text)",
     "(include \"main.nvl\")", "(include \"missing.nvl\")",
 };

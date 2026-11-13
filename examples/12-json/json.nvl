@@ -248,8 +248,9 @@
         otherwise
         (let ((after (number-end text))
               (number-text (apply concatenate (take (- (count text) (count after)) text)))
-              (number (catch (lambda () (string-to-number (novelo-number number-text)))
-                             (lambda (problem) (fail (concatenate "number out of range: " number-text) text)))))
+              (number (try (string-to-number (novelo-number number-text))
+                        {:kind :integer-overflow} (fail (concatenate "number out of range: " number-text) text)
+                        {:kind :float-overflow} (fail (concatenate "number out of range: " number-text) text))))
           (if (void? number) (fail (concatenate "invalid number: " number-text) text)
               otherwise (list number after))))))
 
@@ -257,22 +258,19 @@
 
 ; A text holds one value and nothing after it but spaces. The parse
 ; functions count what is left when they fail; here, where the whole text
-; is known, that becomes the column of the problem.
+; is known, that becomes the column of the problem. `try` catches only the
+; :json errors; any other goes on as it is, with its own position.
 (define read
   (lambda (text)
     (let ((characters-of-text (t/characters text)))
-      (catch (lambda ()
-               (let (((value after) (parse-value characters-of-text))
-                     (after (skip-space after)))
-                 (if (empty? after) value
-                     otherwise (fail "text after the value" after))))
-             (lambda (problem)
-               (match problem
-                 {:kind :json :values (left)}
-                 (raise {:kind :json
-                         :message (get problem :message)
-                         :values (list (+ 1 (- (count characters-of-text) left)))})
-                 otherwise (raise problem)))))))
+      (try (let (((value after) (parse-value characters-of-text))
+                 (after (skip-space after)))
+             (if (empty? after) value
+                 otherwise (fail "text after the value" after)))
+        {:kind :json :message message :values (left)}
+        (raise {:kind :json
+                :message message
+                :values (list (+ 1 (- (count characters-of-text) left)))})))))
 
 ; A text of spaces alone, which holds no value.
 (define blank?

@@ -65,8 +65,9 @@
           (t/digit? character)
           (let (((digits after) (span number-character? characters))
                 (text (apply concatenate digits))
-                (value (catch (lambda () (string-to-number text))
-                              (lambda (problem) (fail (concatenate "number too large " text) column)))))
+                (value (try (string-to-number text)
+                         {:kind :integer-overflow} (fail (concatenate "number too large " text) column)
+                         {:kind :float-overflow} (fail (concatenate "number too large " text) column))))
             (if (void? value) (fail (concatenate "invalid number " text) column)
                 otherwise (tokenize after (+ column (count digits))
                                     (prepend {:kind :number :value value :column column} tokens))))
@@ -287,21 +288,17 @@
 ; Integer or a Float, or a division by zero. Those errors become problems
 ; of this language, at the column of the operator.
 ;
-; Friction: the only way to know which error happened is to catch every
-; error and look at its :kind; a :expression raised inside, by `fail`,
-; has to be passed on by hand.
-(define arithmetic-messages
-  {:integer-overflow "the result is too large"
-   :float-overflow "the result is too large"
-   :division-by-zero "division by zero"})
-
+; Friction: the only way to know which error happened was to catch every
+; error and look at its :kind, and a :expression raised inside, by `fail`,
+; had to be passed on by hand. It became `try` (core 0.13.0), which catches
+; only the kinds its patterns name; every other error, a :expression or a
+; mistake in this program, goes on by itself.
 (define arithmetic
   (lambda (compute column)
-    (catch compute
-           (lambda (problem)
-             (match problem
-               {:kind :expression} (raise problem)
-               {:kind kind} (fail (get arithmetic-messages kind (get problem :message)) column))))))
+    (try (compute)
+      {:kind :integer-overflow} (fail "the result is too large" column)
+      {:kind :float-overflow} (fail "the result is too large" column)
+      {:kind :division-by-zero} (fail "division by zero" column))))
 
 ; A scope holds the :variables and the :functions a tree can see. A
 ; function is {:parameters (name …) :tree tree}; a call evaluates its

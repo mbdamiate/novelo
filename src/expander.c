@@ -45,6 +45,7 @@ const LispSymbols *lisp_symbols(void) {
             .declare = lisp_symbol_cstr("declare"),
             .declare_type = lisp_symbol_cstr("declare-type"),
             .match = lisp_symbol_cstr("match"),
+            .try_ = lisp_symbol_cstr("try"),
             .wildcard = lisp_symbol_cstr("_"),
         };
         ready = true;
@@ -644,6 +645,65 @@ static Value *expand_match(LispState *state, Value *form, const Scope *scope, Va
     return node;
 }
 
+/* ---- try (§8.3, core 0.13.0) ------------------------------------------------------------------- */
+
+/* (try body p1 r1 p2 r2 …) is rewritten into datums and expanded again:
+ *
+ *   (catch (lambda () body)
+ *          (lambda (e) (match e p1 r1 p2 r2 … otherwise (raise e))))
+ *
+ * with `e` a generated symbol, and `catch` and `raise` the primitive values
+ * embedded as constants, so rebinding those names does not change try. */
+static Value *expand_try(LispState *state, Value *form, const Scope *scope, Value *context) {
+    size_t length = lisp_list_length(form);
+    const Value *clauses = length >= 2 ? lisp_rest(lisp_rest(form)) : LISP_EMPTY;
+    bool valid = length >= 4 && (length - 2) % 2 == 0;
+    for (const Value *rest = clauses; valid && rest->kind == LISP_KIND_PAIR; rest = lisp_rest(rest)) {
+        if (lisp_first(rest) == lisp_symbols()->otherwise) valid = false;
+    }
+    if (!valid) {
+        return lisp_expansion_error(state, form, "try must be (try body p1 r1 p2 r2 …), without otherwise");
+    }
+    /* checked here, so that an invalid pattern names the try, not its rewrite */
+    for (const Value *rest = clauses; rest->kind == LISP_KIND_PAIR; rest = lisp_rest(lisp_rest(rest))) {
+        const char *problem = pattern_problem(lisp_first(rest));
+        if (problem) return lisp_expansion_error(state, form, problem);
+    }
+
+    const LispSymbols *symbols = lisp_symbols();
+    Value *catch_primitive = lisp_primitive_value("catch");
+    Value *raise_primitive = lisp_primitive_value("raise");
+    Value *problem_name = lisp_generate_symbol();
+
+    LispListBuilder match_form;
+    lisp_list_builder_init(&match_form);
+    lisp_list_append_take(&match_form, lisp_retain(symbols->match));
+    lisp_list_append_take(&match_form, lisp_retain(problem_name));
+    for (const Value *rest = clauses; rest->kind == LISP_KIND_PAIR; rest = lisp_rest(rest)) {
+        lisp_list_append_take(&match_form, lisp_retain(lisp_first(rest)));
+    }
+    lisp_list_append_take(&match_form, lisp_retain(symbols->otherwise));
+    lisp_list_append_take(&match_form, LISP_LIST(raise_primitive, problem_name));
+    Value *match = lisp_list_builder_finish(&match_form);
+
+    Value *no_parameters = LISP_EMPTY;
+    Value *body = LISP_LIST(symbols->lambda, no_parameters, element(form, 1));
+    Value *parameters = LISP_LIST(problem_name);
+    Value *handler = LISP_LIST(symbols->lambda, parameters, match);
+    Value *rewritten = LISP_LIST(catch_primitive, body, handler);
+    Value *node = expand(state, rewritten, scope, context);
+
+    lisp_release(rewritten);
+    lisp_release(handler);
+    lisp_release(parameters);
+    lisp_release(body);
+    lisp_release(match);
+    lisp_release(problem_name);
+    lisp_release(raise_primitive);
+    lisp_release(catch_primitive);
+    return node;
+}
+
 /* ---- quasiquote (§8.3) ----------------------------------------------------------------------- */
 
 static bool is_marker_form(const Value *form, const Value *marker) {
@@ -898,6 +958,7 @@ static Value *expand_form(LispState *state, Value *form, const Scope *scope, Val
     if (head == symbols->and_) return expand_and(state, lisp_rest(form), scope, context);
     if (head == symbols->or_) return expand_or(state, lisp_rest(form), scope, context);
     if (head == symbols->match) return expand_match(state, form, scope, context);
+    if (head == symbols->try_) return expand_try(state, form, scope, context);
     if (head == symbols->quasiquote) {
         if (lisp_list_length(form) != 2) return lisp_expansion_error(state, form, "quasiquote takes one argument");
         return quasi(state, element(form, 1), 1, scope, context);

@@ -1,4 +1,4 @@
-; Errors: raising, catching, re-raising.
+; Errors: raising, catching everything, catching by kind.
 ;
 ; Reads lines of two integers and prints the quotient of each. Bad lines do
 ; not stop the program: each error is caught, described and skipped.
@@ -59,26 +59,21 @@
       (concatenate "line " (to-string line) " of the program, " (to-string kind)
                    ": " message " " (to-string values)))))
 
-; A handler can deal with one kind and pass the others on: `raise` of the
-; descriptor it received sends it, unchanged and with its position, to the
-; next `catch` outward. Here a zero divisor is not a failure: the result is
-; just "undefined". In a pattern, a literal such as :division-by-zero only
-; matches an equal value.
-(define undefined-on-zero
-  (lambda (thunk)
-    (catch thunk
-      (lambda (problem)
-        (match problem
-          {:kind :division-by-zero} "undefined"
-          otherwise (raise problem))))))
+; (try body pattern result …) catches only the errors whose descriptor
+; matches one of its patterns, the patterns of `match`; the others go on,
+; unchanged and with their position, to the next `catch` or `try` outward.
+; Its body is an expression, not a function. Here a zero divisor is not a
+; failure: the result is just "undefined". In a pattern, a literal such as
+; :division-by-zero only matches an equal value. Every other error reaches
+; the `catch` around it, which describes it.
+(define answer
+  (lambda (line)
+    (try (to-string (divide-line line))
+      {:kind :division-by-zero} "undefined")))
 
 (define report-line
   (lambda (line)
-    (concatenate
-      line " → "
-      (catch (lambda () (to-string (undefined-on-zero (lambda () (divide-line line)))))
-             (lambda (problem) (describe problem)))
-      "\n")))
+    (concatenate line " → " (catch (lambda () (answer line)) describe) "\n")))
 
 ; `read-lines!` returns every line of the input, in order, as a List of
 ; Strings; it computes nothing from them. The work on the lines is pure and
