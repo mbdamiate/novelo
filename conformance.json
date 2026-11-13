@@ -1,5 +1,5 @@
 {
-  "spec": "Core Specification — Novelo, version 0.7.0",
+  "spec": "Core Specification — Novelo, version 0.8.0",
   "format": {
     "read": "Read 'input' (UTF-8). With 'equivalent': also read that text and compare the two datum sequences with equal?. With 'types': the sequence read has exactly these types, in order.",
     "read-error": "Read 'input' (or the bytes of 'input_hex'). Reading MUST fail with the code 'error' at position [line, column].",
@@ -3064,6 +3064,126 @@
         2,
         3
       ],
+      "output": ""
+    },
+    {
+      "id": "code-point-001",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (string-to-code-points \"abc\") (string-to-code-points \"aé😀\") (string-to-code-points \"\"))",
+      "value": "((97 98 99) (97 233 128512) ())",
+      "output": ""
+    },
+    {
+      "id": "code-point-002",
+      "kind": "eval",
+      "section": "9",
+      "program": "(string-to-code-points \"a\\u{0}\\n\\u{7F}\")",
+      "value": "(97 0 10 127)",
+      "output": ""
+    },
+    {
+      "id": "code-point-003",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (code-points-to-string (list 97 233 128512)) (code-points-to-string ()) (code-points-to-string '(0 1114111)))",
+      "value": "(\"aé😀\" \"\" \"\\u{0}\\u{10FFFF}\")",
+      "output": ""
+    },
+    {
+      "id": "code-point-004",
+      "kind": "eval",
+      "section": "9",
+      "program": "(define text \"Ação ✓ 😀\")\n(list (equal? (code-points-to-string (string-to-code-points text)) text) (count (string-to-code-points text)))",
+      "value": "(#true 8)",
+      "output": ""
+    },
+    {
+      "id": "code-point-005",
+      "kind": "eval",
+      "section": "9",
+      "program": "(string-to-code-points (code-points-to-string '(55295 57344 65535 65536)))",
+      "value": "(55295 57344 65535 65536)",
+      "output": ""
+    },
+    {
+      "id": "code-point-006",
+      "kind": "eval",
+      "section": "9",
+      "program": "(code-points-to-string '(-1))",
+      "error": ":invalid-code-point",
+      "output": ""
+    },
+    {
+      "id": "code-point-007",
+      "kind": "eval",
+      "section": "9",
+      "program": "(code-points-to-string '(97 1114112))",
+      "error": ":invalid-code-point",
+      "output": ""
+    },
+    {
+      "id": "code-point-008",
+      "kind": "eval",
+      "section": "9",
+      "program": "(code-points-to-string '(55296))",
+      "error": ":invalid-code-point",
+      "output": ""
+    },
+    {
+      "id": "code-point-009",
+      "kind": "eval",
+      "section": "9",
+      "program": "(code-points-to-string '(57343))",
+      "error": ":invalid-code-point",
+      "output": ""
+    },
+    {
+      "id": "code-point-010",
+      "kind": "eval",
+      "section": "9",
+      "program": "(catch (lambda () (code-points-to-string '(97 56000 -5)))\n  (lambda (problem) (list (get problem :kind) (get problem :values))))",
+      "value": "(:invalid-code-point (56000))",
+      "output": ""
+    },
+    {
+      "id": "code-point-011",
+      "kind": "eval",
+      "section": "9",
+      "program": "(string-to-code-points 'abc)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "code-point-012",
+      "kind": "eval",
+      "section": "9",
+      "program": "(code-points-to-string \"abc\")",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "code-point-013",
+      "kind": "eval",
+      "section": "9",
+      "program": "(code-points-to-string '(97 \"b\"))",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "code-point-014",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (catch (lambda () (code-points-to-string '(\"b\" -1))) (lambda (problem) (get problem :kind)))\n      (catch (lambda () (code-points-to-string '(-1 \"b\"))) (lambda (problem) (get problem :kind))))",
+      "value": "(:wrong-type :invalid-code-point)",
+      "output": ""
+    },
+    {
+      "id": "code-point-015",
+      "kind": "eval",
+      "section": "9",
+      "program": "(define build (lambda (n acc) (if (= n 0) acc otherwise (build (- n 1) (prepend 233 acc)))))\n(define text (code-points-to-string (build 1000000 ())))\n(list (count text) (count (string-to-code-points text)))",
+      "value": "(1000000 1000000)",
       "output": ""
     }
   ]

@@ -340,6 +340,50 @@ PRIMITIVE(string_at) {
     return code_point_slice(arguments[0], (size_t)index, (size_t)index + 1);
 }
 
+/* §9 — each code point of a String, in order, as a List of Integers. */
+PRIMITIVE(string_to_code_points) {
+    (void)argument_count;
+    if (!lisp_expect_kind(state, "string-to-code-points", arguments[0], LISP_KIND_STRING, "String")) return nullptr;
+    const LispString *text = lisp_as_string(arguments[0]);
+    const unsigned char *bytes = (const unsigned char *)text->data;
+    LispListBuilder builder;
+    lisp_list_builder_init(&builder);
+    size_t position = 0;
+    uint32_t code_point;
+    while (position < text->bytes && lisp_utf8_next(bytes, text->bytes, &position, &code_point)) {
+        lisp_list_append_take(&builder, lisp_integer(code_point));
+    }
+    return lisp_list_builder_finish(&builder);
+}
+
+/* §9 — the String of a List of code points. Each element must be an
+ * Integer that is a Unicode scalar value, or :invalid-code-point. */
+PRIMITIVE(code_points_to_string) {
+    (void)argument_count;
+    if (!expect_list(state, "code-points-to-string", arguments[0])) return nullptr;
+    LispBuffer text;
+    lisp_buffer_init(&text);
+    for (const Value *rest = arguments[0]; rest->kind == LISP_KIND_PAIR; rest = lisp_rest(rest)) {
+        Value *element = lisp_first(rest);
+        if (!lisp_expect_kind(state, "code-points-to-string", element, LISP_KIND_INTEGER, "Integer")) {
+            lisp_buffer_free(&text);
+            return nullptr;
+        }
+        int64_t number = lisp_integer_value(element);
+        if (number < 0 || number > LISP_MAX_CODE_POINT || !lisp_is_scalar((uint32_t)number)) {
+            lisp_buffer_free(&text);
+            return lisp_error(state, "invalid-code-point", LISP_LIST(element),
+                              "code-points-to-string: not a Unicode scalar value");
+        }
+        unsigned char encoded[4];
+        size_t size = lisp_utf8_encode((uint32_t)number, encoded);
+        lisp_buffer_append(&text, (const char *)encoded, size);
+    }
+    Value *result = lisp_string(text.data ? text.data : "", text.length);
+    lisp_buffer_free(&text);
+    return result;
+}
+
 PRIMITIVE(substring) {
     (void)argument_count;
     if (!lisp_expect_kind(state, "substring", arguments[0], LISP_KIND_STRING, "String")
@@ -500,6 +544,8 @@ static const LispNativeFunction primitives[] = {
     {"string-at", 2, 2, primitive_string_at},
     {"substring", 3, 3, primitive_substring},
     {"to-string", 1, 1, primitive_to_string},
+    {"string-to-code-points", 1, 1, primitive_string_to_code_points},
+    {"code-points-to-string", 1, 1, primitive_code_points_to_string},
     {"string-to-number", 1, 1, primitive_string_to_number},
     {"string-to-symbol", 1, 1, primitive_string_to_symbol},
     {"symbol-to-string", 1, 1, primitive_symbol_to_string},

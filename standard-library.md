@@ -10,7 +10,7 @@ The standard library is made of five libraries, in the sense of core section 8.9
 
 The reference definitions in section 4 are normative. The implementation MAY replace any of them with a native version, as long as the observable behavior is identical, including errors and the names each library binds.
 
-**Version:** 0.4.0, draft, on top of core 0.7.0.
+**Version:** 0.4.0, draft, on top of core 0.8.0.
 
 **Changes since 0.3.0.** The library `set` (sections 3 and 4.5), with `from-list`, `union`, `intersection`, `difference` and `subset?`, over the type Set of core 0.5.0. The other libraries are unchanged.
 
