@@ -7,6 +7,7 @@
 
 (import io)
 (import list)      ; range, map, filter, fold, reverse, sort, take, any?, ...
+(import number)    ; max, min
 
 ; Prints a label, then a value the way it would be read back.
 (define show!
@@ -59,8 +60,12 @@
 (define total (fold + 0 scores))
 (show! "total" total)
 (show! "average" (quotient total (count scores)))   ; integer division
-(show! "highest" (fold (lambda (best x) (if (> x best) x otherwise best))
-                       (first scores) (rest scores)))
+
+; `max` and `min` take any number of integers, like `+`. `apply` calls a
+; function with the elements of a list as its arguments, so
+; (apply max scores) is (max 72 95 58 88 64 91 77).
+(show! "highest" (apply max scores))
+(show! "lowest" (apply min scores))
 
 ; ---- ordering and slicing -------------------------------------------------------
 

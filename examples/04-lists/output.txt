@@ -12,6 +12,7 @@ at least 90: (95 91)
 total: 545
 average: 77
 highest: 95
+lowest: 58
 ranked: (95 91 88 77 72 64 58)
 top three: (95 91 88)
 the others: (77 72 64 58)

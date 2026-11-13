@@ -1,25 +1,40 @@
 ; Word frequency.
 ;
-; Reads text from standard input and prints the five most frequent words,
-; one per line, as "count word". Words are separated by spaces; they are
-; compared exactly, so "The" and "the" are different words, and punctuation
-; stays attached to the word it touches.
+; Reads text from standard input and prints the six most frequent words,
+; one per line, as "count word". A word is a run of letters, so punctuation
+; separates words, and case does not matter: "The" and "the" are one word.
+; Words with the same count are listed alphabetically.
 ;
 ;   build/novelo examples/05-word-count/main.nvl < examples/05-word-count/input.txt
 
 (import io)        ; display!, read-line!
-(import list)      ; fold, filter, sort, take, ...
-(import text t)    ; t/split
+(import list)      ; fold, filter, map, sort, take, ...
+(import text t)    ; t/split, t/join, t/lowercase, t/letter?, t/precedes?
 (import map)       ; entries
 
-(define how-many 5)
+(define how-many 6)
 
-; The words of one line: split on single spaces, then drop the empty strings
-; that runs of spaces leave between them.
+; Text is made of code points, the numbers of its characters:
+; `string-to-code-points` gives them as a list of Integers, and
+; `code-points-to-string` turns such a list back into text. Converting a
+; line once and working on the list is how a program looks at every
+; character. Here each character that is not a letter becomes a space.
+(define space 32)
+
+(define letter-or-space
+  (lambda (code-point)
+    (if (t/letter? (code-points-to-string (list code-point))) code-point
+        otherwise space)))
+
+; The words of one line: punctuation turned into spaces, everything in
+; lowercase, split on single spaces, then the empty strings that runs of
+; spaces leave between them dropped. "Ball," and "ball." both become "ball";
+; a word with an apostrophe, such as "don't", becomes "don" and "t".
 (define words
   (lambda (line)
-    (filter (lambda (word) (not (empty? word)))
-            (t/split " " line))))
+    (let ((letters (code-points-to-string (map letter-or-space (string-to-code-points line)))))
+      (filter (lambda (word) (not (empty? word)))
+              (t/split " " (t/lowercase letters))))))
 
 ; Counting goes into a Map from word to count. Maps are persistent, so
 ; adding a word returns a new map and leaves `counts` as it was.
@@ -36,30 +51,34 @@
       (if (void? line) counts
           otherwise (read-counts! (fold count-word counts (words line)))))))
 
-; `entries` turns the map into a list of (word count) lists. `match` takes an
-; entry apart: the pattern (word count) matches a list of two elements and
-; names them. `_` matches a part without naming it.
-(define more-frequent?
+; `entries` turns the map into a list of (word count) lists. `match` takes
+; two entries apart at once: the pattern ((word-a count-a) (word-b count-b))
+; matches a list of two lists of two elements and names all four parts.
+;
+; The higher count comes first; on equal counts, `t/precedes?` puts the
+; words in order. It compares code points, which for lowercase ASCII letters
+; is alphabetical order.
+(define comes-before?
   (lambda (a b)
     (match (list a b)
-      ((_ count-a) (_ count-b)) (> count-a count-b))))
+      ((word-a count-a) (word-b count-b))
+      (if (> count-a count-b) #true
+          (< count-a count-b) #false
+          otherwise (t/precedes? word-a word-b)))))
 
-; Most frequent first. The library's merge sort is stable, so words with the
-; same count keep the order in which they first appeared.
 (define ranked
   (lambda (counts)
-    (sort more-frequent? (entries counts))))
+    (sort comes-before? (entries counts))))
 
-; Inside the result, `count` is the entry's count: a name bound by a
-; pattern hides a global of the same name, here the primitive `count`.
-(define show!
+; One line of the report. Inside the result, `count` is the entry's count:
+; a name bound by a pattern hides a global of the same name, here the
+; primitive `count`.
+(define report-line
   (lambda (entry)
     (match entry
-      (word count) (display! (concatenate (to-string count) " " word "\n")))))
+      (word count) (concatenate (to-string count) " " word "\n"))))
 
-; Prints each entry; `fold` is used only to walk the list in order.
-(define show-all!
-  (lambda (entries)
-    (fold (lambda (ignored entry) (show! entry)) #void entries)))
-
-(show-all! (take how-many (ranked (read-counts! {}))))
+; The work above is pure: it only computes values. The program builds the
+; whole report as one String and prints it with a single display!, so the
+; effect stays at the edge of the program.
+(display! (t/join "" (map report-line (take how-many (ranked (read-counts! {}))))))
