@@ -1,0 +1,43 @@
+; Hello.
+;
+; Reads a name from the first line of standard input and greets it. With no
+; input, or an empty line, it greets the world.
+;
+;   build/novelo examples/01-hello.nvl < examples/01-hello.input
+;   echo Grace | build/novelo examples/01-hello.nvl
+;
+; A semicolon starts a comment that runs to the end of the line.
+
+; A program sees only the core primitives until it imports a library. The
+; input and output functions live in the library `io`.
+(import io)
+
+; `define` binds a global name. A value is never changed after it is made:
+; there is no assignment, only new values.
+(define greeting "Hello")
+
+; `lambda` makes a function; this one takes one parameter, `name`.
+; `concatenate` joins any number of strings into a new one.
+(define greet
+  (lambda (name)
+    (concatenate greeting ", " name "!")))
+
+; `read-line!` returns the next line without its "\n", or #void when the
+; input has ended. Functions that touch the outside world end in `!`.
+;
+; `if` takes a condition, a result, then `otherwise` and the other result.
+; Only #false counts as false, so #void and "" are true values: `void?` and
+; `empty?` test for them. `or` stops at the first test that holds, so
+; `empty?` never sees #void.
+(define name-or-world
+  (lambda (line)
+    (if (or (void? line) (empty? line)) "world"
+        otherwise line)))
+
+; `let` names intermediate values. `display!` prints a value as text;
+; `write!` prints it as it would be read back, with quotes on strings.
+(let ((name (name-or-world (read-line!))))
+  (display! (greet name))
+  (display! "\n")
+  (write! name)
+  (display! "\n"))

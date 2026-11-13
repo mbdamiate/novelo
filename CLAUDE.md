@@ -13,7 +13,7 @@ This repository specifies **Novelo**, an immutable Lisp (core v0.5.0, standard l
 | `conformance.json` | 288 core cases (`read`, `read-error`, `read-positions`, `eval`, with an optional `error_position`); programs import at most `io` |
 | `stdlib-conformance.json` | 46 stdlib `eval` cases; programs import `list`, `text`, `function`, `map` or `set` |
 | `README.md` | Building, running, source map, design, implementation-defined behavior |
-| `examples/` | Commented example programs (`NAME.nvl`, optional `NAME.input`, expected `NAME.output`) that drive the language's evolution: the friction they show picks the next extension |
+| `examples/` | Commented example programs (`NN-name.nvl`, optional `.input`, expected `.output`), numbered by complexity, each adding one idea; helper files of an example go in a subdirectory, which the runner skips. The friction they show picks the next extension |
 
 The specs and the conformance files are the only source of truth. When the prose and a conformance case disagree, or the prose is silent, the case wins. Core §12.4 lists behaviors that only the tests fix, such as `first`/`rest` of `()` → `:wrong-type`.
 
