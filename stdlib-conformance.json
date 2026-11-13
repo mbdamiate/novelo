@@ -1,5 +1,5 @@
 {
-  "spec": "Standard Library — Novelo, version 0.6.0",
+  "spec": "Standard Library — Novelo, version 0.7.0",
   "format": {
     "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text, function, map, set and number available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
   },
@@ -685,6 +685,94 @@
       "section": "4.6",
       "program": "(import number n)\n(list (n/abs -3) (n/round 1.5) (catch (lambda () round) (lambda (problem) (get problem :kind))))",
       "value": "(3 2 :unbound-symbol)",
+      "output": ""
+    },
+    {
+      "id": "library-086",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text)\n(list (pad-left 5 \" \" \"42\") (pad-right 5 \".\" \"ab\") (pad-left 3 \"0\" \"\") (pad-right 0 \" \" \"\"))",
+      "value": "(\"   42\" \"ab...\" \"000\" \"\")",
+      "output": ""
+    },
+    {
+      "id": "library-087",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text)\n(list (pad-left 2 \"0\" \"12345\") (pad-right 5 \" \" \"exact\") (pad-left -1 \" \" \"x\"))",
+      "value": "(\"12345\" \"exact\" \"x\")",
+      "output": ""
+    },
+    {
+      "id": "library-088",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text)\n(list (pad-left 4 \"é\" \"ç\") (pad-right 3 \"·\" \"ão\") (count (pad-left 6 \"-\" \"€€\")))",
+      "value": "(\"éééç\" \"ão·\" 6)",
+      "output": ""
+    },
+    {
+      "id": "library-089",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text)\n(define kind (lambda (f) (catch f (lambda (problem) (get problem :kind)))))\n(list (kind (lambda () (pad-left 3 \"ab\" \"x\"))) (kind (lambda () (pad-right 3 \"\" \"x\"))) (kind (lambda () (pad-left 3 32 \"x\"))) (kind (lambda () (pad-left 3.0 \" \" \"x\"))))",
+      "value": "(:error :error :wrong-type :wrong-type)",
+      "output": ""
+    },
+    {
+      "id": "library-090",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text)\n(list (format \"{} + {} = {}\" 1 2 (+ 1 2)) (format \"no holes\") (format \"\") (format \"{}\" \"\"))",
+      "value": "(\"1 + 2 = 3\" \"no holes\" \"\" \"\")",
+      "output": ""
+    },
+    {
+      "id": "library-091",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text)\n(list (format \"name: {}\" \"Ana\") (format \"{}\" (list \"a\" :b 1.5)) (format \"{}{}\" #void {\"k\" 1}))",
+      "value": "(\"name: Ana\" \"(\\\"a\\\" :b 1.5)\" \"#void{\\\"k\\\" 1}\")",
+      "output": ""
+    },
+    {
+      "id": "library-092",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text)\n(list (format \"{{}}\" 7) (format \"} {\") (format \"{ {} }\" 1) (format \"{}}\" 2))",
+      "value": "(\"{7}\" \"} {\" \"{ 1 }\" \"2}\")",
+      "output": ""
+    },
+    {
+      "id": "library-093",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text)\n(define kind (lambda (f) (catch f (lambda (problem) (get problem :kind)))))\n(list (kind (lambda () (format \"{} and {}\" 1))) (kind (lambda () (format \"x\" 1))) (kind (lambda () (format 5))))",
+      "value": "(:error :error :wrong-type)",
+      "output": ""
+    },
+    {
+      "id": "library-094",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text)\n(format \"{} {}\" 1)",
+      "error": ":error",
+      "output": ""
+    },
+    {
+      "id": "library-095",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import io)\n(import list)\n(import text)\n(define row (lambda (name value) (format \"{} {}\\n\" (pad-right 6 \".\" name) (pad-left 7 \" \" (float-to-fixed value 2)))))\n(display! (join \"\" (map (lambda (entry) (row (first entry) (first (rest entry)))) (list (list \"mean\" 21.8375) (list \"low\" -3.0) (list \"high\" 125.125)))))",
+      "value": "#void",
+      "output": "mean..   21.84\nlow...   -3.00\nhigh..  125.13\n"
+    },
+    {
+      "id": "library-096",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text t)\n(list (t/pad-left 3 \"0\" \"7\") (t/format \"[{}]\" (t/pad-right 3 \"_\" \"a\")))",
+      "value": "(\"007\" \"[a__]\")",
       "output": ""
     }
   ]

@@ -10,7 +10,7 @@
 (import io)
 (import list)      ; fold, map, reverse
 (import number)    ; max, min, round
-(import text t)    ; t/join
+(import text t)    ; t/format, t/join, t/pad-right
 
 ; ---- two kinds of numbers ---------------------------------------------------
 
@@ -76,21 +76,21 @@
 
 ; ---- presenting -------------------------------------------------------------------
 
-; There is no way yet to print a Float with a fixed number of decimals. This
-; rounds to two: the deviation 2.249965277509856 times 100 rounds to the
-; Integer 225, which divided by 100.0 is 2.25. Trailing zeros still disappear, since
-; 20.10 and 20.1 are the same Float.
-(define two-decimals
-  (lambda (x)
-    (/ (integer-to-float (round (* x 100.0))) 100.0)))
+; `float-to-fixed` writes a Float with a fixed number of decimals, rounding
+; the exact value of the Float, halfway away from zero. The result is a
+; String, so trailing zeros stay: (float-to-fixed 20.1 2) is "20.10". Four
+; decimals hide the error of the sum above: 21.837500000000002 is "21.8375".
 
 ; Fahrenheit is Celsius times 1.8 plus 32. The constants are written 1.8 and
 ; 32.0, because 32 would be an Integer.
 (define fahrenheit (lambda (celsius) (+ (* celsius 1.8) 32.0)))
 
+; `format` puts each value into the template at a `{}`, as `to-string` would
+; write it, so a String goes in without its quotes. `t/pad-right` fills the
+; label with spaces up to one width, which lines up the values.
 (define line
   (lambda (label value)
-    (concatenate label ": " (to-string value) "\n")))
+    (t/format "{} {}\n" (t/pad-right 20 " " (concatenate label ":")) value)))
 
 (define report
   (lambda (numbers)
@@ -99,10 +99,11 @@
                        (line "lowest" (apply min numbers))
                        (line "highest" (apply max numbers))
                        (line "mean" center)
-                       (line "mean, two decimals" (two-decimals center))
+                       (line "mean, four decimals" (float-to-fixed center 4))
+                       (line "mean, two decimals" (float-to-fixed center 2))
                        (line "mean, whole degrees" (round center))
-                       (line "deviation" (two-decimals (deviation numbers)))
-                       (line "mean in Fahrenheit" (two-decimals (fahrenheit center))))))))
+                       (line "deviation" (float-to-fixed (deviation numbers) 2))
+                       (line "mean in Fahrenheit" (float-to-fixed (fahrenheit center) 2)))))))
 
 (define numbers (reverse (read-measurements! ())))
 (if (empty? numbers) (display! "no measurements\n")

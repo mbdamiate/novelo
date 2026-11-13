@@ -1,9 +1,10 @@
 skipped: "warm" is not a number
-count: 8
-lowest: 18.4
-highest: 25.3
-mean: 21.837500000000002
-mean, two decimals: 21.84
+count:               8
+lowest:              18.4
+highest:             25.3
+mean:                21.837500000000002
+mean, four decimals: 21.8375
+mean, two decimals:  21.84
 mean, whole degrees: 22
-deviation: 2.25
-mean in Fahrenheit: 71.31
+deviation:           2.25
+mean in Fahrenheit:  71.31

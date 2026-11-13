@@ -1,6 +1,6 @@
 # Novelo
 
-An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.10.0) and the standard library (`standard-library.md`, v0.6.0).
+An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.10.0) and the standard library (`standard-library.md`, v0.7.0).
 
 *Novelo* is Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as Novelo's lists are. Source files end in `.nvl`.
 
@@ -9,7 +9,7 @@ Every case of both conformance suites passes:
 | Suite | Cases |
 | --- | --- |
 | core | 461 |
-| stdlib | 85 |
+| stdlib | 96 |
 
 Those runs report no leaks, and they also pass under AddressSanitizer and UndefinedBehaviorSanitizer.
 
@@ -70,7 +70,7 @@ An uncaught error names the innermost form, read from a file, that contains the 
 ```lisp
 (import io)            ; write!, display!, read-line!
 (import list)          ; map, filter, fold, sort, ...
-(import text t)        ; t/split, t/join, t/precedes?, t/lowercase, t/letter?, ... (and the names of list, as t/map)
+(import text t)        ; t/split, t/join, t/format, t/pad-left, t/lowercase, ... (and the names of list, as t/map)
 (import function)      ; partial
 (import map)           ; values, entries, merge, update, map-values, ...
 (import set)           ; from-list, union, intersection, difference, subset?
