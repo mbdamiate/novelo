@@ -1,0 +1,7 @@
+; Unit conversions. shapes.nvl includes this file with the prefix `units`.
+
+(define centimeters-per-meter 100)
+
+(define centimeters
+  (lambda (meters)
+    (* meters centimeters-per-meter)))   ; resolves to this file's own name

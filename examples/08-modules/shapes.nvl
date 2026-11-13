@@ -1,0 +1,29 @@
+; Areas of shapes. 08-modules.nvl includes this file with the prefix `shape`.
+;
+; Inside this file the names it defines are written plainly: `rectangle-area`
+; here means shape/rectangle-area, whatever the including program calls
+; `rectangle-area`.
+
+; A file imports what it uses, like any program.
+(import io)
+
+; A relative path is resolved against the directory of this file, not the
+; directory the program was started from. With the prefix `units`, its
+; names are units/… here, and shape/units/… outside.
+(include "units.nvl" units)
+
+; Top-level forms run when the file is loaded, so this line shows each load.
+(display! "(loading shapes)\n")
+
+(define rectangle-area
+  (lambda (width height)
+    (* width height)))
+
+(define square-area
+  (lambda (side)
+    (rectangle-area side side)))
+
+; Side in meters, area in square centimeters.
+(define square-area-in-centimeters
+  (lambda (side-in-meters)
+    (square-area (units/centimeters side-in-meters))))

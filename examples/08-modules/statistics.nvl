@@ -1,0 +1,12 @@
+; Small statistics over lists of integers. 08-modules.nvl includes this file
+; without a prefix, so its definitions become ordinary global names.
+
+(import list)      ; fold
+
+(define total
+  (lambda (numbers)
+    (fold + 0 numbers)))
+
+(define mean
+  (lambda (numbers)
+    (quotient (total numbers) (count numbers))))
