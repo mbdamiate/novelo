@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-This repository specifies **Novelo**, an immutable Lisp (core v0.5.0, standard library v0.4.0); the name means "ball of yarn" in Portuguese, and source files use `.nvl`, and implements an interpreter for it in **C23**, following `IMPLEMENTATION-PLAN.md` phase by phase. Each phase ends with its tests passing and one commit. All six phases are done, and the language is now being extended one feature at a time (core 0.3.0 added source positions to runtime errors, core 0.4.0 persistent maps and the stdlib library `map`, core 0.5.0 the type Set `#{…}` and the library `set`): all 288 core and 46 stdlib cases and the unit tests pass, also under `make asan`. `README.md` covers building, running, the source map, the design and the behavior the spec leaves to the implementation. Core 0.2.1 settled the points 0.2.0 left open; when a new gap appears, decide it with the user, write it into the spec and add conformance cases rather than only documenting the choice.
+This repository specifies **Novelo**, an immutable Lisp (core v0.5.0, standard library v0.4.0); the name means "ball of yarn" in Portuguese, and source files use `.nvl`, and implements an interpreter for it in **C23**. The interpreter was built in six phases, all done; the language is now being extended one feature at a time (core 0.3.0 added source positions to runtime errors, core 0.4.0 persistent maps and the stdlib library `map`, core 0.5.0 the type Set `#{…}` and the library `set`): all 288 core and 46 stdlib cases and the unit tests pass, also under `make asan`. `README.md` covers building, running, the source map, the design and the behavior the spec leaves to the implementation. Core 0.2.1 settled the points 0.2.0 left open; when a new gap appears, decide it with the user, write it into the spec and add conformance cases rather than only documenting the choice.
 
 | File | Role |
 | --- | --- |
@@ -12,9 +12,7 @@ This repository specifies **Novelo**, an immutable Lisp (core v0.5.0, standard l
 | `standard-library.md` | Normative stdlib: the libraries `list`, `text`, `function`, `map`, `set`, whose sources are the `lisp` code blocks of §4.1–4.5 |
 | `conformance.json` | 288 core cases (`read`, `read-error`, `read-positions`, `eval`, with an optional `error_position`); programs import at most `io` |
 | `stdlib-conformance.json` | 46 stdlib `eval` cases; programs import `list`, `text`, `function`, `map` or `set` |
-| `IMPLEMENTATION-PLAN.md` | Architecture, decisions, file layout, phases, test runners |
 | `README.md` | Building, running, source map, design, implementation-defined behavior |
-| `implementation-notes.md` | Non-normative advice (refcounting, position-table address reuse) |
 
 The specs and the conformance files are the only source of truth. When the prose and a conformance case disagree, or the prose is silent, the case wins. Core §12.4 lists behaviors that only the tests fix, such as `first`/`rest` of `()` → `:wrong-type`.
 

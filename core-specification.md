@@ -510,9 +510,9 @@ In **continuation**, the function receives the rest of the work as an argument, 
 
 Lists of at least 1,000,000 elements MUST be built, traversed and discarded without error.
 
-Maps are persistent: `associate` and `dissociate` return a new map that shares most of its structure with the original, which stays unchanged. Neither of them, nor `get` and `contains?`, may copy or traverse the whole map: their cost MUST grow at most logarithmically with the number of keys. As a result, a map of at least 1,000,000 keys MUST be built with `associate`, one key at a time, queried, reduced with `dissociate` and discarded without error. `keys`, `equal?` and printing traverse the whole map, so their cost grows with its size. Sets are persistent in the same way: `adjoin`, `disjoin` and `contains?` follow the same rule, and a set of at least 1,000,000 elements MUST be built with `adjoin`, one element at a time. A hash array mapped trie, as in `implementation-notes.md`, meets these requirements.
+Maps are persistent: `associate` and `dissociate` return a new map that shares most of its structure with the original, which stays unchanged. Neither of them, nor `get` and `contains?`, may copy or traverse the whole map: their cost MUST grow at most logarithmically with the number of keys. As a result, a map of at least 1,000,000 keys MUST be built with `associate`, one key at a time, queried, reduced with `dissociate` and discarded without error. `keys`, `equal?` and printing traverse the whole map, so their cost grows with its size. Sets are persistent in the same way: `adjoin`, `disjoin` and `contains?` follow the same rule, and a set of at least 1,000,000 elements MUST be built with `adjoin`, one element at a time. A hash array mapped trie meets these requirements.
 
-Memory management is otherwise left to the implementation and has no observable effect. Non-normative advice for implementers is in `implementation-notes.md`.
+Memory management is otherwise left to the implementation and has no observable effect.
 
 ### 8.7 Programs and REPL
 
