@@ -1,0 +1,66 @@
+; Recursion: factorial, and a sum written two ways.
+;
+; Prints n! for n from 0 to 20, then the sum 1 + 2 + … + n computed with
+; plain recursion and with a tail-recursive loop.
+;
+;   build/novelo examples/03-recursion.nvl
+
+(import io)
+
+; ---- factorial ------------------------------------------------------------
+
+; The definition, read straight from mathematics: 0! is 1, and n! is n times
+; (n - 1)!. A function refers to itself through its global name.
+(define factorial
+  (lambda (n)
+    (if (= n 0) 1
+        otherwise (* n (factorial (- n 1))))))
+
+; Integers are 64 bits and never wrap around: 20! = 2432902008176640000 is
+; the largest factorial that fits, and (factorial 21) stops the program with
+; the error :integer-overflow instead of returning a wrong number.
+
+(define show-factorials!
+  (lambda (n last)
+    (if (> n last) #void
+        otherwise (sequence
+                    (display! (concatenate (to-string n) "! = " (to-string (factorial n)) "\n"))
+                    (show-factorials! (+ n 1) last)))))
+
+(show-factorials! 0 20)
+
+; ---- sum, two ways ----------------------------------------------------------
+
+; Plain recursion. The addition happens after the recursive call returns,
+; so every call waits for the next one: (sum-to n) keeps n calls open at
+; once. The interpreter allows well over 100,000 of them, but (sum-to
+; 10000000) raises :stack-overflow.
+(define sum-to
+  (lambda (n)
+    (if (= n 0) 0
+        otherwise (+ n (sum-to (- n 1))))))
+
+; The same sum with an accumulator. `total` carries the work done so far,
+; so the recursive call is the last thing left to do: a tail call. It does
+; not keep the caller open, so it runs in constant memory for any n.
+(define sum-loop
+  (lambda (n total)
+    (if (= n 0) total
+        otherwise (sum-loop (- n 1) (+ total n)))))
+
+; Callers should not have to pass the accumulator, so a small function
+; starts it with the sum of nothing, 0.
+(define fast-sum-to
+  (lambda (n)
+    (sum-loop n 0)))
+
+; `let` names both results; they must agree.
+(define show-sums!
+  (lambda (n)
+    (let ((slow (sum-to n))
+          (fast (fast-sum-to n)))
+      (display! (concatenate "sum to " (to-string n) " = " (to-string fast)
+                             (if (= slow fast) "\n" otherwise " (mismatch)\n"))))))
+
+(show-sums! 100)
+(show-sums! 100000)
