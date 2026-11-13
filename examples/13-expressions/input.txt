@@ -1,0 +1,57 @@
+# Numbers, operators and precedence.
+1 + 2 * 3
+(1 + 2) * 3
+8 - 2 - 1
+2 ^ 3 ^ 2
+-2 ^ 2
+(-2) ^ 2
+7 / 2
+7 % 2
+7.0 / 2
+0.1 + 0.2
+2 ^ 62
+
+# Variables.
+let x = 2 * (3 + 4)
+x ^ 2 - 1
+let rate = 0.15
+let price = 40
+price * (1 + rate)
+let x = x + 1
+x
+
+# Functions.
+let area(w, h) = w * h
+area(x, 3) / 4
+let hypotenuse2(a, b) = a ^ 2 + b ^ 2
+hypotenuse2(3, 4)
+let tax(amount) = amount * rate
+tax(price) + tax(area(2, 5))
+let pi() = 3.14159
+let circle(r) = pi() * r ^ 2
+circle(2)
+let shape(a, b) = (a - b) - (a - (b - 1)) * -(a ^ 2) ^ 3
+shape(2, 1)
+let área(lado) = lado ^ 2
+área(1.5)
+
+# Problems.
+let y = z + 1
+1 / (x - 15)
+2.5 / 0
+2 ^ 63
+9223372036854775807 + 1
+99999999999999999999
+2 ^ -1
+2.5 % 2
+(1 + 2
+1 + * 2
+1 2
+3 $ 4
+1.2.3
+let = 5
+let f(a, a) = a
+let g(a b) = a
+area(1)
+missing(1)
+let 5 = 2

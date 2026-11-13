@@ -1,0 +1,114 @@
+> 1 + 2 * 3
+7
+> (1 + 2) * 3
+9
+> 8 - 2 - 1
+5
+> 2 ^ 3 ^ 2
+512
+> -2 ^ 2
+-4
+> (-2) ^ 2
+4
+> 7 / 2
+3
+> 7 % 2
+1
+> 7.0 / 2
+3.5
+> 0.1 + 0.2
+0.30000000000000004
+> 2 ^ 62
+4611686018427387904
+> let x = 2 * (3 + 4)
+x = 14
+> x ^ 2 - 1
+195
+> let rate = 0.15
+rate = 0.15
+> let price = 40
+price = 40
+> price * (1 + rate)
+46.0
+> let x = x + 1
+x = 15
+> x
+15
+> let area(w, h) = w * h
+area(w, h) = w * h
+> area(x, 3) / 4
+11
+> let hypotenuse2(a, b) = a ^ 2 + b ^ 2
+hypotenuse2(a, b) = a ^ 2 + b ^ 2
+> hypotenuse2(3, 4)
+25
+> let tax(amount) = amount * rate
+tax(amount) = amount * rate
+> tax(price) + tax(area(2, 5))
+7.5
+> let pi() = 3.14159
+pi() = 3.14159
+> let circle(r) = pi() * r ^ 2
+circle(r) = pi() * r ^ 2
+> circle(2)
+12.56636
+> let shape(a, b) = (a - b) - (a - (b - 1)) * -(a ^ 2) ^ 3
+shape(a, b) = a - b - (a - (b - 1)) * -(a ^ 2) ^ 3
+> shape(2, 1)
+129
+> let área(lado) = lado ^ 2
+área(lado) = lado ^ 2
+> área(1.5)
+2.25
+> let y = z + 1
+          ^ unknown variable z
+> 1 / (x - 15)
+    ^ division by zero
+> 2.5 / 0
+      ^ division by zero
+> 2 ^ 63
+    ^ the result is too large
+> 9223372036854775807 + 1
+                      ^ the result is too large
+> 99999999999999999999
+  ^ number too large 99999999999999999999
+> 2 ^ -1
+    ^ the exponent must be a whole number, 0 or more
+> 2.5 % 2
+      ^ % takes whole numbers
+> (1 + 2
+        ^ expected ), found the end
+> 1 + * 2
+      ^ expected a value, found *
+> 1 2
+    ^ unexpected 2
+> 3 $ 4
+    ^ unexpected character $
+> 1.2.3
+  ^ invalid number 1.2.3
+> let = 5
+      ^ expected a name after let, found =
+> let f(a, a) = a
+           ^ parameter a given twice
+> let g(a b) = a
+          ^ expected ), found b
+> area(1)
+  ^ area takes 2 arguments, given 1
+> missing(1)
+  ^ unknown function missing
+> let 5 = 2
+      ^ expected a name after let, found 5
+
+variables:
+  price = 40
+  rate = 0.15
+  x = 15
+
+functions:
+  area(w, h) = w * h
+  circle(r) = pi() * r ^ 2
+  hypotenuse2(a, b) = a ^ 2 + b ^ 2
+  pi() = 3.14159
+  shape(a, b) = a - b - (a - (b - 1)) * -(a ^ 2) ^ 3
+  tax(amount) = amount * rate
+  área(lado) = lado ^ 2

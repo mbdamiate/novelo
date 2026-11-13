@@ -1,0 +1,439 @@
+; Expressions: a small language with precedence, variables and functions.
+;
+; Each input line is a statement in an infix language: an expression, such
+; as "2 * (3 + 4)", whose value is printed; "let x = …", which names a
+; value; or "let area(w, h) = …", which defines a function. Each line is
+; echoed after "> ", then its result, or a caret under the column where the
+; problem was found. A problem does not stop the program. At the end, the
+; variables and functions defined are listed.
+;
+;   build/novelo examples/13-expressions/main.nvl < examples/13-expressions/input.txt
+;
+; Example 10 evaluated reverse Polish notation, where the order of the
+; words is the order of the work. Here the text has to become a tree first,
+; in three steps that each build on the one before: the tokenizer turns
+; characters into tokens, the parser turns tokens into a tree, and the
+; evaluator turns a tree into a value. A fourth step prints a tree back as
+; text, with only the parentheses it needs.
+;
+; The notes marked "friction" say where the language is still awkward.
+
+(import io)
+(import list)      ; any?, every?, filter, fold, map, reverse, sort
+(import text t)    ; t/characters, t/digit?, t/join, t/letter?, t/pad-left, t/precedes?
+(import map)       ; from-entries, merge
+
+; A problem raises the error :expression, whose value is the column where
+; it was found. Every step below knows the column of what it works on: a
+; token keeps the column where it starts, and a node of the tree the column
+; of its token.
+(define fail
+  (lambda (message column)
+    (raise {:kind :expression :message message :values (list column)})))
+
+; ---- tokens ---------------------------------------------------------------------
+
+; A token is a Map: {:kind :number :value 14 :column 5}, {:kind :name :text
+; "x" :column 1}, or {:kind :symbol :text "+" :column 3}. The list of tokens
+; ends with {:kind :end}, so the parser always has a token to look at and
+; to report a column for.
+(define symbols #{"+" "-" "*" "/" "%" "^" "(" ")" "," "="})
+
+(define name-character?
+  (lambda (character)
+    (or (t/letter? character) (t/digit? character) (equal? character "_"))))
+
+(define number-character?
+  (lambda (character)
+    (or (t/digit? character) (equal? character "."))))
+
+; The characters at the front of a list that satisfy keep?, and the rest.
+;
+; Friction: the library list has take and drop by count, and filter over
+; the whole list, but nothing that splits a list where a test stops
+; holding. The tokenizer needs it twice.
+(define span
+  (lambda (keep? elements)
+    (span-step keep? elements ())))
+
+(define span-step
+  (lambda (keep? elements taken)
+    (if (and (not (empty? elements)) (keep? (first elements)))
+        (span-step keep? (rest elements) (prepend (first elements) taken))
+        otherwise (list (reverse taken) elements))))
+
+(define tokenize
+  (lambda (characters column tokens)
+    (match characters
+      () (reverse (prepend {:kind :end :column column} tokens))
+      (character &rest more)
+      (if (or (equal? character " ") (equal? character "\t"))
+          (tokenize more (+ column 1) tokens)
+          (t/digit? character)
+          (let (((digits after) (span number-character? characters))
+                (text (apply concatenate digits))
+                (value (catch (lambda () (string-to-number text))
+                              (lambda (problem) (fail (concatenate "number too large " text) column)))))
+            (if (void? value) (fail (concatenate "invalid number " text) column)
+                otherwise (tokenize after (+ column (count digits))
+                                    (prepend {:kind :number :value value :column column} tokens))))
+          (t/letter? character)
+          (let (((letters after) (span name-character? characters)))
+            (tokenize after (+ column (count letters))
+                      (prepend {:kind :name :text (apply concatenate letters) :column column} tokens)))
+          (contains? symbols character)
+          (tokenize more (+ column 1) (prepend {:kind :symbol :text character :column column} tokens))
+          otherwise (fail (concatenate "unexpected character " character) column)))))
+
+; How a token is named in a message.
+(define describe
+  (lambda (token)
+    (match token
+      {:kind :end} "the end"
+      {:kind :number :value value} (to-string value)
+      {:kind :name :text text} text
+      {:kind :symbol :text text} text)))
+
+; ---- the tree ---------------------------------------------------------------------
+
+; The parser turns the tokens of a statement into a tree of Maps:
+;
+;   {:kind :number :value 2}
+;   {:kind :variable :name "x"}
+;   {:kind :negate :operand tree}
+;   {:kind :binary :operator "*" :left tree :right tree}
+;   {:kind :call :name "area" :arguments (tree …)}
+;
+; each with the :column of its token. As in example 12, each parse function
+; takes the tokens left and returns the tree it read and the tokens after
+; it, and `let` names the two with a pattern.
+;
+; The binary operators, by precedence: the higher binds tighter, so
+; 1 + 2 * 3 is 1 + (2 * 3). All of them group from the left, 8 - 2 - 1 is
+; (8 - 2) - 1, except ^, which groups from the right: 2 ^ 3 ^ 2 is
+; 2 ^ (3 ^ 2). A minus before an operand binds tighter than * but looser
+; than ^, so -2 ^ 2 is -(2 ^ 2), as in mathematics.
+(define precedences {"+" 1 "-" 1 "*" 2 "/" 2 "%" 2 "^" 4})
+(define negate-precedence 3)
+
+(define right-grouping? (lambda (operator) (equal? operator "^")))
+
+; An expression is read by precedence climbing: an operand, then as long as
+; the next token is an operator that binds at least as tightly as minimum,
+; the operator and its right side, read with a minimum that keeps looser
+; operators out of it.
+(define parse-expression
+  (lambda (tokens minimum)
+    (let (((left after) (parse-operand tokens)))
+      (parse-operators left after minimum))))
+
+(define parse-operators
+  (lambda (left tokens minimum)
+    (match tokens
+      ({:kind :symbol :text operator :column column} &rest more)
+      (let ((precedence (get precedences operator 0)))
+        (if (or (= precedence 0) (< precedence minimum)) (list left tokens)
+            otherwise
+            (let (((right after) (parse-expression more (if (right-grouping? operator) precedence
+                                                            otherwise (+ precedence 1))))
+                  (tree {:kind :binary :operator operator :left left :right right :column column}))
+              (parse-operators tree after minimum))))
+      otherwise (list left tokens))))
+
+(define parse-operand
+  (lambda (tokens)
+    (match tokens
+      ({:kind :number :value value :column column} &rest more)
+      (list {:kind :number :value value :column column} more)
+      ({:kind :name :text name :column column} {:kind :symbol :text "("} &rest more)
+      (let (((arguments after) (parse-arguments more)))
+        (list {:kind :call :name name :arguments arguments :column column} after))
+      ({:kind :name :text name :column column} &rest more)
+      (list {:kind :variable :name name :column column} more)
+      ({:kind :symbol :text "-" :column column} &rest more)
+      (let (((operand after) (parse-expression more negate-precedence)))
+        (list {:kind :negate :operand operand :column column} after))
+      ({:kind :symbol :text "("} &rest more)
+      (let (((tree after) (parse-expression more 1)))
+        (list tree (expect ")" after)))
+      (token &rest more) (fail (concatenate "expected a value, found " (describe token)) (get token :column)))))
+
+(define expect
+  (lambda (text tokens)
+    (match tokens
+      ({:kind :symbol :text found} &rest more)
+      (if (equal? found text) more
+          otherwise (fail (concatenate "expected " text ", found " found) (get (first tokens) :column)))
+      (token &rest more) (fail (concatenate "expected " text ", found " (describe token)) (get token :column)))))
+
+; The arguments of a call, after its "(": none, or expressions separated by
+; commas, up to the ")".
+(define parse-arguments
+  (lambda (tokens)
+    (match tokens
+      ({:kind :symbol :text ")"} &rest more) (list () more)
+      otherwise (parse-more-arguments tokens ()))))
+
+(define parse-more-arguments
+  (lambda (tokens arguments)
+    (let (((argument after) (parse-expression tokens 1))
+          (arguments (prepend argument arguments)))
+      (match after
+        ({:kind :symbol :text ","} &rest more) (parse-more-arguments more arguments)
+        otherwise (list (reverse arguments) (expect ")" after))))))
+
+; The parameters of a function: names separated by commas, up to the ")".
+; A name given twice would leave the function no way to tell them apart.
+(define parse-parameters
+  (lambda (tokens parameters)
+    (match tokens
+      ({:kind :name :text name :column column} &rest more)
+      (if (any? (lambda (parameter) (equal? parameter name)) parameters)
+          (fail (concatenate "parameter " name " given twice") column)
+          otherwise
+          (match more
+            ({:kind :symbol :text ","} &rest after) (parse-parameters after (prepend name parameters))
+            otherwise (list (reverse (prepend name parameters)) (expect ")" more))))
+      (token &rest more) (fail (concatenate "expected a parameter, found " (describe token)) (get token :column)))))
+
+(define expect-end
+  (lambda (tokens)
+    (match tokens
+      ({:kind :end}) #true
+      (token &rest more) (fail (concatenate "unexpected " (describe token)) (get token :column)))))
+
+; A statement is one of three shapes, told apart by its first tokens.
+(define parse-statement
+  (lambda (tokens)
+    (match tokens
+      ({:kind :name :text "let"} {:kind :name :text name} {:kind :symbol :text "="} &rest more)
+      (let (((tree after) (parse-expression more 1))
+            (_ (expect-end after)))
+        {:kind :define-variable :name name :tree tree})
+      ({:kind :name :text "let"} {:kind :name :text name} {:kind :symbol :text "("} &rest more)
+      (let (((parameters after) (match more
+                                  ({:kind :symbol :text ")"} &rest after) (list () after)
+                                  otherwise (parse-parameters more ())))
+            ((tree after) (parse-expression (expect "=" after) 1))
+            (_ (expect-end after)))
+        {:kind :define-function :name name :parameters parameters :tree tree})
+      ({:kind :name :text "let"} token &rest more)
+      (fail (concatenate "expected a name after let, found " (describe token)) (get token :column))
+      otherwise
+      (let (((tree after) (parse-expression tokens 1))
+            (_ (expect-end after)))
+        {:kind :expression :tree tree}))))
+
+; ---- printing a tree ----------------------------------------------------------------
+
+; A tree prints back as text with only the parentheses it needs: a part is
+; put in parentheses when it binds more loosely than its place requires.
+; The right side of 8 - (2 - 1) needs them, the left side of (8 - 2) - 1
+; does not.
+(define show
+  (lambda (tree required)
+    (match tree
+      {:kind :number :value value} (to-string value)
+      {:kind :variable :name name} name
+      {:kind :call :name name :arguments arguments}
+      (concatenate name "(" (t/join ", " (map (lambda (argument) (show argument 1)) arguments)) ")")
+      {:kind :negate :operand operand}
+      (parenthesize (concatenate "-" (show operand negate-precedence)) negate-precedence required)
+      {:kind :binary :operator operator :left left :right right}
+      (let ((precedence (get precedences operator))
+            (tighter (+ precedence 1)))
+        (parenthesize (concatenate (show left (if (right-grouping? operator) tighter otherwise precedence))
+                                   " " operator " "
+                                   (show right (if (right-grouping? operator) precedence otherwise tighter)))
+                      precedence required)))))
+
+(define parenthesize
+  (lambda (text precedence required)
+    (if (< precedence required) (concatenate "(" text ")")
+        otherwise text)))
+
+; ---- evaluation ---------------------------------------------------------------------
+
+; Numbers are Integers or Floats. Novelo never mixes them, but this
+; language does, as calculators do: when one operand is a Float, the other
+; becomes one too. / divides Integers to a whole number, toward zero, and %
+; is the remainder of that division.
+(define same-type
+  (lambda (left right)
+    (if (and (integer? left) (float? right)) (list (integer-to-float left) right)
+        (and (float? left) (integer? right)) (list left (integer-to-float right))
+        otherwise (list left right))))
+
+; x ^ n multiplies x by itself n times, so n must be a whole number, not
+; negative. Squaring at each step takes about log₂ n multiplications. The
+; base is squared only when another step needs it, so 2 ^ 62 does not
+; compute 2 ^ 64 on the way.
+(define power
+  (lambda (base exponent result)
+    (if (= exponent 0) result
+        (= exponent 1) (* result base)
+        otherwise (power (* base base) (quotient exponent 2)
+                         (if (= (remainder exponent 2) 1) (* result base) otherwise result)))))
+
+(define operate
+  (lambda (operator left right column)
+    (if (equal? operator "^")
+        (if (and (integer? right) (>= right 0)) (power left right (if (integer? left) 1 otherwise 1.0))
+            otherwise (fail "the exponent must be a whole number, 0 or more" column))
+        otherwise
+        (let (((left right) (same-type left right)))
+          (match operator
+            "+" (+ left right)
+            "-" (- left right)
+            "*" (* left right)
+            "/" (if (integer? left) (quotient left right) otherwise (/ left right))
+            "%" (if (integer? left) (remainder left right)
+                    otherwise (fail "% takes whole numbers" column)))))))
+
+; Arithmetic can fail inside Novelo itself: a result too large for an
+; Integer or a Float, or a division by zero. Those errors become problems
+; of this language, at the column of the operator.
+;
+; Friction: the only way to know which error happened is to catch every
+; error and look at its :kind; a :expression raised inside, by `fail`,
+; has to be passed on by hand.
+(define arithmetic-messages
+  {:integer-overflow "the result is too large"
+   :float-overflow "the result is too large"
+   :division-by-zero "division by zero"})
+
+(define arithmetic
+  (lambda (compute column)
+    (catch compute
+           (lambda (problem)
+             (match problem
+               {:kind :expression} (raise problem)
+               {:kind kind} (fail (get arithmetic-messages kind (get problem :message)) column))))))
+
+; A scope holds the :variables and the :functions a tree can see. A
+; function is {:parameters (name …) :tree tree}; a call evaluates its
+; arguments, then its tree with the parameters bound to them over the
+; variables of the caller.
+(define evaluate
+  (lambda (tree scope)
+    (match tree
+      {:kind :number :value value} value
+      {:kind :variable :name name :column column}
+      (let ((variables (get scope :variables)))
+        (if (contains? variables name) (get variables name)
+            otherwise (fail (concatenate "unknown variable " name) column)))
+      {:kind :negate :operand operand :column column}
+      (let ((value (evaluate operand scope)))
+        (arithmetic (lambda () (- value)) column))
+      {:kind :binary :operator operator :left left :right right :column column}
+      (let ((left-value (evaluate left scope))
+            (right-value (evaluate right scope)))
+        (arithmetic (lambda () (operate operator left-value right-value column)) column))
+      {:kind :call :name name :arguments arguments :column column}
+      (let ((functions (get scope :functions)))
+        (if (not (contains? functions name)) (fail (concatenate "unknown function " name) column)
+            otherwise (call (get functions name) name (map (lambda (argument) (evaluate argument scope)) arguments)
+                            scope column))))))
+
+; Friction: binding each parameter to its argument needs the two lists
+; side by side, and the library list has no function that walks two lists
+; at once; `pairs` does it here.
+(define pairs
+  (lambda (lefts rights)
+    (reverse (pairs-step lefts rights ()))))
+
+(define pairs-step
+  (lambda (lefts rights gathered)
+    (if (or (empty? lefts) (empty? rights)) gathered
+        otherwise (pairs-step (rest lefts) (rest rights) (prepend (list (first lefts) (first rights)) gathered)))))
+
+(define call
+  (lambda (function name values scope column)
+    (let (({:parameters parameters :tree tree} function))
+      (if (not (= (count parameters) (count values)))
+          (fail (t/format "{} takes {} arguments, given {}" name (count parameters) (count values)) column)
+          otherwise
+          (evaluate tree (associate scope :variables
+                                    (merge (get scope :variables) (from-entries (pairs parameters values)))))))))
+
+; ---- statements ---------------------------------------------------------------------
+
+; Running a statement gives the text to print and the scope for the next
+; line. Only a definition changes the scope. A function's tree is checked
+; only when it is called, so it may use a variable or a function defined
+; later.
+(define show-function
+  (lambda (name function)
+    (t/format "{}({}) = {}" name (t/join ", " (get function :parameters)) (show (get function :tree) 1))))
+
+(define run
+  (lambda (statement scope)
+    (match statement
+      {:kind :expression :tree tree}
+      (list (to-string (evaluate tree scope)) scope)
+      {:kind :define-variable :name name :tree tree}
+      (let ((value (evaluate tree scope)))
+        (list (t/format "{} = {}" name value)
+              (associate scope :variables (associate (get scope :variables) name value))))
+      {:kind :define-function :name name :parameters parameters :tree tree}
+      (let ((function {:parameters parameters :tree tree}))
+        (list (show-function name function)
+              (associate scope :functions (associate (get scope :functions) name function)))))))
+
+; ---- the loop -------------------------------------------------------------------------
+
+; Each line is echoed after "> ", so the caret under a problem, two columns
+; further right than the column it names, falls under the right character.
+(define report
+  (lambda (line scope)
+    (display! (concatenate "> " line "\n"))
+    (catch (lambda ()
+             (let (((text scope) (run (parse-statement (tokenize (t/characters line) 1 ())) scope)))
+               (display! (concatenate text "\n"))
+               scope))
+           (lambda (problem)
+             (match problem
+               {:kind :expression :values (column)}
+               (sequence
+                 (display! (concatenate (t/pad-left (+ column 2) " " "^") " " (get problem :message) "\n"))
+                 scope)
+               otherwise
+               (sequence
+                 (display! (concatenate "error: " (get problem :message) "\n"))
+                 scope))))))
+
+; Blank lines, and lines starting with #, are skipped.
+(define comment?
+  (lambda (line)
+    (match (filter (lambda (character) (not (equal? character " "))) (t/characters line))
+      () #true
+      ("#" &rest more) #true
+      otherwise #false)))
+
+(define read-statements
+  (lambda (scope)
+    (let ((line (read-line!)))
+      (if (void? line) scope
+          (comment? line) (read-statements scope)
+          otherwise (read-statements (report line scope))))))
+
+(define scope (read-statements {:variables {} :functions {}}))
+
+; The names, in order, with their values or definitions.
+(define sorted-names
+  (lambda (table)
+    (sort t/precedes? (keys table))))
+
+; Each list is printed one name to a line, under its title.
+;
+; Friction: printing each name is done for its effect alone, but the
+; library list only has `map`, which also builds a list of the results,
+; thrown away here.
+(define list-names
+  (lambda (title table describe-entry)
+    (display! (concatenate "\n" title ":\n"))
+    (map (lambda (name) (display! (concatenate "  " (describe-entry name (get table name)) "\n")))
+         (sorted-names table))))
+
+(list-names "variables" (get scope :variables) (lambda (name value) (t/format "{} = {}" name value)))
+(list-names "functions" (get scope :functions) show-function)
