@@ -8,7 +8,7 @@
 ;   build/novelo examples/11-statistics/main.nvl < examples/11-statistics/input.txt
 
 (import io)
-(import list)      ; fold, map, reverse
+(import list)      ; filter, fold, map, reverse
 (import number)    ; max, min, round
 (import text t)    ; t/format, t/join, t/pad-right
 
@@ -36,21 +36,21 @@
           (integer? number) (integer-to-float number)
           otherwise #void))))
 
-; Collects the measurements, newest first, and complains about bad lines
-; on the way. `prepend` builds the list backwards; the end of the program
-; reverses it into reading order.
-(define read-measurements!
-  (lambda (collected)
+; Reading only gathers the lines, until read-line! returns #void at the end
+; of the input. `prepend` builds the list backwards, so it is reversed into
+; reading order at the end. What the lines mean is worked out afterwards,
+; by pure functions; the program prints once, at the end.
+(define read-lines!
+  (lambda (lines)
     (let ((line (read-line!)))
-      (if (void? line) collected
-          (empty? line) (read-measurements! collected)
-          otherwise
-          (let ((number (measurement line)))
-            (if (void? number)
-                (sequence
-                  (display! (concatenate "skipped: \"" line "\" is not a number\n"))
-                  (read-measurements! collected))
-                otherwise (read-measurements! (prepend number collected))))))))
+      (if (void? line) (reverse lines)
+          otherwise (read-lines! (prepend line lines))))))
+
+; Blank lines are left out. A line is either a measurement or a line to
+; complain about; `measurement` decides both.
+(define lines (filter (lambda (line) (not (empty? line))) (read-lines! ())))
+(define numbers (filter float? (map measurement lines)))
+(define skipped (filter (lambda (line) (void? (measurement line))) lines))
 
 ; ---- statistics -----------------------------------------------------------------
 
@@ -68,11 +68,11 @@
     (/ (sum numbers) (integer-to-float (count numbers)))))
 
 ; The standard deviation: the square root of the mean of the squared
-; distances from the mean. `sqrt` takes a Float.
+; distances from the mean, which the caller has already computed and passes
+; in as `center`. `sqrt` takes a Float.
 (define deviation
-  (lambda (numbers)
-    (let ((center (mean numbers)))
-      (sqrt (mean (map (lambda (x) (* (- x center) (- x center))) numbers))))))
+  (lambda (numbers center)
+    (sqrt (mean (map (lambda (x) (* (- x center) (- x center))) numbers)))))
 
 ; ---- presenting -------------------------------------------------------------------
 
@@ -102,9 +102,13 @@
                        (line "mean, four decimals" (float-to-fixed center 4))
                        (line "mean, two decimals" (float-to-fixed center 2))
                        (line "mean, whole degrees" (round center))
-                       (line "deviation" (float-to-fixed (deviation numbers) 2))
+                       (line "deviation" (float-to-fixed (deviation numbers center) 2))
                        (line "mean in Fahrenheit" (float-to-fixed (fahrenheit center) 2)))))))
 
-(define numbers (reverse (read-measurements! ())))
-(if (empty? numbers) (display! "no measurements\n")
-    otherwise (display! (report numbers)))
+(define skipped-line
+  (lambda (line)
+    (concatenate "skipped: \"" line "\" is not a number\n")))
+
+(display! (concatenate (t/join "" (map skipped-line skipped))
+                       (if (empty? numbers) "no measurements\n"
+                           otherwise (report numbers))))

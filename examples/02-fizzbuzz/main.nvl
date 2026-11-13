@@ -7,6 +7,8 @@
 ;   build/novelo examples/02-fizzbuzz/main.nvl
 
 (import io)
+(import list)      ; range, map
+(import text t)    ; t/join
 
 (define limit 15)
 
@@ -32,20 +34,14 @@
         (multiple? number 5) "Buzz"
         otherwise (to-string number))))
 
-; There are no loops either: a function that calls itself is the loop. The
-; call to count-from! is the last thing the function does (a tail call), so
-; it reuses the same space: counting to ten million uses no more memory
-; than counting to 15.
-;
-; Each branch of `if` is one expression. `sequence` runs several in order
-; and returns the value of the last, so the branch can print and then
-; continue. When the count is done the function returns #void, the value
-; that means "nothing".
-(define count-from!
+; There are no loops. `range` makes the list of the numbers from 1 to 15
+; (the end it is given is left out), `map` applies `fizzbuzz-line` to each
+; of them, and `t/join` puts the lines together into one text; 04-lists
+; shows lists in detail. The whole text is computed first and printed once,
+; with a single `display!`: the effect stays at the edge of the program,
+; and everything before it is a function of its arguments alone.
+(define fizzbuzz-line
   (lambda (number)
-    (if (> number limit) #void
-        otherwise (sequence
-                    (display! (concatenate (fizzbuzz number) "\n"))
-                    (count-from! (+ number 1))))))
+    (concatenate (fizzbuzz number) "\n")))
 
-(count-from! 1)
+(display! (t/join "" (map fizzbuzz-line (range 1 (+ limit 1)))))

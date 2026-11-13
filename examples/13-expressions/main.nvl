@@ -20,7 +20,7 @@
 ; changed it, or where it still is.
 
 (import io)
-(import list)      ; any?, filter, map, reverse, sort, span, zip
+(import list)      ; any?, filter, fold, map, reverse, sort, span, zip
 (import text t)    ; t/characters, t/digit?, t/join, t/letter?, t/pad-left, t/precedes?
 (import map)       ; from-entries, merge
 
@@ -369,23 +369,19 @@
 
 ; Each line is echoed after "> ", so the caret under a problem, two columns
 ; further right than the column it names, falls under the right character.
+; `report` prints nothing: it returns the text for the line, echo
+; included, with the new scope, as (text scope).
 (define report
   (lambda (line scope)
-    (display! (concatenate "> " line "\n"))
-    (catch (lambda ()
-             (let (((text scope) (run (parse-statement (tokenize (t/characters line) 1 ())) scope)))
-               (display! (concatenate text "\n"))
-               scope))
-           (lambda (problem)
-             (match problem
-               {:kind :expression :values (column)}
-               (sequence
-                 (display! (concatenate (t/pad-left (+ column 2) " " "^") " " (get problem :message) "\n"))
-                 scope)
-               otherwise
-               (sequence
-                 (display! (concatenate "error: " (get problem :message) "\n"))
-                 scope))))))
+    (let (((answer scope)
+           (catch (lambda () (run (parse-statement (tokenize (t/characters line) 1 ())) scope))
+                  (lambda (problem)
+                    (match problem
+                      {:kind :expression :values (column)}
+                      (list (concatenate (t/pad-left (+ column 2) " " "^") " " (get problem :message)) scope)
+                      otherwise
+                      (list (concatenate "error: " (get problem :message)) scope))))))
+      (list (concatenate "> " line "\n" answer "\n") scope))))
 
 ; Blank lines, and lines starting with #, are skipped.
 (define comment?
@@ -395,28 +391,42 @@
       ("#" &rest more) #true
       otherwise #false)))
 
-(define read-statements
-  (lambda (scope)
+; Reading only gathers the lines, until read-line! returns #void at the end
+; of the input; `prepend` builds the list backwards, so it is reversed.
+(define read-lines!
+  (lambda (lines)
     (let ((line (read-line!)))
-      (if (void? line) scope
-          (comment? line) (read-statements scope)
-          otherwise (read-statements (report line scope))))))
+      (if (void? line) (reverse lines)
+          otherwise (read-lines! (prepend line lines))))))
 
-(define scope (read-statements {:variables {} :functions {}}))
+; The statements run in order, each in the scope the ones before it left;
+; `fold` carries the texts so far, newest first, and the scope.
+(define step
+  (lambda (state line)
+    (let (((texts scope) state)
+          ((text scope) (report line scope)))
+      (list (prepend text texts) scope))))
+
+(define session
+  (fold step (list () {:variables {} :functions {}})
+        (filter (lambda (line) (not (comment? line))) (read-lines! ()))))
+
+(define scope (first (rest session)))
 
 ; The names, in order, with their values or definitions.
 (define sorted-names
   (lambda (table)
     (sort t/precedes? (keys table))))
 
-; Each list is printed one name to a line, under its title. The lines are
-; built first and joined, then printed at once: the effect stays at the
-; edge of the program, as everywhere else in it.
+; Each list is one name to a line, under its title.
 (define list-names
   (lambda (title table describe-entry)
-    (display! (concatenate "\n" title ":\n"
-                           (t/join "" (map (lambda (name) (concatenate "  " (describe-entry name (get table name)) "\n"))
-                                           (sorted-names table)))))))
+    (concatenate "\n" title ":\n"
+                 (t/join "" (map (lambda (name) (concatenate "  " (describe-entry name (get table name)) "\n"))
+                                 (sorted-names table))))))
 
-(list-names "variables" (get scope :variables) (lambda (name value) (t/format "{} = {}" name value)))
-(list-names "functions" (get scope :functions) show-function)
+; Everything above only computes text; the program prints it all here, at
+; once: the effect stays at the edge of the program.
+(display! (concatenate (t/join "" (reverse (first session)))
+                       (list-names "variables" (get scope :variables) (lambda (name value) (t/format "{} = {}" name value)))
+                       (list-names "functions" (get scope :functions) show-function)))

@@ -1,5 +1,5 @@
 {
-  "spec": "Standard Library — Novelo, version 0.9.0",
+  "spec": "Standard Library — Novelo, version 0.9.1",
   "format": {
     "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text, function, map, set and number available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
   },

@@ -246,12 +246,12 @@
     (if (not (or (equal? (first text) "-") (t/digit? (first text))))
         (fail (concatenate "unexpected " (first text)) text)
         otherwise
-        (let ((after (number-end text)))
-          (let ((number-text (apply concatenate (take (- (count text) (count after)) text))))
-            (let ((number (catch (lambda () (string-to-number (novelo-number number-text)))
-                                 (lambda (problem) (fail (concatenate "number out of range: " number-text) text)))))
-              (if (void? number) (fail (concatenate "invalid number: " number-text) text)
-                  otherwise (list number after))))))))
+        (let ((after (number-end text))
+              (number-text (apply concatenate (take (- (count text) (count after)) text)))
+              (number (catch (lambda () (string-to-number (novelo-number number-text)))
+                             (lambda (problem) (fail (concatenate "number out of range: " number-text) text)))))
+          (if (void? number) (fail (concatenate "invalid number: " number-text) text)
+              otherwise (list number after))))))
 
 ; ---- reading a text -----------------------------------------------------------
 

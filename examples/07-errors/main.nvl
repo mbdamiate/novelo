@@ -10,8 +10,8 @@
 ; exits with 1. Everything below catches its errors, so it exits with 0.
 
 (import io)
-(import list)      ; filter
-(import text t)    ; t/split
+(import list)      ; filter, map, reverse
+(import text t)    ; t/split, t/join
 
 ; ---- raising ---------------------------------------------------------------
 
@@ -72,19 +72,21 @@
           {:kind :division-by-zero} "undefined"
           otherwise (raise problem))))))
 
-(define report!
+(define report-line
   (lambda (line)
-    (display!
-      (concatenate
-        line " → "
-        (catch (lambda () (to-string (undefined-on-zero (lambda () (divide-line line)))))
-               (lambda (problem) (describe problem)))
-        "\n"))))
+    (concatenate
+      line " → "
+      (catch (lambda () (to-string (undefined-on-zero (lambda () (divide-line line)))))
+             (lambda (problem) (describe problem)))
+      "\n")))
 
-(define report-all!
-  (lambda ()
+; Reading only gathers the lines of the input, in order, until read-line!
+; returns #void at its end; it computes nothing from them. The work on the
+; lines is pure and builds the text, and the program prints it once.
+(define read-lines!
+  (lambda (lines)
     (let ((line (read-line!)))
-      (if (void? line) #void
-          otherwise (sequence (report! line) (report-all!))))))
+      (if (void? line) (reverse lines)
+          otherwise (read-lines! (prepend line lines))))))
 
-(report-all!)
+(display! (t/join "" (map report-line (read-lines! ()))))

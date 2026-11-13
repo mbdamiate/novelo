@@ -10,7 +10,9 @@ The standard library is made of six libraries, in the sense of core section 8.9:
 
 The reference definitions in section 4 are normative. The implementation MAY replace any of them with a native version, as long as the observable behavior is identical, including errors and the names each library binds.
 
-**Version:** 0.9.0, draft, on top of core 0.11.0.
+**Version:** 0.9.1, draft, on top of core 0.11.0.
+
+**Changes since 0.9.0.** No change in behavior. The definition of `any?` uses the `if` with several pairs (core 0.6.0) instead of an `if` nested in `otherwise` (section 4.1).
 
 **Changes since 0.8.0.** Two functions in `list` that example 13-expressions, an infix calculator, had to write by hand. `span` splits a list where a test stops holding, as a tokenizer reads a run of digits; `zip` pairs the elements of two lists, as a call pairs parameters with arguments, in the shape `from-entries` takes (sections 3 and 4.1). The other functions are unchanged.
 
@@ -176,8 +178,8 @@ The source of each library is the concatenation, in order, of the `lisp` code bl
 (define any?
   (lambda (matches? xs)
     (if (empty? xs) #false
-        otherwise (if (matches? (first xs)) #true
-                      otherwise (any? matches? (rest xs))))))
+        (matches? (first xs)) #true
+        otherwise (any? matches? (rest xs)))))
 
 (define every?
   (lambda (matches? xs)

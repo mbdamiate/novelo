@@ -6,6 +6,8 @@
 ;   build/novelo examples/03-recursion/main.nvl
 
 (import io)
+(import list)      ; range, map
+(import text t)    ; t/join
 
 ; ---- factorial ------------------------------------------------------------
 
@@ -20,14 +22,13 @@
 ; the largest factorial that fits, and (factorial 21) stops the program with
 ; the error :integer-overflow instead of returning a wrong number.
 
-(define show-factorials!
-  (lambda (n last)
-    (if (> n last) #void
-        otherwise (sequence
-                    (display! (concatenate (to-string n) "! = " (to-string (factorial n)) "\n"))
-                    (show-factorials! (+ n 1) last)))))
+; One line of text per n; as in 02-fizzbuzz, `map` and `range` build them
+; all, and the program prints them at the end.
+(define factorial-line
+  (lambda (n)
+    (concatenate (to-string n) "! = " (to-string (factorial n)) "\n")))
 
-(show-factorials! 0 20)
+(define factorials (t/join "" (map factorial-line (range 0 21))))
 
 ; ---- sum, two ways ----------------------------------------------------------
 
@@ -55,12 +56,12 @@
     (sum-loop n 0)))
 
 ; `let` names both results; they must agree.
-(define show-sums!
+(define sum-line
   (lambda (n)
     (let ((slow (sum-to n))
           (fast (fast-sum-to n)))
-      (display! (concatenate "sum to " (to-string n) " = " (to-string fast)
-                             (if (= slow fast) "\n" otherwise " (mismatch)\n"))))))
+      (concatenate "sum to " (to-string n) " = " (to-string fast)
+                   (if (= slow fast) "\n" otherwise " (mismatch)\n")))))
 
-(show-sums! 100)
-(show-sums! 100000)
+; Everything above only computes values; the one effect is here, at the end.
+(display! (concatenate factorials (sum-line 100) (sum-line 100000)))

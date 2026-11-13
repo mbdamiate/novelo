@@ -9,10 +9,10 @@
 ;   build/novelo examples/10-calculator/main.nvl < examples/10-calculator/input.txt
 ;
 ; It brings together the earlier examples: reading input (01), tail-call
-; loops (02, 03), lists and fold (04), maps and match (05), errors (07).
+; loops (03), lists and fold (04), maps and match (05), errors (07).
 
 (import io)
-(import list)      ; fold, filter, map
+(import list)      ; fold, filter, map, reverse
 (import text t)    ; t/split, t/join
 
 ; ---- the stack ------------------------------------------------------------------
@@ -99,12 +99,17 @@
     (catch (lambda () (to-string (evaluate line)))
            describe)))
 
-(define calculate!
-  (lambda ()
-    (let ((line (read-line!)))
-      (if (void? line) #void
-          otherwise (sequence
-                      (display! (concatenate line "  →  " (answer line) "\n"))
-                      (calculate!))))))
+(define answer-line
+  (lambda (line)
+    (concatenate line "  →  " (answer line) "\n")))
 
-(calculate!)
+; Reading only gathers the lines of the input, in order, until read-line!
+; returns #void at its end; it computes nothing from them. The work on the
+; lines is pure and builds the text, and the program prints it once.
+(define read-lines!
+  (lambda (lines)
+    (let ((line (read-line!)))
+      (if (void? line) (reverse lines)
+          otherwise (read-lines! (prepend line lines))))))
+
+(display! (t/join "" (map answer-line (read-lines! ()))))

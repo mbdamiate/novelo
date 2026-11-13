@@ -63,8 +63,10 @@
 
 ; ---- the report -----------------------------------------------------------------
 
-; The state carried from line to line: the totals per customer and the
-; numbers of the lines rejected. A JSON error gives a column; any other
+; The state carried from line to line: the totals per customer, the
+; numbers of the lines rejected, and the lines of text to print, newest
+; first. Nothing is printed while the orders are read; the text is printed
+; once, at the end, with the report. A JSON error gives a column; any other
 ; error, from checking the order, gives its message and values.
 (define reason
   (lambda (problem)
@@ -73,18 +75,21 @@
       (t/format "column {}: {}" column (get problem :message))
       otherwise (t/join " " (prepend (get problem :message) (map to-string (get problem :values ())))))))
 
+(define say
+  (lambda (state text)
+    (associate state :output (prepend text (get state :output)))))
+
 (define record
   (lambda (state number line)
     (catch (lambda ()
              (let (((customer item-count total) (order-total (json/read line)))
                    (totals (get state :totals)))
-               (display! (t/format "{}: {}, {} {}, {}\n" number (json/string customer) item-count
-                                   (if (= item-count 1) "item" otherwise "items") (float-to-fixed total 2)))
-               (associate state :totals (associate totals customer (+ total (get totals customer 0.0))))))
+               (say (associate state :totals (associate totals customer (+ total (get totals customer 0.0))))
+                    (t/format "{}: {}, {} {}, {}\n" number (json/string customer) item-count
+                              (if (= item-count 1) "item" otherwise "items") (float-to-fixed total 2)))))
            (lambda (problem)
-             (sequence
-               (display! (t/format "{}: rejected, {}\n" number (reason problem)))
-               (associate state :rejected (prepend number (get state :rejected))))))))
+             (say (associate state :rejected (prepend number (get state :rejected)))
+                  (t/format "{}: rejected, {}\n" number (reason problem)))))))
 
 (define read-orders
   (lambda (state number)
@@ -93,10 +98,11 @@
           (json/blank? line) (read-orders state (+ number 1))
           otherwise (read-orders (record state number line) (+ number 1))))))
 
-(define state (read-orders {:totals {} :rejected ()} 1))
+(define state (read-orders {:totals {} :rejected () :output ()} 1))
 
-(display! "\n")
-(display! (json/write {"lines" (get state :lines)
-                    "rejected" (reverse (get state :rejected))
-                    "totals" (map-values cents (get state :totals))}))
-(display! "\n")
+(display! (concatenate (t/join "" (reverse (get state :output)))
+                       "\n"
+                       (json/write {"lines" (get state :lines)
+                                    "rejected" (reverse (get state :rejected))
+                                    "totals" (map-values cents (get state :totals))})
+                       "\n"))
