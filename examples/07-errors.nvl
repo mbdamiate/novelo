@@ -1,0 +1,87 @@
+; Errors: raising, catching, re-raising.
+;
+; Reads lines of two integers and prints the quotient of each. Bad lines do
+; not stop the program: each error is caught, described and skipped.
+;
+;   build/novelo examples/07-errors.nvl < examples/07-errors.input
+;
+; An error that nothing catches stops the program: it prints
+; "file:line:column: error :kind: message values" on standard error and
+; exits with 1. Everything below catches its errors, so it exits with 0.
+
+(import io)
+(import list)      ; filter
+(import text t)    ; t/split
+
+; ---- raising ---------------------------------------------------------------
+
+; Every error is a map, its descriptor: {:kind … :message … :values (…)}.
+; `error` builds one with :kind :error and stops the evaluation.
+(define parse-integer
+  (lambda (text)
+    (let ((number (string-to-number text)))   ; #void when text is not an integer
+      (if (void? number) (error "not an integer" text)
+          otherwise number))))
+
+; `raise` stops the evaluation with a descriptor the program built itself,
+; which may use its own :kind.
+(define two-fields
+  (lambda (line)
+    (let ((fields (filter (lambda (field) (not (empty? field)))
+                          (t/split " " line))))
+      (if (= (count fields) 2) fields
+          otherwise (raise {:kind :bad-line
+                            :message "expected two integers"
+                            :values (list line)})))))
+
+; Errors raised by primitives have kinds of their own: `quotient` by zero
+; raises :division-by-zero, and `string-to-number` of a number too large for
+; 64 bits raises :integer-overflow.
+(define divide-line
+  (lambda (line)
+    (let ((fields (two-fields line)))
+      (quotient (parse-integer (first fields))
+                (parse-integer (first (rest fields)))))))
+
+; ---- catching ----------------------------------------------------------------
+
+; (catch body handler) calls `body`, a function of no arguments. If it
+; fails, the work it was doing is abandoned and `handler` receives the
+; descriptor; whatever the handler returns becomes the value of `catch`.
+;
+; Errors raised while the program runs also carry :position, the line and
+; column of the innermost form that failed.
+(define describe
+  (lambda (problem)
+    (concatenate "line " (to-string (get (get problem :position) :line))
+                 " of the program, " (to-string (get problem :kind))
+                 ": " (get problem :message)
+                 " " (to-string (get problem :values)))))
+
+; A handler can deal with one kind and pass the others on: `raise` of the
+; descriptor it received sends it, unchanged and with its position, to the
+; next `catch` outward. Here a zero divisor is not a failure: the result is
+; just "undefined".
+(define undefined-on-zero
+  (lambda (thunk)
+    (catch thunk
+      (lambda (problem)
+        (if (equal? (get problem :kind) :division-by-zero) "undefined"
+            otherwise (raise problem))))))
+
+(define report!
+  (lambda (line)
+    (display!
+      (concatenate
+        line " → "
+        (catch (lambda () (to-string (undefined-on-zero (lambda () (divide-line line)))))
+               (lambda (problem) (describe problem)))
+        "\n"))))
+
+(define report-all!
+  (lambda ()
+    (let ((line (read-line!)))
+      (if (void? line) #void
+          otherwise (sequence (report! line) (report-all!))))))
+
+(report-all!)
