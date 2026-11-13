@@ -4,7 +4,7 @@
 #   make test         unit tests + conformance suites + examples
 #   make unit         unit tests only
 #   make conformance  conformance suites only
-#   make examples     run examples/*.nvl with the interpreter and check their output
+#   make examples     run examples/*/main.nvl with the interpreter and check their output
 #   make asan         everything above, rebuilt with AddressSanitizer + UBSan in build/asan
 #   make clean
 

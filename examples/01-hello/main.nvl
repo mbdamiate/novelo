@@ -3,8 +3,8 @@
 ; Reads a name from the first line of standard input and greets it. With no
 ; input, or an empty line, it greets the world.
 ;
-;   build/novelo examples/01-hello.nvl < examples/01-hello.input
-;   echo Grace | build/novelo examples/01-hello.nvl
+;   build/novelo examples/01-hello/main.nvl < examples/01-hello/input.txt
+;   echo Grace | build/novelo examples/01-hello/main.nvl
 ;
 ; A semicolon starts a comment that runs to the end of the line.
 

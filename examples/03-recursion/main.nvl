@@ -3,7 +3,7 @@
 ; Prints n! for n from 0 to 20, then the sum 1 + 2 + … + n computed with
 ; plain recursion and with a tail-recursive loop.
 ;
-;   build/novelo examples/03-recursion.nvl
+;   build/novelo examples/03-recursion/main.nvl
 
 (import io)
 

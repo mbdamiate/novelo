@@ -5,7 +5,7 @@
 ; compared exactly, so "The" and "the" are different words, and punctuation
 ; stays attached to the word it touches.
 ;
-;   build/novelo examples/05-word-count.nvl < examples/05-word-count.input
+;   build/novelo examples/05-word-count/main.nvl < examples/05-word-count/input.txt
 
 (import io)        ; display!, read-line!
 (import list)      ; fold, filter, sort, take, ...

@@ -4,7 +4,7 @@
 ; prints "Buzz", a multiple of both prints "FizzBuzz", and any other number
 ; prints itself.
 ;
-;   build/novelo examples/02-fizzbuzz.nvl
+;   build/novelo examples/02-fizzbuzz/main.nvl
 
 (import io)
 

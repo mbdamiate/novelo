@@ -104,7 +104,7 @@ make examples
   - Matches the exact output.
   - Runs each case with a fresh state on a large stack. A case's `files` sit in an in-memory file system around `/main.nvl`.
   - After each case, no object and no position entry may remain alive.
-- **Examples (`examples/`):** numbered by complexity, each adding one idea, starting at `01-hello.nvl`. Each `NAME.nvl` is a complete program, commented, run by `build/novelo` through `tests/examples.sh`. It must exit with 0 and print exactly `NAME.output`; `NAME.input`, when present, is its standard input.
+- **Examples (`examples/`):** numbered by complexity, each adding one idea, starting at `01-hello`. Each example is a directory: `main.nvl` is a complete program, commented, run by `build/novelo` through `tests/examples.sh`. It must exit with 0 and print exactly `output.txt`; `input.txt`, when present, is its standard input. Any other file is part of the example, such as the files `08-modules` includes.
 
 ## Source map
 

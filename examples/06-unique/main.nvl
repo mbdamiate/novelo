@@ -3,7 +3,7 @@
 ; Two days of a visitor log, with repeats. Sets answer the questions a log
 ; raises: who came at all, who came both days, who came only once.
 ;
-;   build/novelo examples/06-unique.nvl
+;   build/novelo examples/06-unique/main.nvl
 
 (import io)
 (import list)      ; map, filter

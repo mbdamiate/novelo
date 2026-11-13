@@ -3,7 +3,7 @@
 ; Works through a list of exam scores with the core list primitives and the
 ; library `list`: building, taking apart, transforming, reducing, sorting.
 ;
-;   build/novelo examples/04-lists.nvl
+;   build/novelo examples/04-lists/main.nvl
 
 (import io)
 (import list)      ; range, map, filter, fold, reverse, sort, take, any?, ...

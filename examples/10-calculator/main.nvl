@@ -6,7 +6,7 @@
 ; stack and pushes its result. A line is valid when exactly one value is
 ; left. Errors are reported per line and do not stop the calculator.
 ;
-;   build/novelo examples/10-calculator.nvl < examples/10-calculator.input
+;   build/novelo examples/10-calculator/main.nvl < examples/10-calculator/input.txt
 ;
 ; It brings together the earlier examples: reading input (01), tail-call
 ; loops (02, 03), lists and fold (04), maps (05), errors (07).

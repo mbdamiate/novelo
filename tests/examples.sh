@@ -1,7 +1,8 @@
 #!/bin/sh
-# Runs each examples/NAME.nvl with the interpreter and checks that it exits
-# with 0 and prints exactly examples/NAME.output. When examples/NAME.input
-# exists, it is the program's standard input.
+# Runs each example, examples/NAME/main.nvl, with the interpreter and checks
+# that it exits with 0 and prints exactly examples/NAME/output.txt. When
+# examples/NAME/input.txt exists, it is the program's standard input. Other
+# files in the directory belong to the example, such as files it includes.
 #
 #   tests/examples.sh build/novelo
 
@@ -16,17 +17,17 @@ failed=0
 actual=$(mktemp)
 trap 'rm -f "$actual"' EXIT
 
-for program in examples/*.nvl; do
-    name=${program%.nvl}
+for program in examples/*/main.nvl; do
+    directory=${program%/main.nvl}
     input=/dev/null
-    [ -f "$name.input" ] && input=$name.input
+    [ -f "$directory/input.txt" ] && input=$directory/input.txt
     if "$interpreter" "$program" < "$input" > "$actual"; then
-        if cmp -s "$actual" "$name.output"; then
+        if cmp -s "$actual" "$directory/output.txt"; then
             passed=$((passed + 1))
             continue
         fi
-        echo "FAIL $program: the output differs from $name.output" >&2
-        diff "$name.output" "$actual" >&2
+        echo "FAIL $program: the output differs from $directory/output.txt" >&2
+        diff "$directory/output.txt" "$actual" >&2
     else
         echo "FAIL $program: exit code $?" >&2
     fi

@@ -13,7 +13,7 @@ This repository specifies **Novelo**, an immutable Lisp (core v0.5.0, standard l
 | `conformance.json` | 288 core cases (`read`, `read-error`, `read-positions`, `eval`, with an optional `error_position`); programs import at most `io` |
 | `stdlib-conformance.json` | 46 stdlib `eval` cases; programs import `list`, `text`, `function`, `map` or `set` |
 | `README.md` | Building, running, source map, design, implementation-defined behavior |
-| `examples/` | Commented example programs (`NN-name.nvl`, optional `.input`, expected `.output`), numbered by complexity, each adding one idea; helper files of an example go in a subdirectory, which the runner skips. The friction they show picks the next extension |
+| `examples/` | Commented example programs, numbered by complexity, each adding one idea: one directory per example, `NN-name/main.nvl` with an optional `input.txt`, the expected `output.txt`, and any files it includes. The friction they show picks the next extension |
 
 The specs and the conformance files are the only source of truth. When the prose and a conformance case disagree, or the prose is silent, the case wins. Core §12.4 lists behaviors that only the tests fix, such as `first`/`rest` of `()` → `:wrong-type`.
 
@@ -24,7 +24,7 @@ make               # build build/novelo (C23, -Wall -Wextra -Wpedantic -Werror)
 make test          # unit tests + both conformance suites + examples; must pass with zero leaks
 make unit          # unit tests only
 make conformance   # both conformance suites
-make examples      # run examples/*.nvl with build/novelo and compare with NAME.output
+make examples      # run examples/*/main.nvl with build/novelo and compare with output.txt
 make asan          # rebuild in build/asan with ASan + UBSan and run `make test` there
 ./build/unit-tests -k reader/strings --no-fork   # one unit test, in-process for a debugger
 ./build/conformance -v -k read-error conformance.json

@@ -2,10 +2,10 @@
 ;
 ; `include` loads the forms of another file as if they were written here.
 ; With a prefix, the file's names are kept apart under that prefix, so two
-; files can use the same names without clashing. The included files are in
-; examples/08-modules/.
+; files can use the same names without clashing. The included files sit
+; next to this one, in examples/08-modules/.
 ;
-;   build/novelo examples/08-modules.nvl
+;   build/novelo examples/08-modules/main.nvl
 
 (import io)
 
@@ -23,7 +23,7 @@
 
 ; The path is relative to this file. Every name shapes.nvl defines is bound
 ; here as shape/<name>; the file itself prints a line when it loads.
-(include "08-modules/shapes.nvl" shape)
+(include "shapes.nvl" shape)
 
 (show! "square of side 3" (shape/square-area 3))
 (show! "rectangle 2 by 5" (shape/rectangle-area 2 5))
@@ -41,14 +41,14 @@
 ; Including the same file again with the same prefix does nothing: no second
 ; "(loading shapes)" line. With another prefix it loads again, with its own
 ; copy of every name.
-(include "08-modules/shapes.nvl" shape)
-(include "08-modules/shapes.nvl" figure)
+(include "shapes.nvl" shape)
+(include "shapes.nvl" figure)
 (show! "figure/square-area 4" (figure/square-area 4))
 
 ; ---- without a prefix ----------------------------------------------------------
 
 ; Without a prefix the file's definitions are plain global names, as if they
 ; had been written in this file.
-(include "08-modules/statistics.nvl")
+(include "statistics.nvl")
 (show! "mean" (mean '(4 8 15 16 23 42)))
 (show! "total" (total '(4 8 15 16 23 42)))

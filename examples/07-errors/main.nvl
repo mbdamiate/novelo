@@ -3,7 +3,7 @@
 ; Reads lines of two integers and prints the quotient of each. Bad lines do
 ; not stop the program: each error is caught, described and skipped.
 ;
-;   build/novelo examples/07-errors.nvl < examples/07-errors.input
+;   build/novelo examples/07-errors/main.nvl < examples/07-errors/input.txt
 ;
 ; An error that nothing catches stops the program: it prints
 ; "file:line:column: error :kind: message values" on standard error and

@@ -1,4 +1,4 @@
-; Small statistics over lists of integers. 08-modules.nvl includes this file
+; Small statistics over lists of integers. main.nvl includes this file
 ; without a prefix, so its definitions become ordinary global names.
 
 (import list)      ; fold

@@ -1,4 +1,4 @@
-; Areas of shapes. 08-modules.nvl includes this file with the prefix `shape`.
+; Areas of shapes. main.nvl includes this file with the prefix `shape`.
 ;
 ; Inside this file the names it defines are written plainly: `rectangle-area`
 ; here means shape/rectangle-area, whatever the including program calls

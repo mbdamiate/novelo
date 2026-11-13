@@ -5,7 +5,7 @@
 ; place. This file builds `when`, `unless`, a `cond` for the else-if chains
 ; of 02-fizzbuzz, and shows the one trap of macros, name capture.
 ;
-;   build/novelo examples/09-macros.nvl
+;   build/novelo examples/09-macros/main.nvl
 
 (import io)
 (import list)      ; map
