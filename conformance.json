@@ -1,5 +1,5 @@
 {
-  "spec": "Core Specification — Novelo, version 0.8.0",
+  "spec": "Core Specification — Novelo, version 0.8.1",
   "format": {
     "read": "Read 'input' (UTF-8). With 'equivalent': also read that text and compare the two datum sequences with equal?. With 'types': the sequence read has exactly these types, in order.",
     "read-error": "Read 'input' (or the bytes of 'input_hex'). Reading MUST fail with the code 'error' at position [line, column].",

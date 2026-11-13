@@ -39,8 +39,8 @@ static void report_read_error(const LispReplOptions *options, const LispReadErro
     lisp_buffer_free(&message);
 }
 
-/* The session begins as if with (import io), (import list), (import text)
- * and (import function) in the empty context. */
+/* The session begins as if with (import io) and an import of each library
+ * of the standard library, in the empty context (core §8.7). */
 static void import_libraries(LispState *state, const LispReplOptions *options) {
     for (const char *const *name = lisp_library_names; *name; name++) {
         Value *result = lisp_import(state, lisp_symbol_cstr(*name), nullptr, nullptr);

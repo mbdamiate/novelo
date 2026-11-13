@@ -22,7 +22,9 @@ The core is a three-stage pipeline:
 
 **Normative terms.** MUST indicates a mandatory requirement. MUST NOT indicates a prohibition. MAY indicates implementation freedom that does not affect observable behavior.
 
-**Version:** core 0.8.0, draft.
+**Version:** core 0.8.1, draft.
+
+**Changes since 0.8.0.** The REPL imports every library of the standard library, whatever their number, instead of a fixed list (8.7). Nothing else changes.
 
 **Changes since 0.7.0.** Two primitives convert between a String and its code points: `string-to-code-points` and `code-points-to-string` (9). A number that is not a Unicode scalar value produces the new error `:invalid-code-point` (8.5, 9). With them, comparing, classifying and changing the case of text can be written in the language, so the standard library does it. Section 8.9 no longer lists the libraries of the standard library, which has its own specification.
 
@@ -580,7 +582,7 @@ Memory management is otherwise left to the implementation and has no observable 
 3. Print the result with `write!`, followed by a newline. If the result is `#void`, print nothing.
 4. On a read error or an uncaught error, show the message, discard the input and go back to step 1.
 
-The REPL starts as if the session began with `(import io)`, `(import list)`, `(import text)`, `(import function)`, `(import map)` and `(import set)`, in the empty context, so every library the implementation provides is at hand; a library the implementation does not provide is skipped. Step 3 prints with the `write!` rules (section 10) whether or not `write!` is bound.
+The REPL starts as if the session began with `(import io)` and then an `import` of each library of the standard library, in the order its specification lists them, in the empty context, so every library the implementation provides is at hand; a library the implementation does not provide is skipped. Step 3 prints with the `write!` rules (section 10) whether or not `write!` is bound.
 
 Redefining a name with `define` replaces the previous binding (8.2). The REPL ends at the end of standard input.
 

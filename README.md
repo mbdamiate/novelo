@@ -1,6 +1,6 @@
 # Novelo
 
-An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.8.0) and the standard library (`standard-library.md`, v0.4.0).
+An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.8.1) and the standard library (`standard-library.md`, v0.5.0).
 
 *Novelo* is Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as Novelo's lists are. Source files end in `.nvl`.
 
@@ -9,7 +9,7 @@ Every case of both conformance suites passes:
 | Suite | Cases |
 | --- | --- |
 | core | 357 |
-| stdlib | 46 |
+| stdlib | 64 |
 
 Those runs report no leaks, and they also pass under AddressSanitizer and UndefinedBehaviorSanitizer.
 
@@ -70,16 +70,17 @@ An uncaught error names the innermost form, read from a file, that contains the 
 ```lisp
 (import io)            ; write!, display!, read-line!
 (import list)          ; map, filter, fold, sort, ...
-(import text t)        ; t/split, t/join (and the names of list, as t/map, ...)
+(import text t)        ; t/split, t/join, t/precedes?, t/lowercase, t/letter?, ... (and the names of list, as t/map)
 (import function)      ; partial
 (import map)           ; values, entries, merge, update, map-values, ...
 (import set)           ; from-list, union, intersection, difference, subset?
+(import number)        ; max, min
 (include "lib/geometry.nvl" geo)   ; geo/area, ...
 ```
 
-**The REPL** starts with all six libraries imported. An input may span several lines: while a list, map or string is still open, the REPL keeps reading. Each value except `#void` is printed with the `write!` rules. After an error the REPL reports it and reads the next input. The `> ` prompt appears only when standard input is a terminal, so piping a file through the REPL prints only the values.
+**The REPL** starts with all seven libraries imported. An input may span several lines: while a list, map or string is still open, the REPL keeps reading. Each value except `#void` is printed with the `write!` rules. After an error the REPL reports it and reads the next input. The `> ` prompt appears only when standard input is a terminal, so piping a file through the REPL prints only the values.
 
-**The standard library** is not compiled in. On each `import`, `list`, `text`, `function`, `map` and `set` are read from the `lisp` code blocks of `standard-library.md` §4.1–4.5, so the code that runs is the normative code. The build fixes the absolute path of that document. To use another copy, set `NOVELO_STDLIB`:
+**The standard library** is not compiled in. On each `import`, `list`, `text`, `function`, `map`, `set` and `number` are read from the `lisp` code blocks of `standard-library.md` §4.1–4.6, so the code that runs is the normative code. The build fixes the absolute path of that document. To use another copy, set `NOVELO_STDLIB`:
 
 ```bash
 NOVELO_STDLIB=/usr/local/share/novelo/standard-library.md build/novelo program.nvl

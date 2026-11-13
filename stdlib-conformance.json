@@ -1,7 +1,7 @@
 {
-  "spec": "Standard Library — Novelo, version 0.4.0",
+  "spec": "Standard Library — Novelo, version 0.5.0",
   "format": {
-    "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text, function, map and set available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
+    "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text, function, map, set and number available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
   },
   "cases": [
     {
@@ -373,6 +373,150 @@
       "section": "4.5",
       "program": "(import map)\n(import set s)\n(list (merge {:a 1} {:b 2}) (s/union #{1} #{2}) (s/reverse (list 1 2)) (catch (lambda () union) (lambda (problem) (get problem :kind))))",
       "value": "({:a 1 :b 2} #{1 2} (2 1) :unbound-symbol)",
+      "output": ""
+    },
+    {
+      "id": "library-047",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text)\n(list (precedes? \"apple\" \"banana\") (precedes? \"b\" \"a\") (precedes? \"a\" \"a\") (precedes? \"ab\" \"abc\") (precedes? \"abc\" \"ab\") (precedes? \"\" \"a\") (precedes? \"\" \"\"))",
+      "value": "(#true #false #false #true #false #true #false)",
+      "output": ""
+    },
+    {
+      "id": "library-048",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text)\n(list (precedes? \"Zebra\" \"apple\") (precedes? \"z\" \"é\") (precedes? \"é\" \"😀\") (sort precedes? (list \"pera\" \"uva\" \"maçã\" \"Banana\" \"abacaxi\")))",
+      "value": "(#true #true #true (\"Banana\" \"abacaxi\" \"maçã\" \"pera\" \"uva\"))",
+      "output": ""
+    },
+    {
+      "id": "library-049",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text)\n(sort precedes? (list \"b1\" \"a2\" \"b1\" \"a1\"))",
+      "value": "(\"a1\" \"a2\" \"b1\" \"b1\")",
+      "output": ""
+    },
+    {
+      "id": "library-050",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text)\n(precedes? \"a\" :a)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-051",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text)\n(list (uppercase \"Ação, Vovô! 1z\") (lowercase \"AÇÃO, VOVÔ! 1Z\") (uppercase \"\") (lowercase \"ÀÉÎÕÜÝÞ\"))",
+      "value": "(\"AÇÃO, VOVÔ! 1Z\" \"ação, vovô! 1z\" \"\" \"àéîõüýþ\")",
+      "output": ""
+    },
+    {
+      "id": "library-052",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text)\n(list (uppercase \"ß ÿ × ÷ ñ\") (lowercase \"× ÷ Ÿ Ω\") (uppercase \"ω λ 😀\"))",
+      "value": "(\"ß ÿ × ÷ Ñ\" \"× ÷ Ÿ Ω\" \"ω λ 😀\")",
+      "output": ""
+    },
+    {
+      "id": "library-053",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text)\n(list (letter? \"a\") (letter? \"Ação\") (letter? \"ßÿ\") (letter? \"a1\") (letter? \"\") (letter? \"×\") (letter? \"÷\") (letter? \" \") (letter? \"λ\") (letter? \",\"))",
+      "value": "(#true #true #true #false #false #false #false #false #false #false)",
+      "output": ""
+    },
+    {
+      "id": "library-054",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text)\n(list (digit? \"0\") (digit? \"2024\") (digit? \"12a\") (digit? \"\") (digit? \"-1\") (digit? \"٣\"))",
+      "value": "(#true #true #false #false #false #false)",
+      "output": ""
+    },
+    {
+      "id": "library-055",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text)\n(letter? 7)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-056",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text)\n(define words (list \"The\" \"the\" \"Ball,\" \"ball\"))\n(define clean (lambda (word) (lowercase (code-points-to-string (filter (lambda (n) (letter? (code-points-to-string (list n)))) (string-to-code-points word))))))\n(map clean words)",
+      "value": "(\"the\" \"the\" \"ball\" \"ball\")",
+      "output": ""
+    },
+    {
+      "id": "library-057",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(list (max 3 7 2) (min 3 7 2) (max 5) (min -5) (max -1 -9) (apply max (list 4 -1 9)) (apply min (list 4 -1 9)))",
+      "value": "(7 2 5 -5 -1 9 -1)",
+      "output": ""
+    },
+    {
+      "id": "library-058",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(max)",
+      "error": ":wrong-arguments",
+      "output": ""
+    },
+    {
+      "id": "library-059",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(apply min ())",
+      "error": ":wrong-arguments",
+      "output": ""
+    },
+    {
+      "id": "library-060",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(max \"a\")",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-061",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(min 1 \"a\")",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-062",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(list (apply max (range 0 100000)) (apply min (range -50000 50000)) (reverse (list 1 2)))",
+      "value": "(99999 -50000 (2 1))",
+      "output": ""
+    },
+    {
+      "id": "library-063",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number n)\n(list (n/max 1 2) (n/reverse (list 1 2)) (catch (lambda () max) (lambda (problem) (get problem :kind))))",
+      "value": "(2 (2 1) :unbound-symbol)",
+      "output": ""
+    },
+    {
+      "id": "library-064",
+      "kind": "eval",
+      "section": "3",
+      "program": "(import list)\n(import text)\n(import function)\n(import map)\n(import set)\n(import number)\n(list (precedes? \"a\" \"b\") (max 1 2) (from-list (list 1 1)) (values {:a 1}))",
+      "value": "(#true 2 #{1} (1))",
       "output": ""
     }
   ]
