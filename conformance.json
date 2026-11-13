@@ -1,5 +1,5 @@
 {
-  "spec": "Core Specification — Novelo, version 0.5.0",
+  "spec": "Core Specification — Novelo, version 0.6.0",
   "format": {
     "read": "Read 'input' (UTF-8). With 'equivalent': also read that text and compare the two datum sequences with equal?. With 'types': the sequence read has exactly these types, in order.",
     "read-error": "Read 'input' (or the bytes of 'input_hex'). Reading MUST fail with the code 'error' at position [line, column].",
@@ -2612,6 +2612,174 @@
       "section": "8.9",
       "program": "(import io)\n(define display! (lambda (text) :mine))\n(display! \"a\")",
       "value": ":mine",
+      "output": ""
+    },
+    {
+      "id": "if-001",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(if #true 1 #true 2 otherwise 3)",
+      "value": "1",
+      "output": ""
+    },
+    {
+      "id": "if-002",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(define n 0)\n(if (< n 0) :negative\n    (= n 0) :zero\n    otherwise :positive)",
+      "value": ":zero",
+      "output": ""
+    },
+    {
+      "id": "if-003",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(if #false 1 #false 2 otherwise 3)",
+      "value": "3",
+      "output": ""
+    },
+    {
+      "id": "if-004",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(list (if #false 1 #false 2) (if #false 1 () 2) (if #false 1 0 2 otherwise 3))",
+      "value": "(#void 2 2)",
+      "output": ""
+    },
+    {
+      "id": "if-005",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(define sign (lambda (n) (if (< n 0) :negative (= n 0) :zero (> n 100) :large otherwise :positive)))\n(list (sign -5) (sign 0) (sign 7) (sign 500))",
+      "value": "(:negative :zero :positive :large)",
+      "output": ""
+    },
+    {
+      "id": "if-006",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(import io)\n(if (sequence (display! \"a\") #false) 1\n    (sequence (display! \"b\") #true) 2\n    (sequence (display! \"c\") #true) 3\n    otherwise (display! \"d\"))",
+      "value": "2",
+      "output": "ab"
+    },
+    {
+      "id": "if-007",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(define loop (lambda (n) (if (< n 0) :negative (= n 0) :done otherwise (loop (- n 1))))) (loop 1000000)",
+      "value": ":done",
+      "output": ""
+    },
+    {
+      "id": "if-008",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(define evens (lambda (n acc) (if (= n 0) acc (= (remainder n 2) 0) (evens (- n 1) (+ acc 1)) otherwise (evens (- n 1) acc)))) (evens 1000000 0)",
+      "value": "500000",
+      "output": ""
+    },
+    {
+      "id": "if-009",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(if)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "if-010",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(if #true)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "if-011",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(if #false 1 #true 2 3)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "if-012",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(if otherwise 1)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "if-013",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(if #true 1 otherwise)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "if-014",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(if #true 1 otherwise 2 3)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "if-015",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(if #false 1 otherwise 2 #true 3)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "if-016",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(if #true otherwise 1 2)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "if-017",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(if #false 1 otherwise 2 otherwise 3)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "if-018",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(define otherwise 5)\n(list otherwise (if #false 1 #true otherwise))",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "if-019",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define f (lambda (n)\n  (if (= n 0) 1\n      (= n 1) (first ())\n      otherwise 3)))\n(f 1)",
+      "error": ":wrong-type",
+      "error_position": [
+        3,
+        15
+      ],
+      "output": ""
+    },
+    {
+      "id": "if-020",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define g (lambda ()\n  (if #true 1\n      #false 2\n      3)))",
+      "error": ":expansion-error",
+      "error_position": [
+        2,
+        3
+      ],
       "output": ""
     }
   ]

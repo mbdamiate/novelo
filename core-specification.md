@@ -16,13 +16,15 @@ The core is a three-stage pipeline:
 
 **Libraries.** Nothing beyond the primitives (section 9) is visible to a program until it asks for it. A program declares each library it uses with `import` (8.9), much as a C program declares its headers. The core defines the mechanism and one native library, `io`, which holds the input and output functions.
 
-**Out of scope.** The standard library, with the libraries `list`, `text`, `function`, `map` and `set` and functions such as `map`, `filter` and `sort`, has its own specification. The extensions already planned, such as multi-pair `if`, sum types and gradual typing, belong to the full specification. The core only reserves the names they use (section 8.2).
+**Out of scope.** The standard library, with the libraries `list`, `text`, `function`, `map` and `set` and functions such as `map`, `filter` and `sort`, has its own specification. The extensions already planned, such as sum types and gradual typing, belong to the full specification. The core only reserves the names they use (section 8.2).
 
 **Name.** The language is called **Novelo**, Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as the lists of the language are. Source files use the extension `.nvl`; the extension is a convention, and `include` accepts any path (8.8).
 
 **Normative terms.** MUST indicates a mandatory requirement. MUST NOT indicates a prohibition. MAY indicates implementation freedom that does not affect observable behavior.
 
-**Version:** core 0.5.0, draft.
+**Version:** core 0.6.0, draft.
+
+**Changes since 0.5.0.** `if` accepts several test and result pairs, with an optional `otherwise` at the end: `(if c1 a1 c2 a2 otherwise b)` (8.2). The two forms that existed keep their meaning, and every other shape is still an expansion error. Each result is in tail position (8.4).
 
 **Changes since 0.4.0.** A new type, Set, written `#{…}` (2, 5.2, 5.5), with the read error `duplicate-element` (7.4) and the runtime error `:duplicate-element` (8.4, 8.5). Set literals evaluate their elements like map literals (8.1, 8.4). `equal?`, printing and quasiquote handle sets (2.4.1, 8.3, 10). New primitives `set?`, `adjoin`, `disjoin` and `elements`; `count`, `empty?` and `contains?` accept sets (9). Sets are persistent, like maps (8.6). The REPL also imports the library `set` (8.7).
 
@@ -350,12 +352,27 @@ In an **application** `(f a b …)`, the operator is evaluated first and the arg
 | Form | Syntax | Meaning |
 | --- | --- | --- |
 | `quote` | `(quote datum)` | returns the datum without evaluating it |
-| `if` | `(if c a otherwise b)` or `(if c a)` | evaluates `c`; if it is not `#false`, evaluates `a`; otherwise evaluates `b`, or returns `#void` if there is no `otherwise` |
+| `if` | `(if c a otherwise b)`, `(if c a)`, or several pairs `(if c1 a1 c2 a2 … otherwise b)` | evaluates `c`; if it is not `#false`, evaluates `a`; otherwise evaluates `b`, or returns `#void` if there is no `otherwise` |
 | `lambda` | `(lambda (parameters …) body …)` | creates a closure; the value of a call is that of the last body expression |
 | `define` | `(define name value)` | binds a global name and returns `#void`; top level only |
 | `define-macro` | `(define-macro name (lambda (parameters …) body …))` | binds a name to a code transformer; top level only |
 
-**`if`.** `if` has exactly one of the two forms in the table; `otherwise` is a marker, not a variable. Other forms are an expansion error. This leaves room for a future multi-pair extension compatible with these two forms.
+**`if`.** After `if` come one or more pairs of a test and a result, optionally followed by `otherwise` and exactly one expression. `otherwise` is a marker, not a variable: it may appear only once, right before the last expression. Every other shape is an expansion error: no pair, a test without a result, `otherwise` anywhere else, or none or more than one expression after it. So `(if c a b)` is an error, not a two-armed `if`.
+
+With more than one pair, `if` is rewritten into nested `if`s, each pair becoming the condition and result of one of them:
+
+```lisp
+(if c1 a1 c2 a2 more …)           ; ≡ (if c1 a1 otherwise (if c2 a2 more …))
+(if c1 a1 c2 a2 otherwise b)      ; ≡ (if c1 a1 otherwise (if c2 a2 otherwise b))
+```
+
+The tests are evaluated in order, and the first one that is not `#false` selects its result; the tests after it are not evaluated. When no test holds, the value is that of the expression after `otherwise`, or `#void` without one. A chain of cases is written one pair per line:
+
+```lisp
+(if (< n 0) "negative"
+    (= n 0) "zero"
+    otherwise "positive")
+```
 
 **`lambda`.** Parameters are distinct symbols. `&rest`, if present, comes before the last parameter, which receives the extra arguments as a list. The body has one or more expressions. Every function is anonymous: recursion uses a global name, defined with `define`.
 
@@ -412,7 +429,7 @@ In the `or` rewrite, `t` is a symbol created by `generate-symbol`, so that it do
 
 **Set literals** evaluate their elements, left to right: `#{(+ 1 2) x}` is a set with `3` and the value of `x`. For the literal datum, use `quote`. Elements that only repeat after evaluation, as in `#{a b}` with `a` and `b` equal, MUST produce `:duplicate-element`.
 
-**Tail calls are guaranteed.** A call in tail position MUST NOT use more space than the call it replaces, so that tail recursion runs in constant memory. It is the only looping mechanism. The tail positions are the last expression of a `lambda` body and both branches of an `if` that is itself in tail position. Through rewriting, the following inherit the position of the form that contains them: the body of a `let`, the last expression of a `sequence`, and the last argument of an `and` or an `or`.
+**Tail calls are guaranteed.** A call in tail position MUST NOT use more space than the call it replaces, so that tail recursion runs in constant memory. It is the only looping mechanism. The tail positions are the last expression of a `lambda` body and every result of an `if` that is itself in tail position, including the expression after `otherwise`. Through rewriting, the following inherit the position of the form that contains them: the body of a `let`, the last expression of a `sequence`, and the last argument of an `and` or an `or`.
 
 ```lisp
 (define numbers-from
@@ -753,18 +770,18 @@ An implementation is conformant when it passes all the cases below. Results are 
 
 ### 12.4 Conformance file
 
-The file `conformance.json` has 288 cases, each with an `id`, the section it tests and a kind:
+The file `conformance.json` has 308 cases, each with an `id`, the section it tests and a kind:
 
 | Kind | Cases | What it checks |
 | --- | --- | --- |
 | `read` | 22 | `input` produces the same sequence of datums as `equivalent`, or datums with the types in `types` |
 | `read-error` | 45 | reading `input`, or the bytes of `input_hex`, fails with the code `error` at `position` |
 | `read-positions` | 3 | the node indicated by each `path` is in the position table with the expected `position` |
-| `eval` | 218 | `program` runs as a file, with `input` (or the bytes of `input_hex`) on standard input; it imports at most the library `io`; the output is exactly `output`, and the program ends with the value `value` or with an uncaught error of the `:kind` given in `error`; with `error_position`, the descriptor of that error has a `:position` whose `:line` and `:column` are the given pair, or, when `error_position` is `null`, no `:position` |
+| `eval` | 238 | `program` runs as a file, with `input` (or the bytes of `input_hex`) on standard input; it imports at most the library `io`; the output is exactly `output`, and the program ends with the value `value` or with an uncaught error of the `:kind` given in `error`; with `error_position`, the descriptor of that error has a `:position` whose `:line` and `:column` are the given pair, or, when `error_position` is `null`, no `:position` |
 
 An `eval` case that tests `include` (8.8) also has `files`, an object that maps each relative path, with `/` as separator, to the text of that file. The program is the file `main.nvl`, and the paths are relative to its directory. A path missing from `files` cannot be opened.
 
-The `eval` cases cover the special and derived forms, tail calls with one million iterations, a traversal of a list of one million elements with `empty?`, `first` and `rest` (8.6), a map of one million keys built with `associate`, persistence and `dissociate` on large maps, keys whose hashes may collide (8.6), sets: reading, literals, equality, printing, quasiquote, the primitives and a set of one million elements, 10,000 nested non-tail calls and `:stack-overflow`, equality, arithmetic and overflows, primitives, `read-line!` with invalid UTF-8, printing (including `display!` of strings inside collections), `catch` and `raise`, the positions in errors (8.5), both callback patterns, `include` with and without prefixes, and `import` (8.9). Some cases check that what was removed from the core does not exist: `/`, `same?`, named `lambda`, the names without `!`, the standard library functions without `import`, and the `io` functions without `import`. The library has its own cases, in the file `stdlib-conformance.json`.
+The `eval` cases cover the special and derived forms, including `if` with several pairs, tail calls with one million iterations, a traversal of a list of one million elements with `empty?`, `first` and `rest` (8.6), a map of one million keys built with `associate`, persistence and `dissociate` on large maps, keys whose hashes may collide (8.6), sets: reading, literals, equality, printing, quasiquote, the primitives and a set of one million elements, 10,000 nested non-tail calls and `:stack-overflow`, equality, arithmetic and overflows, primitives, `read-line!` with invalid UTF-8, printing (including `display!` of strings inside collections), `catch` and `raise`, the positions in errors (8.5), both callback patterns, `include` with and without prefixes, and `import` (8.9). Some cases check that what was removed from the core does not exist: `/`, `same?`, named `lambda`, the names without `!`, the standard library functions without `import`, and the `io` functions without `import`. The library has its own cases, in the file `stdlib-conformance.json`.
 
 **Behaviors fixed by the tests.** While writing the cases, these points needed an answer that the text above does not give yet:
 
@@ -773,4 +790,4 @@ The `eval` cases cover the special and derived forms, tail calls with one millio
 - `dissociate` of a missing key returns the map unchanged.
 - A `raise` with a valid descriptor and a custom `:kind`, such as `:custom`, terminates the program with that `:kind`.
 
-Version 0.2.1 settled the remaining points in the text (see its list of changes), and the cases cover them. Version 0.3.0 added the positions in errors, version 0.4.0 the persistent maps and version 0.5.0 the type Set; their cases cover them too.
+Version 0.2.1 settled the remaining points in the text (see its list of changes), and the cases cover them. Version 0.3.0 added the positions in errors, version 0.4.0 the persistent maps, version 0.5.0 the type Set and version 0.6.0 the `if` with several pairs; their cases cover them too.

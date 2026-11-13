@@ -18,15 +18,19 @@
   (lambda (number divisor)
     (= (remainder number divisor) 0)))
 
-; There is no `cond` or `else if`: each `otherwise` branch holds the next
-; `if`. `and` holds when both of its tests hold. `to-string` turns the
-; number into text, so every branch returns a String.
+; `if` takes pairs of a test and a result, one pair per line, tried in order:
+; the first test that holds picks its result, and `otherwise` gives the
+; result when none does. So the order matters here: a multiple of both 3
+; and 5 must be caught before the tests for 3 and for 5 alone.
+;
+; `and` holds when both of its tests hold. `to-string` turns the number into
+; text, so every branch returns a String.
 (define fizzbuzz
   (lambda (number)
     (if (and (multiple? number 3) (multiple? number 5)) "FizzBuzz"
-        otherwise (if (multiple? number 3) "Fizz"
-                      otherwise (if (multiple? number 5) "Buzz"
-                                    otherwise (to-string number))))))
+        (multiple? number 3) "Fizz"
+        (multiple? number 5) "Buzz"
+        otherwise (to-string number))))
 
 ; There are no loops either: a function that calls itself is the loop. The
 ; call to count-from! is the last thing the function does (a tail call), so

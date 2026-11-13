@@ -91,7 +91,11 @@ static void check_output(const char *file, int line, const char *source, const c
 
 static void t_special_form_shapes(void) {
     CHECK_RUN_ERROR("(if 1)", ":expansion-error");
-    CHECK_RUN_ERROR("(if 1 2 else 3)", ":expansion-error");
+    CHECK_RUN_ERROR("(if 1 2 3)", ":expansion-error");
+    CHECK_RUN_ERROR("(if 1 2 3 otherwise)", ":expansion-error");
+    /* Two pairs: `else` is an ordinary variable, the second test. */
+    CHECK_RUN("(if 1 2 else 3)", "2");
+    CHECK_RUN_ERROR("(if #false 2 else 3)", ":unbound-symbol");
     CHECK_RUN_ERROR("(quote)", ":expansion-error");
     CHECK_RUN_ERROR("(quote a b)", ":expansion-error");
     CHECK_RUN_ERROR("(lambda (x))", ":expansion-error");

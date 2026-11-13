@@ -62,8 +62,8 @@
   (lambda (stack token)
     (let ((number (string-to-number token)))
       (if (integer? number) (prepend number stack)
-          otherwise (if (contains? words token) ((get words token) stack)
-                        otherwise (error "unknown word" token))))))
+          (contains? words token) ((get words token) stack)
+          otherwise (error "unknown word" token)))))
 
 (define tokens
   (lambda (line)

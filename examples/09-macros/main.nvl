@@ -2,8 +2,8 @@
 ;
 ; A macro is a function that runs before evaluation. It receives the code of
 ; its arguments as data, unevaluated, and returns new code, which takes its
-; place. This file builds `when`, `unless`, a `cond` for the else-if chains
-; of 02-fizzbuzz, and shows the one trap of macros, name capture.
+; place. This file builds `when`, `unless` and a `cond`, and shows the one
+; trap of macros, name capture.
 ;
 ;   build/novelo examples/09-macros/main.nvl
 
@@ -47,8 +47,12 @@
 
 ; ---- cond -------------------------------------------------------------------------
 
-; (cond (test result) … (otherwise result)) tries each test in turn. The
-; transformer is an ordinary function, so it can be defined, called and
+; (cond (test result) … (otherwise result)) tries each test in turn, like
+; the `if` with several pairs of 02-fizzbuzz, but with each clause in its
+; own parentheses, as in other Lisps. The language already has that `if`;
+; `cond` is here to show a macro that expands into itself.
+;
+; The transformer is an ordinary function, so it can be defined, called and
 ; inspected like any other before it becomes a macro.
 (define cond-expansion
   (lambda (&rest clauses)
@@ -65,7 +69,7 @@
 ; `cond`, which expands again in turn.
 (show! "expansion" (cond-expansion '((= n 0) "zero") '(otherwise "many")))
 
-; FizzBuzz again, now without the staircase of nested `if`s.
+; FizzBuzz again, written with the macro.
 (define fizzbuzz
   (lambda (number)
     (cond ((= (remainder number 15) 0) "FizzBuzz")

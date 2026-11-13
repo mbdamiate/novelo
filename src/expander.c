@@ -14,6 +14,7 @@
 #include "include.h"
 #include "node.h"
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -167,30 +168,59 @@ static Value *expand_quote(LispState *state, Value *form) {
     return constant_node(element(form, 1));
 }
 
-/* (if c a) or (if c a otherwise b) */
-static Value *expand_if(LispState *state, Value *form, const Scope *scope, Value *context) {
-    size_t length = lisp_list_length(form);
-    bool short_form = length == 3;
-    bool long_form = length == 5 && element(form, 3) == lisp_symbols()->otherwise;
-    if (!short_form && !long_form) {
-        return lisp_expansion_error(state, form, "if must be (if c a) or (if c a otherwise b)");
-    }
+/* Builds the IF node of the pairs left in `arguments`, `pairs` of them,
+ * followed by `otherwise` and one expression when has_otherwise:
+ * (if c1 a1 c2 a2 …) ≡ (if c1 a1 otherwise (if c2 a2 …)). */
+static Value *expand_if_pairs(LispState *state, const Value *arguments, size_t pairs, bool has_otherwise,
+                              const Scope *scope, Value *context) {
     Value *node = lisp_node_new(LISP_NODE_IF, 3);
     LispNode *conditional = mutable_node(node);
-    conditional->children[0] = expand(state, element(form, 1), scope, context);
-    if (conditional->children[0]) conditional->children[1] = expand(state, element(form, 2), scope, context);
-    if (conditional->children[1] && long_form) {
-        conditional->children[2] = expand(state, element(form, 4), scope, context);
-        if (!conditional->children[2]) {
-            lisp_release(node);
-            return nullptr;
-        }
+    conditional->children[0] = expand(state, lisp_first(arguments), scope, context);
+    if (!conditional->children[0]) {
+        lisp_release(node);
+        return nullptr;
     }
+    const Value *after_test = lisp_rest(arguments);
+    conditional->children[1] = expand(state, lisp_first(after_test), scope, context);
     if (!conditional->children[1]) {
         lisp_release(node);
         return nullptr;
     }
+    const Value *more = lisp_rest(after_test);
+    if (pairs > 1) {
+        conditional->children[2] = expand_if_pairs(state, more, pairs - 1, has_otherwise, scope, context);
+    } else if (has_otherwise) {
+        conditional->children[2] = expand(state, lisp_first(lisp_rest(more)), scope, context); /* skips otherwise */
+    } else {
+        return node; /* no otherwise: #void when no test holds */
+    }
+    if (!conditional->children[2]) {
+        lisp_release(node);
+        return nullptr;
+    }
     return node;
+}
+
+/* (if c1 a1 c2 a2 …) or (if c1 a1 c2 a2 … otherwise b), one pair or more.
+ * `otherwise` may appear only right before the last expression. */
+static Value *expand_if(LispState *state, Value *form, const Scope *scope, Value *context) {
+    const Value *arguments = lisp_rest(form);
+    size_t count = lisp_list_length(arguments);
+    size_t index = 0;
+    size_t otherwise_index = SIZE_MAX;
+    bool valid = true;
+    for (const Value *rest = arguments; rest->kind == LISP_KIND_PAIR; rest = lisp_rest(rest), index++) {
+        if (lisp_first(rest) != lisp_symbols()->otherwise) continue;
+        if (otherwise_index != SIZE_MAX || index + 2 != count) valid = false;
+        otherwise_index = index;
+    }
+    bool has_otherwise = otherwise_index != SIZE_MAX;
+    size_t paired = has_otherwise ? count - 2 : count; /* the arguments that form pairs */
+    if (!valid || paired == 0 || paired % 2 != 0) {
+        return lisp_expansion_error(state, form,
+                                    "if must be (if c1 a1 c2 a2 …), optionally ending with otherwise and one expression");
+    }
+    return expand_if_pairs(state, arguments, paired / 2, has_otherwise, scope, context);
 }
 
 /* (lambda (parameters …) body …) */
