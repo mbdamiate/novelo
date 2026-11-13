@@ -1,9 +1,10 @@
 # Novelo — build, tests and sanitizers.
 #
 #   make              build the interpreter, build/novelo
-#   make test         unit tests + conformance suites
+#   make test         unit tests + conformance suites + examples
 #   make unit         unit tests only
 #   make conformance  conformance suites only
+#   make examples     run examples/*.nvl with the interpreter and check their output
 #   make asan         everything above, rebuilt with AddressSanitizer + UBSan in build/asan
 #   make clean
 
@@ -32,17 +33,20 @@ CONFORMANCE_OBJ := $(CONFORMANCE_SRC:tests/conformance/%.c=$(BUILD)/tests/confor
 CONFORMANCE_BIN := $(BUILD)/conformance
 CLI_BIN := $(BUILD)/novelo
 
-.PHONY: all test unit conformance asan clean
+.PHONY: all test unit conformance examples asan clean
 
 all: $(CLI_BIN)
 
-test: unit conformance
+test: unit conformance examples
 
 unit: $(UNIT_BIN)
 	./$(UNIT_BIN)
 
 conformance: $(CONFORMANCE_BIN)
 	./$(CONFORMANCE_BIN) conformance.json stdlib-conformance.json
+
+examples: $(CLI_BIN)
+	tests/examples.sh $(CLI_BIN)
 
 asan:
 	$(MAKE) test BUILD=build/asan SANITIZE=1

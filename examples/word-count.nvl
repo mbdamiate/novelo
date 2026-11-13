@@ -1,0 +1,60 @@
+; Word frequency.
+;
+; Reads text from standard input and prints the five most frequent words,
+; one per line, as "count word". Words are separated by spaces; they are
+; compared exactly, so "The" and "the" are different words, and punctuation
+; stays attached to the word it touches.
+;
+;   build/novelo examples/word-count.nvl < examples/word-count.input
+
+(import io)        ; display!, read-line!
+(import list)      ; fold, filter, sort, take, ...
+(import text t)    ; t/split
+(import map)       ; entries
+
+(define how-many 5)
+
+; The words of one line: split on single spaces, then drop the empty strings
+; that runs of spaces leave between them.
+(define words
+  (lambda (line)
+    (filter (lambda (word) (not (empty? word)))
+            (t/split " " line))))
+
+; Counting goes into a Map from word to count. Maps are persistent, so
+; adding a word returns a new map and leaves `counts` as it was.
+(define count-word
+  (lambda (counts word)
+    (associate counts word (+ 1 (get counts word 0)))))
+
+; Reads every line until the end of the input (read-line! returns #void) and
+; returns the counts. The recursive call is in tail position, so the loop runs
+; in constant memory however long the input is.
+(define read-counts!
+  (lambda (counts)
+    (let ((line (read-line!)))
+      (if (void? line) counts
+          otherwise (read-counts! (fold count-word counts (words line)))))))
+
+; `entries` turns the map into a list of (word count) lists. Taking the parts
+; of an entry apart needs first and rest by hand.
+(define entry-word (lambda (entry) (first entry)))
+(define entry-count (lambda (entry) (first (rest entry))))
+
+; Most frequent first. The library's merge sort is stable, so words with the
+; same count keep the order in which they first appeared.
+(define ranked
+  (lambda (counts)
+    (sort (lambda (a b) (> (entry-count a) (entry-count b)))
+          (entries counts))))
+
+(define show!
+  (lambda (entry)
+    (display! (concatenate (to-string (entry-count entry)) " " (entry-word entry) "\n"))))
+
+; Prints each entry; `fold` is used only to walk the list in order.
+(define show-all!
+  (lambda (entries)
+    (fold (lambda (ignored entry) (show! entry)) #void entries)))
+
+(show-all! (take how-many (ranked (read-counts! {}))))

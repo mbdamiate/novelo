@@ -33,7 +33,7 @@ make CC=gcc test
 
 ```bash
 make            # builds build/novelo
-make test       # unit tests + both conformance suites
+make test       # unit tests + both conformance suites + the examples
 make asan       # the same, rebuilt in build/asan with ASan + UBSan
 make clean
 ```
@@ -90,6 +90,7 @@ NOVELO_STDLIB=/usr/local/share/novelo/standard-library.md build/novelo program.n
 ```bash
 make unit
 make conformance
+make examples
 ./build/unit-tests -k reader/strings --no-fork      # one test, in-process for a debugger
 ./build/conformance -v -k include conformance.json  # list the matching cases
 ```
@@ -103,6 +104,7 @@ make conformance
   - Matches the exact output.
   - Runs each case with a fresh state on a large stack. A case's `files` sit in an in-memory file system around `/main.nvl`.
   - After each case, no object and no position entry may remain alive.
+- **Examples (`examples/`):** each `NAME.nvl` is a complete program, commented, run by `build/novelo` through `tests/examples.sh`. It must exit with 0 and print exactly `NAME.output`; `NAME.input`, when present, is its standard input.
 
 ## Source map
 
