@@ -22,7 +22,9 @@ The core is a three-stage pipeline:
 
 **Normative terms.** MUST indicates a mandatory requirement. MUST NOT indicates a prohibition. MAY indicates implementation freedom that does not affect observable behavior.
 
-**Version:** core 0.10.0, draft.
+**Version:** core 0.10.1, draft.
+
+**Changes since 0.10.0.** No change to the language. Measuring which code of the reference implementation the cases reach showed behaviors with no case, now covered by 38 new ones (12.4): an error inside a map, set or quasiquote being built, expansion errors nested in `if`, `let`, `and`, `or`, `match`, literals and quasiquotes, macros with many arguments or whose transformer fails, the argument types of `/`, `contains?`, `string-at`, `substring`, `empty?`, `dissociate`, `concatenate`, `string-to-number`, `string-to-symbol`, `symbol-to-string`, `raise` and `catch`, `quotient` and `remainder` by `-1`, every type as a map key, keys nested deeper than twelve levels, an `include` path with a NUL, and a `\u` escape cut by the end of the input.
 
 **Changes since 0.9.0.** A new primitive, `float-to-fixed`, writes a Float with a fixed number of decimals, rounded from its exact binary value with ties away from zero (9). It cannot be written in the language, since the arithmetic of Floats rounds at every step. Nothing else changes.
 
@@ -833,14 +835,14 @@ An implementation is conformant when it passes all the cases below. Results are 
 
 ### 12.4 Conformance file
 
-The file `conformance.json` has 461 cases, each with an `id`, the section it tests and a kind:
+The file `conformance.json` has 499 cases, each with an `id`, the section it tests and a kind:
 
 | Kind | Cases | What it checks |
 | --- | --- | --- |
 | `read` | 28 | `input` produces the same sequence of datums as `equivalent`, or datums with the types in `types` |
-| `read-error` | 54 | reading `input`, or the bytes of `input_hex`, fails with the code `error` at `position` |
+| `read-error` | 55 | reading `input`, or the bytes of `input_hex`, fails with the code `error` at `position` |
 | `read-positions` | 3 | the node indicated by each `path` is in the position table with the expected `position` |
-| `eval` | 376 | `program` runs as a file, with `input` (or the bytes of `input_hex`) on standard input; it imports at most the library `io`; the output is exactly `output`, and the program ends with the value `value` or with an uncaught error of the `:kind` given in `error`; with `error_position`, the descriptor of that error has a `:position` whose `:line` and `:column` are the given pair, or, when `error_position` is `null`, no `:position` |
+| `eval` | 413 | `program` runs as a file, with `input` (or the bytes of `input_hex`) on standard input; it imports at most the library `io`; the output is exactly `output`, and the program ends with the value `value` or with an uncaught error of the `:kind` given in `error`; with `error_position`, the descriptor of that error has a `:position` whose `:line` and `:column` are the given pair, or, when `error_position` is `null`, no `:position` |
 
 An `eval` case that tests `include` (8.8) also has `files`, an object that maps each relative path, with `/` as separator, to the text of that file. The program is the file `main.nvl`, and the paths are relative to its directory. A path missing from `files` cannot be opened.
 
@@ -853,4 +855,4 @@ The `eval` cases cover the special and derived forms, including `if` with severa
 - `dissociate` of a missing key returns the map unchanged.
 - A `raise` with a valid descriptor and a custom `:kind`, such as `:custom`, terminates the program with that `:kind`.
 
-Version 0.2.1 settled the remaining points in the text (see its list of changes), and the cases cover them. Version 0.3.0 added the positions in errors, version 0.4.0 the persistent maps, version 0.5.0 the type Set and version 0.6.0 the `if` with several pairs, version 0.7.0 `match`, version 0.8.0 the code point conversions and version 0.9.0 the type Float and version 0.10.0 `float-to-fixed`; their cases cover them too.
+Version 0.2.1 settled the remaining points in the text (see its list of changes), and the cases cover them. Version 0.3.0 added the positions in errors, version 0.4.0 the persistent maps, version 0.5.0 the type Set and version 0.6.0 the `if` with several pairs, version 0.7.0 `match`, version 0.8.0 the code point conversions and version 0.9.0 the type Float and version 0.10.0 `float-to-fixed`; their cases cover them too. Version 0.10.1 added cases for the behaviors that a measurement of the implementation's coverage found untested.

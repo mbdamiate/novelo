@@ -209,6 +209,8 @@ static void t_fixed_against_printf(void) {
     }
 }
 
+static const LispClass widget_class = {"Widget", nullptr};
+
 static void t_functions(void) {
     Value *primitive = lisp_primitive("dummy", 0, 0, dummy_primitive);
     LispBuffer output;
@@ -217,6 +219,14 @@ static void t_functions(void) {
     CHECK_STR(output.data, "#<function>");
     lisp_buffer_free(&output);
     lisp_release(primitive);
+
+    /* an opaque object prints its class, inside a list too */
+    Value *list = lisp_prepend_take(lisp_opaque_new(&widget_class, sizeof(LispOpaque)), LISP_EMPTY);
+    lisp_buffer_init(&output);
+    lisp_print(&output, list, LISP_PRINT_WRITE);
+    CHECK_STR(output.data, "(#<Widget>)");
+    lisp_buffer_free(&output);
+    lisp_release(list);
 }
 
 /* Reading the printed text gives an equal? value (§10). */
@@ -247,7 +257,7 @@ const TestSuite printer_suite = {"printer", (const TestCase[]){
     {"every Float reads back from the shortest digits", t_float_round_trip},
     {"fixed decimals", t_fixed},
     {"fixed decimals agree with printf away from ties", t_fixed_against_printf},
-    {"functions", t_functions},
+    {"functions and opaque objects", t_functions},
     {"printed text reads back", t_round_trip},
     {},
 }};

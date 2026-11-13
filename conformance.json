@@ -1,5 +1,5 @@
 {
-  "spec": "Core Specification — Novelo, version 0.10.0",
+  "spec": "Core Specification — Novelo, version 0.10.1",
   "format": {
     "read": "Read 'input' (UTF-8). With 'equivalent': also read that text and compare the two datum sequences with equal?. With 'types': the sequence read has exactly these types, in order.",
     "read-error": "Read 'input' (or the bytes of 'input_hex'). Reading MUST fail with the code 'error' at position [line, column].",
@@ -4048,6 +4048,313 @@
       "section": "9",
       "program": "(catch (lambda () (float-to-fixed 3.0 25)) (lambda (problem) (get problem :values)))",
       "value": "(25)",
+      "output": ""
+    },
+    {
+      "id": "eval-239",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(define message (lambda (thunk) (catch thunk (lambda (problem) (get problem :message)))))\n(list (message (lambda () {:a (error \"in a map\")}))\n      (message (lambda () #{1 (error \"in a set\")}))\n      (message (lambda () `(1 ,(error \"in a list\"))))\n      (message (lambda () `{:a ,(error \"in a quasiquoted map\")}))\n      (message (lambda () `#{,(error \"in a quasiquoted set\")})))",
+      "value": "(\"in a map\" \"in a set\" \"in a list\" \"in a quasiquoted map\" \"in a quasiquoted set\")",
+      "output": ""
+    },
+    {
+      "id": "eval-240",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(if (let) 1)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-241",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(if #true (let))",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-242",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(if #false 1 otherwise (let))",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-243",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(if #false 1 #true (let))",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-244",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(let x 1)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-245",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(and #true (let))",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-246",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(or #false (let))",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-247",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "{:a (let)}",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-248",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "#{1 (let)}",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-249",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "`{:a ,(let)}",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-250",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "`#{,(let)}",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-251",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "`{:a ,@(list 1)}",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-252",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "`#{,@(list 1)}",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-253",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (quotient 7 -1) (remainder 7 -1) (quotient -9 -1) (remainder -9223372036854775808 -1))",
+      "value": "(-7 0 9 0)",
+      "output": ""
+    },
+    {
+      "id": "eval-254",
+      "kind": "eval",
+      "section": "9",
+      "program": "(define kind (lambda (thunk) (catch thunk (lambda (problem) (get problem :kind)))))\n(list (kind (lambda () (/ \"a\" 1.0))) (kind (lambda () (/ 1.0 :b)))\n      (kind (lambda () (contains? (list 1) 1))) (kind (lambda () (contains? \"abc\" \"a\")))\n      (kind (lambda () (string-at 5 0))) (kind (lambda () (string-at \"abc\" 1.0)))\n      (kind (lambda () (substring 5 0 1))) (kind (lambda () (substring \"abc\" \"0\" 1))) (kind (lambda () (substring \"abc\" 0 #void))))",
+      "value": "(:wrong-type :wrong-type :wrong-type :wrong-type :wrong-type :wrong-type :wrong-type :wrong-type :wrong-type)",
+      "output": ""
+    },
+    {
+      "id": "eval-255",
+      "kind": "eval",
+      "section": "8.6",
+      "program": "(define identity (lambda (x) x))\n(define table {#void 1 () 2 #true 3 #false 4 \"s\" 5 'sym 6 :k 7 1.5 8 -0.0 9 {:a 1} 10 #{1} 11})\n(list (get table #void) (get table ()) (get table #true) (get table #false) (get table \"s\") (get table 'sym) (get table :k)\n      (get table 1.5) (get table 0.0) (get table {:a 1}) (get table #{1})\n      (get (associate {} identity 12) identity) (contains? (adjoin #{} first) first) (contains? (adjoin #{} identity) (lambda (x) x)))",
+      "value": "(1 2 3 4 5 6 7 8 9 10 11 12 #true #false)",
+      "output": ""
+    },
+    {
+      "id": "eval-256",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(include \"a\\u{0}b.nvl\")",
+      "error": ":include-error",
+      "output": ""
+    },
+    {
+      "id": "read-error-046",
+      "kind": "read-error",
+      "section": "4.3",
+      "error": "unterminated-string",
+      "position": [
+        1,
+        1
+      ],
+      "input": "\"\\u"
+    },
+    {
+      "id": "eval-257",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(lambda (&rest a &rest b) 1)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-258",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(let ((1 2)) 1)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-259",
+      "kind": "eval",
+      "section": "8.2",
+      "program": "(let ((x (let))) x)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-260",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(match {:a 1} {:a (quote x y)} 1)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-261",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(match 1 otherwise 2 x 3)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-262",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "`{,@(list 1) 2}",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-263",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "`{,(let) 1}",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-264",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "{(let) 1}",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-265",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(quasiquote)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-266",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(quasiquote 1 2)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-267",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(list `{} `#{} `{:a ,(+ 1 1)} `#{,(+ 1 2)})",
+      "value": "({} #{} {:a 2} #{3})",
+      "output": ""
+    },
+    {
+      "id": "eval-268",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(define-macro nine (lambda (a b c d e f g h i) (list (quote list) a e i))) (nine 1 2 3 4 5 6 7 8 9)",
+      "value": "(1 5 9)",
+      "output": ""
+    },
+    {
+      "id": "eval-269",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(define-macro broken (lambda () (error \"inside a macro\"))) (broken)",
+      "error": ":error",
+      "output": ""
+    },
+    {
+      "id": "eval-270",
+      "kind": "eval",
+      "section": "9",
+      "program": "(define kind (lambda (thunk) (catch thunk (lambda (problem) (get problem :kind)))))\n(list (kind (lambda () (empty? 5))) (kind (lambda () (dissociate 5 1))) (kind (lambda () (concatenate \"a\" 5)))\n      (kind (lambda () (substring \"abc\" -1 2))) (kind (lambda () (substring \"abc\" 4 4))) (substring \"abc\" 3 3))",
+      "value": "(:wrong-type :wrong-type :wrong-type :index-out-of-range :index-out-of-range \"\")",
+      "output": ""
+    },
+    {
+      "id": "eval-271",
+      "kind": "eval",
+      "section": "8.6",
+      "program": "(define nest (lambda (n inner) (if (= n 0) inner otherwise (nest (- n 1) (list inner)))))\n(define table (associate (associate {} (nest 12 {:a 1}) :map) (nest 12 #{1}) :set))\n(list (get table (nest 12 {:a 1})) (get table (nest 12 #{1})) (contains? table (nest 12 {:a 2})) (count table))",
+      "value": "(:map :set #false 2)",
+      "output": ""
+    },
+    {
+      "id": "eval-272",
+      "kind": "eval",
+      "section": "9",
+      "program": "(define kind (lambda (thunk) (catch thunk (lambda (problem) (get problem :kind)))))\n(list (kind (lambda () (string-to-number 5))) (kind (lambda () (string-to-symbol :a))) (kind (lambda () (symbol-to-string \"a\")))\n      (kind (lambda () (raise {:message \"no kind\"}))) (kind (lambda () (raise {:kind \"text\"}))) (kind (lambda () (raise (list :kind))))\n      (kind (lambda () (catch 1 (lambda (p) p)))) (kind (lambda () (catch (lambda () 1) 2))))",
+      "value": "(:wrong-type :wrong-type :wrong-type :wrong-type :wrong-type :wrong-type :wrong-type :wrong-type)",
+      "output": ""
+    },
+    {
+      "id": "eval-273",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(define-macro incomplete)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-274",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(include 5)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "eval-275",
+      "kind": "eval",
+      "section": "8.8",
+      "program": "(include \"a.nvl\" \"prefix\")",
+      "error": ":expansion-error",
       "output": ""
     }
   ]

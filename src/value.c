@@ -255,16 +255,6 @@ Value *lisp_generate_symbol(void) {
     return &name->header;
 }
 
-void lisp_values_shutdown(void) {
-    for (size_t slot = 0; slot < interned_capacity; slot++) free(interned_names[slot]);
-    free(interned_names);
-    interned_names = nullptr;
-    interned_count = interned_capacity = 0;
-    free(pending_objects);
-    pending_objects = nullptr;
-    pending_count = pending_capacity = 0;
-}
-
 /* ---- lists ------------------------------------------------------------------------ */
 
 Value *lisp_prepend_take(Value *first, Value *rest) {

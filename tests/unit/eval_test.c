@@ -227,6 +227,12 @@ static void t_deep_recursion_and_stack_overflow(void) {
 
     /* the default limit protects an ordinary thread too */
     CHECK_RUN_ERROR("(define forever (lambda (n) (+ 1 (forever n)))) (forever 0)", ":stack-overflow");
+
+    /* expanding a form too deep for the stack: a macro builds it, since the
+     * reader stops at 1000 levels */
+    CHECK_RUN_ERROR("(define nest (lambda (n inner) (if (= n 0) inner otherwise (nest (- n 1) (list 'list inner)))))"
+                    "(define-macro deep (lambda () (nest 1000000 1))) (deep)",
+                    ":stack-overflow");
 }
 
 /* ---- primitives (§9) ------------------------------------------------------------------------ */
@@ -258,6 +264,8 @@ static void t_other_primitives(void) {
     CHECK_RUN("(list (string-to-number \"007\") (string-to-number \"-\") (string-to-number \"+5\"))", "(7 #void #void)");
     CHECK_RUN("(symbol-to-string (string-to-symbol \"a b\"))", "\"a b\"");
     CHECK_RUN("(list (not #false) (not ()) (not 0))", "(#true #false #false)");
+    /* a state created with no input reads nothing */
+    CHECK_RUN("(import io) (list (read-line!) (read-line!))", "(#void #void)");
     CHECK_RUN("(apply list 1 2 ())", "(1 2)");
     CHECK_RUN_ERROR("(apply + 1 2)", ":wrong-type");
     CHECK_RUN_ERROR("(apply 1 ())", ":not-a-function");

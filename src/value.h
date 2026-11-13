@@ -160,9 +160,6 @@ size_t lisp_live_objects(void);
 /* Called when an object with LISP_HAS_POSITION is freed (§6.4). */
 void lisp_set_position_forget_hook(void (*hook)(const Value *node));
 
-/* Frees the interning table and the integer cache. No value may be used after. */
-void lisp_values_shutdown(void);
-
 /* ---- types --------------------------------------------------------------- */
 
 static inline bool lisp_is_list(const Value *value) {

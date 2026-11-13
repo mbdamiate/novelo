@@ -115,14 +115,3 @@ uint32_t lisp_source_file_register(const char *name) {
 const char *lisp_source_file_name(uint32_t file) {
     return file > 0 && file <= file_name_count ? file_names[file - 1] : nullptr;
 }
-
-void lisp_positions_shutdown(void) {
-    assert(entry_count == 0);
-    free(entries);
-    entries = nullptr;
-    entry_count = capacity = 0;
-    for (uint32_t index = 0; index < file_name_count; index++) free(file_names[index]);
-    free(file_names);
-    file_names = nullptr;
-    file_name_count = file_name_capacity = 0;
-}

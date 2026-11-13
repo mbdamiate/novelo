@@ -29,9 +29,6 @@ bool lisp_position_lookup(const Value *node, LispPosition *position);
 /* Number of entries (for leak checks in tests). */
 size_t lisp_position_count(void);
 
-/* Frees the table, which must be empty, and the file names. */
-void lisp_positions_shutdown(void);
-
 /* core §8.5 — the names of the files positions come from, kept for the
  * :file of error positions. Registering a name again returns the same id;
  * ids start at 1. */

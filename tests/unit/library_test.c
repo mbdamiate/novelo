@@ -148,7 +148,25 @@ static void t_errors(void) {
     library_run(&run, "(import list)", path);
     check_values(__FILE__, __LINE__, &run, "(list :odd-map 5 3)");
     library_run_finish(&run);
+
+    /* a document without the section of the library */
+    library_run(&run, "(import text)", path);
+    check_values(__FILE__, __LINE__, &run, "(text :cannot-open)");
+    library_run_finish(&run);
     unlink(path);
+
+    /* code that fails while the library is imported stops the import */
+    char failing_path[] = "/tmp/novelo-library-XXXXXX";
+    descriptor = mkstemp(failing_path);
+    CHECK(descriptor >= 0);
+    if (descriptor < 0) return;
+    const char *failing = "### 4.1 `list`\n\n```lisp\n(define a 1)\n(error \"broken library\" a)\n(define b 2)\n```\n";
+    CHECK(write(descriptor, failing, strlen(failing)) == (ssize_t)strlen(failing));
+    close(descriptor);
+    library_run(&run, "(import list)", failing_path);
+    check_values(__FILE__, __LINE__, &run, "(1)");
+    library_run_finish(&run);
+    unlink(failing_path);
 }
 
 const TestSuite library_suite = {"library", (const TestCase[]){

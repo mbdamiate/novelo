@@ -106,7 +106,9 @@ static bool run_forked(const TestCase *test) {
         perror("fork");
         exit(2);
     }
-    if (child == 0) _exit(run_here(test) ? 0 : 1);
+    /* exit, not _exit: the streams were flushed above, and a coverage build
+     * writes its profile from an exit handler. */
+    if (child == 0) exit(run_here(test) ? 0 : 1);
     int status = 0;
     if (waitpid(child, &status, 0) < 0) {
         perror("waitpid");

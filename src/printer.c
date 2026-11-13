@@ -25,10 +25,13 @@ static bool reads_back(uint64_t mantissa, int exponent, double number) {
 /* Finds the shortest digits for a positive finite `number`: `mantissa` with
  * its decimal digits, worth mantissa × 10^exponent. For each length from 1 to
  * 17 digits, printf gives the correctly rounded digits, the closest of that
- * length (ties to even). They may fail to read back while a neighbor of the
- * same length does, because the interval of numbers that read back as
- * `number` is narrower below a power of two than above it; so the neighbors
- * are tried too. Seventeen digits always read back. */
+ * length (ties to even). They may fail to read back while the neighbor above
+ * of the same length does: below a power of two the interval of numbers that
+ * read back as `number` is half as wide as above it, so the closest digits,
+ * when below `number`, can fall outside it while the next ones up fall
+ * inside. The neighbor below never helps: it is farther than the closest
+ * digits, on the side where the interval is narrower or the same. Seventeen
+ * digits always read back. */
 static void shortest_digits(double number, uint64_t *mantissa, int *exponent) {
     for (int precision = 0; precision <= 16; precision++) {
         char text[48];
@@ -39,29 +42,12 @@ static void shortest_digits(double number, uint64_t *mantissa, int *exponent) {
             if (*cursor != '.') digits = digits * 10 + (uint64_t)(*cursor - '0');
         }
         int scale = atoi(cursor + 1) - precision; /* number ≈ digits × 10^scale */
-        uint64_t smallest = 1;                   /* 10^precision: the smallest of this length */
-        for (int count = 0; count < precision; count++) smallest *= 10;
-
-        if (reads_back(digits, scale, number)) {
-            *mantissa = digits;
-            *exponent = scale;
-            return;
-        }
-        if (digits == smallest) { /* below 10^precision, the same length has a finer step */
-            if (reads_back(smallest * 10 - 1, scale - 1, number)) {
-                *mantissa = smallest * 10 - 1;
-                *exponent = scale - 1;
+        for (uint64_t candidate = digits; candidate <= digits + 1; candidate++) {
+            if (reads_back(candidate, scale, number)) {
+                *mantissa = candidate;
+                *exponent = scale;
                 return;
             }
-        } else if (reads_back(digits - 1, scale, number)) {
-            *mantissa = digits - 1;
-            *exponent = scale;
-            return;
-        }
-        if (reads_back(digits + 1, scale, number)) {
-            *mantissa = digits + 1;
-            *exponent = scale;
-            return;
         }
     }
     abort(); /* unreachable: 17 significant digits always read back */

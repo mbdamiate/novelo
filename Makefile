@@ -1,11 +1,13 @@
 # Novelo — build, tests and sanitizers.
 #
 #   make              build the interpreter, build/novelo
-#   make test         unit tests + conformance suites + examples
+#   make test         unit tests + conformance suites + examples + command line
 #   make unit         unit tests only
 #   make conformance  conformance suites only
 #   make examples     run examples/*/main.nvl with the interpreter and check their output
+#   make cli          check the command line: exit codes and messages
 #   make asan         everything above, rebuilt with AddressSanitizer + UBSan in build/asan
+#   make coverage     everything above, rebuilt with clang's coverage in build/coverage, then a report
 #   make clean
 
 CC      ?= cc
@@ -24,6 +26,16 @@ CFLAGS  += -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-re
 LDFLAGS += -fsanitize=address,undefined
 endif
 
+ifeq ($(COVERAGE),1)
+CFLAGS  += -fprofile-instr-generate -fcoverage-mapping
+LDFLAGS += -fprofile-instr-generate
+endif
+
+# llvm-cov and llvm-profdata ship with Xcode; elsewhere they are on the PATH.
+LLVM_COV      ?= $(shell xcrun -f llvm-cov 2>/dev/null || command -v llvm-cov)
+LLVM_PROFDATA ?= $(shell xcrun -f llvm-profdata 2>/dev/null || command -v llvm-profdata)
+COVERAGE_DIR  := build/coverage
+
 LIB_SRC  := $(filter-out src/main.c,$(wildcard src/*.c))
 LIB_OBJ  := $(LIB_SRC:src/%.c=$(BUILD)/src/%.o)
 UNIT_SRC := $(wildcard tests/unit/*.c)
@@ -34,11 +46,11 @@ CONFORMANCE_OBJ := $(CONFORMANCE_SRC:tests/conformance/%.c=$(BUILD)/tests/confor
 CONFORMANCE_BIN := $(BUILD)/conformance
 CLI_BIN := $(BUILD)/novelo
 
-.PHONY: all test unit conformance examples asan clean
+.PHONY: all test unit conformance examples cli asan coverage clean
 
 all: $(CLI_BIN)
 
-test: unit conformance examples
+test: unit conformance examples cli
 
 unit: $(UNIT_BIN)
 	./$(UNIT_BIN)
@@ -49,8 +61,21 @@ conformance: $(CONFORMANCE_BIN)
 examples: $(CLI_BIN)
 	tests/examples.sh $(CLI_BIN)
 
+cli: $(CLI_BIN)
+	tests/cli.sh $(CLI_BIN)
+
 asan:
 	$(MAKE) test BUILD=build/asan SANITIZE=1
+
+# Every process writes its own profile (%p): the unit runner forks per test.
+coverage:
+	rm -rf $(COVERAGE_DIR)/profiles
+	LLVM_PROFILE_FILE=$(CURDIR)/$(COVERAGE_DIR)/profiles/%p.profraw $(MAKE) test BUILD=$(COVERAGE_DIR) COVERAGE=1
+	$(LLVM_PROFDATA) merge -sparse $(COVERAGE_DIR)/profiles/*.profraw -o $(COVERAGE_DIR)/merged.profdata
+	$(LLVM_COV) show -format=html -output-dir=$(COVERAGE_DIR)/html -instr-profile=$(COVERAGE_DIR)/merged.profdata \
+	    $(COVERAGE_DIR)/novelo -object $(COVERAGE_DIR)/unit-tests -object $(COVERAGE_DIR)/conformance $(LIB_SRC) src/main.c
+	$(LLVM_COV) report -instr-profile=$(COVERAGE_DIR)/merged.profdata \
+	    $(COVERAGE_DIR)/novelo -object $(COVERAGE_DIR)/unit-tests -object $(COVERAGE_DIR)/conformance $(LIB_SRC) src/main.c
 
 clean:
 	rm -rf build

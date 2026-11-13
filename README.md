@@ -1,6 +1,6 @@
 # Novelo
 
-An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.10.0) and the standard library (`standard-library.md`, v0.7.0).
+An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.10.1) and the standard library (`standard-library.md`, v0.7.0).
 
 *Novelo* is Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as Novelo's lists are. Source files end in `.nvl`.
 
@@ -8,7 +8,7 @@ Every case of both conformance suites passes:
 
 | Suite | Cases |
 | --- | --- |
-| core | 461 |
+| core | 499 |
 | stdlib | 96 |
 
 Those runs report no leaks, and they also pass under AddressSanitizer and UndefinedBehaviorSanitizer.
@@ -33,8 +33,9 @@ make CC=gcc test
 
 ```bash
 make            # builds build/novelo
-make test       # unit tests + both conformance suites + the examples
+make test       # unit tests + both conformance suites + the examples + the command line
 make asan       # the same, rebuilt in build/asan with ASan + UBSan
+make coverage   # the same, rebuilt in build/coverage with clang's coverage, then a report
 make clean
 ```
 
@@ -92,6 +93,8 @@ NOVELO_STDLIB=/usr/local/share/novelo/standard-library.md build/novelo program.n
 make unit
 make conformance
 make examples
+make cli
+make coverage
 ./build/unit-tests -k reader/strings --no-fork      # one test, in-process for a debugger
 ./build/conformance -v -k include conformance.json  # list the matching cases
 ```
@@ -105,7 +108,36 @@ make examples
   - Matches the exact output.
   - Runs each case with a fresh state on a large stack. A case's `files` sit in an in-memory file system around `/main.nvl`.
   - After each case, no object and no position entry may remain alive.
+- **Command line (`tests/cli.sh`):** runs `build/novelo` in a temporary directory and checks the exit code, standard output and standard error of each case:
+  - the exit codes 0, 1 and 2;
+  - bad arguments and missing files;
+  - read errors and uncaught errors, with and without a position, after the program's own output;
+  - descriptors built by `raise` that lack fields;
+  - errors in included files;
+  - `NOVELO_STDLIB`;
+  - the REPL with standard input that is not a terminal.
 - **Examples (`examples/`):** numbered by complexity, each adding one idea, starting at `01-hello`. Each example is a directory: `main.nvl` is a complete program, commented, run by `build/novelo` through `tests/examples.sh`. It must exit with 0 and print exactly `output.txt`; `input.txt`, when present, is its standard input. Any other file is part of the example, such as the files `08-modules` includes.
+
+### Coverage
+
+`make coverage` builds everything in `build/coverage` with `-fprofile-instr-generate -fcoverage-mapping`, runs `make test` there, and merges the profile of every process. The unit runner forks once per test, so each process writes its own file. It then prints `llvm-cov report` for `src/` and writes the annotated sources to `build/coverage/html/index.html`. It needs clang with `llvm-cov` and `llvm-profdata`, which come with Xcode and are found through `xcrun`. Elsewhere, put them on the `PATH` or pass `LLVM_COV=…` and `LLVM_PROFDATA=…`. With gcc there is no coverage target.
+
+| | Lines | Branches | Functions |
+| --- | --- | --- | --- |
+| before the measurement | 95.9% | 89.3% | 98.0% |
+| now | 99.5% | 93.5% | 99.7% |
+
+The 22 lines left are unreachable:
+- running out of memory (`buffer.c`);
+- failing to create the interpreter's thread (`main.c`);
+- the `abort()` after the search for the shortest digits, which always ends by 17 digits;
+- trailing zeros removed from the shortest digits, which would only appear if the neighbor above carried into a power of ten; no binary64 tried has needed it, and it costs nothing to keep;
+- the `return` after a switch that covers every case;
+- a REPL input still open at the end that reads without error, which cannot happen because complete inputs are evaluated as they arrive;
+- `lisp_primitive_value` with an unknown name, which the expander never asks for;
+- closing braces that `llvm-cov` counts as lines.
+
+Most of the branches left are null checks and the other side of `assert`s.
 
 ## Source map
 

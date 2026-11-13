@@ -6,14 +6,18 @@
 #include <string.h>
 
 /* Runs a REPL session over `input`; checks what it printed and reported. */
-static void check_session(const char *file, int line, const char *input, const char *expected_output,
-                          const char *expected_errors) {
+static void check_session_with(const char *file, int line, const char *library_path, const char *input,
+                               const char *expected_output, const char *expected_errors) {
     LispBuffer output;
     lisp_buffer_init(&output);
     LispBuffer errors;
     lisp_buffer_init(&errors);
     LispTextInput text = {input, strlen(input), 0};
-    LispStateOptions options = {.output = lisp_output_to_buffer(&output), .input = lisp_input_from_text(&text)};
+    LispStateOptions options = {
+        .output = lisp_output_to_buffer(&output),
+        .input = lisp_input_from_text(&text),
+        .library_path = library_path,
+    };
     LispState *state = lisp_state_new(&options);
     LispReplOptions repl = {.errors = lisp_output_to_buffer(&errors), .prompt = nullptr};
     lisp_repl(state, &repl);
@@ -29,7 +33,7 @@ static void check_session(const char *file, int line, const char *input, const c
     lisp_buffer_free(&output);
     lisp_buffer_free(&errors);
 }
-#define CHECK_SESSION(input, output, errors) check_session(__FILE__, __LINE__, (input), (output), (errors))
+#define CHECK_SESSION(input, output, errors) check_session_with(__FILE__, __LINE__, nullptr, (input), (output), (errors))
 
 static void t_values(void) {
     CHECK_SESSION("(+ 1 2)\n\"text\"\n(define x 1)\nx\n", "3\n\"text\"\n1\n", "");
@@ -64,6 +68,18 @@ static void t_errors(void) {
     CHECK_SESSION("nothing\n", "", "error :unbound-symbol: unbound symbol nothing nothing\n");
 }
 
+/* Without the standard library document, each import is reported once and
+ * the session still evaluates what needs only the core. */
+static void t_missing_library(void) {
+#define CANNOT_IMPORT(name)                                                                              \
+    "error :import-error: cannot open the standard library /no/such/standard-library.md (set NOVELO_STDLIB) " \
+    name " :cannot-open\n"
+    check_session_with(__FILE__, __LINE__, "/no/such/standard-library.md", "(+ 1 2)\n", "3\n",
+                       CANNOT_IMPORT("list") CANNOT_IMPORT("text") CANNOT_IMPORT("function")
+                           CANNOT_IMPORT("map") CANNOT_IMPORT("set") CANNOT_IMPORT("number"));
+#undef CANNOT_IMPORT
+}
+
 /* read-line! reads the lines that follow the input in the same stream; at
  * the end it returns #void, which the REPL does not print. */
 static void t_read_line(void) {
@@ -76,5 +92,6 @@ const TestSuite repl_suite = {"repl", (const TestCase[]){
     {"inputs over several lines", t_continuation},
     {"errors", t_errors},
     {"read-line! shares the input", t_read_line},
+    {"a missing standard library is reported", t_missing_library},
     {},
 }};
