@@ -1,0 +1,79 @@
+; Lists.
+;
+; Works through a list of exam scores with the core list primitives and the
+; library `list`: building, taking apart, transforming, reducing, sorting.
+;
+;   build/novelo examples/04-lists.nvl
+
+(import io)
+(import list)      ; range, map, filter, fold, reverse, sort, take, any?, ...
+
+; Prints a label, then a value the way it would be read back.
+(define show!
+  (lambda (label value)
+    (display! label)
+    (display! ": ")
+    (write! value)
+    (display! "\n")))
+
+; ---- building and taking apart ------------------------------------------
+
+; A quote ' gives the list as written, without evaluating it. `list`
+; evaluates each argument first, so it can hold computed values.
+(define scores '(72 95 58 88 64 91 77))
+(show! "scores" scores)
+(show! "computed" (list (+ 1 2) (* 2 3)))
+
+; A list is a first element followed by the rest of the list. `prepend`
+; makes a new, longer list; `scores` itself never changes.
+(show! "first" (first scores))
+(show! "rest" (rest scores))
+(show! "prepend" (prepend 100 scores))
+(show! "count" (count scores))
+(show! "empty?" (empty? ()))
+
+; ---- functions as values ------------------------------------------------
+
+; A function is a value like any other: it can be passed to another function.
+; `map` applies one to every element, `filter` keeps the elements it accepts.
+(define square (lambda (x) (* x x)))
+(show! "squares" (map square (range 1 6)))     ; range 1 6 is (1 2 3 4 5)
+
+(define passed? (lambda (score) (>= score 70)))
+(show! "passed" (filter passed? scores))
+
+; A lambda can also be written right where it is needed.
+(show! "failed" (filter (lambda (score) (< score 70)) scores))
+
+; A function can return a function. The inner lambda remembers `minimum`,
+; the value it was created with: this is a closure.
+(define at-least
+  (lambda (minimum)
+    (lambda (score) (>= score minimum))))
+(show! "at least 90" (filter (at-least 90) scores))
+
+; ---- reducing ---------------------------------------------------------------
+
+; `fold` walks the list from left to right, combining an accumulator with each
+; element: (fold f start (a b c)) is (f (f (f start a) b) c).
+(define total (fold + 0 scores))
+(show! "total" total)
+(show! "average" (quotient total (count scores)))   ; integer division
+(show! "highest" (fold (lambda (best x) (if (> x best) x otherwise best))
+                       (first scores) (rest scores)))
+
+; ---- ordering and slicing -------------------------------------------------------
+
+; `sort` takes the "comes before" test. Comparisons are functions too, so
+; `>` itself sorts from the highest score down, as `+` summed above.
+(define ranked (sort > scores))
+(show! "ranked" ranked)
+(show! "top three" (take 3 ranked))
+(show! "the others" (drop 3 ranked))
+(show! "reversed" (reverse ranked))
+(show! "appended" (append (take 2 ranked) (take 2 (reverse ranked))))
+
+; ---- questions --------------------------------------------------------------------
+
+(show! "any perfect?" (any? (lambda (score) (= score 100)) scores))
+(show! "all above 50?" (every? (at-least 50) scores))

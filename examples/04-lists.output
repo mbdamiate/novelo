@@ -1,0 +1,21 @@
+scores: (72 95 58 88 64 91 77)
+computed: (3 6)
+first: 72
+rest: (95 58 88 64 91 77)
+prepend: (100 72 95 58 88 64 91 77)
+count: 7
+empty?: #true
+squares: (1 4 9 16 25)
+passed: (72 95 88 91 77)
+failed: (58 64)
+at least 90: (95 91)
+total: 545
+average: 77
+highest: 95
+ranked: (95 91 88 77 72 64 58)
+top three: (95 91 88)
+the others: (77 72 64 58)
+reversed: (58 64 72 77 88 91 95)
+appended: (95 91 58 64)
+any perfect?: #false
+all above 50?: #true
