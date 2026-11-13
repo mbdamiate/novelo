@@ -391,16 +391,9 @@
       ("#" &rest more) #true
       otherwise #false)))
 
-; Reading only gathers the lines, until read-line! returns #void at the end
-; of the input; `prepend` builds the list backwards, so it is reversed.
-(define read-lines!
-  (lambda (lines)
-    (let ((line (read-line!)))
-      (if (void? line) (reverse lines)
-          otherwise (read-lines! (prepend line lines))))))
-
-; The statements run in order, each in the scope the ones before it left;
-; `fold` carries the texts so far, newest first, and the scope.
+; `read-lines!` returns every line of the input, in order. The statements
+; run in that order, each in the scope the ones before it left; `fold`
+; carries the texts so far, newest first, and the scope.
 (define step
   (lambda (state line)
     (let (((texts scope) state)
@@ -409,7 +402,7 @@
 
 (define session
   (fold step (list () {:variables {} :functions {}})
-        (filter (lambda (line) (not (comment? line))) (read-lines! ()))))
+        (filter (lambda (line) (not (comment? line))) (read-lines!))))
 
 (define scope (first (rest session)))
 

@@ -8,7 +8,7 @@
 ;   build/novelo examples/11-statistics/main.nvl < examples/11-statistics/input.txt
 
 (import io)
-(import list)      ; filter, fold, map, reverse
+(import list)      ; filter, fold, map
 (import number)    ; max, min, round
 (import text t)    ; t/format, t/join, t/pad-right
 
@@ -36,19 +36,11 @@
           (integer? number) (integer-to-float number)
           otherwise #void))))
 
-; Reading only gathers the lines, until read-line! returns #void at the end
-; of the input. `prepend` builds the list backwards, so it is reversed into
-; reading order at the end. What the lines mean is worked out afterwards,
-; by pure functions; the program prints once, at the end.
-(define read-lines!
-  (lambda (lines)
-    (let ((line (read-line!)))
-      (if (void? line) (reverse lines)
-          otherwise (read-lines! (prepend line lines))))))
-
-; Blank lines are left out. A line is either a measurement or a line to
+; `read-lines!` returns every line of the input, in order, as a List of
+; Strings. What the lines mean is worked out afterwards, by pure functions;
+; the program prints once, at the end. Blank lines are left out. A line is either a measurement or a line to
 ; complain about; `measurement` decides both.
-(define lines (filter (lambda (line) (not (empty? line))) (read-lines! ())))
+(define lines (filter (lambda (line) (not (empty? line))) (read-lines!)))
 (define numbers (filter float? (map measurement lines)))
 (define skipped (filter (lambda (line) (void? (measurement line))) lines))
 

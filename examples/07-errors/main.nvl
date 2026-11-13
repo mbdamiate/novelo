@@ -10,7 +10,7 @@
 ; exits with 1. Everything below catches its errors, so it exits with 0.
 
 (import io)
-(import list)      ; filter, map, reverse
+(import list)      ; filter, map
 (import text t)    ; t/split, t/join
 
 ; ---- raising ---------------------------------------------------------------
@@ -80,13 +80,8 @@
              (lambda (problem) (describe problem)))
       "\n")))
 
-; Reading only gathers the lines of the input, in order, until read-line!
-; returns #void at its end; it computes nothing from them. The work on the
-; lines is pure and builds the text, and the program prints it once.
-(define read-lines!
-  (lambda (lines)
-    (let ((line (read-line!)))
-      (if (void? line) (reverse lines)
-          otherwise (read-lines! (prepend line lines))))))
+; `read-lines!` returns every line of the input, in order, as a List of
+; Strings; it computes nothing from them. The work on the lines is pure and
+; builds the text, and the program prints it once.
 
-(display! (t/join "" (map report-line (read-lines! ()))))
+(display! (t/join "" (map report-line (read-lines!))))
