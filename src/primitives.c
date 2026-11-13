@@ -8,6 +8,7 @@
 #include "reader.h"
 #include "utf8.h"
 
+#include <math.h>
 #include <stdckdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,10 +53,57 @@ static Value *overflow(LispState *state, const char *function) {
     return lisp_error(state, "integer-overflow", LISP_EMPTY, "%s: result outside 64 bits", function);
 }
 
+/* §8.5 — a Float result too large for binary64. From finite operands, only
+ * overflow gives an infinity, and only 0/0 a NaN, which / rejects first. */
+static Value *float_overflow(LispState *state, const char *function) {
+    return lisp_error(state, "float-overflow", LISP_EMPTY, "%s: result too large for a Float", function);
+}
+
+static bool is_number(const Value *value) {
+    return value->kind == LISP_KIND_INTEGER || value->kind == LISP_KIND_FLOAT;
+}
+
+/* §2.5 — the arguments are all Integers or all Floats; the first one decides
+ * which, and none at all counts as Integers, so (+) is 0. */
+static bool expect_numbers(LispState *state, const char *function, size_t count, Value *const *values,
+                           LispKind *kind) {
+    *kind = LISP_KIND_INTEGER;
+    if (count == 0) return true;
+    if (!is_number(values[0])) {
+        lisp_error(state, "wrong-type", LISP_LIST(values[0]), "%s expects a number, got a %s", function,
+                   lisp_type_name(values[0]));
+        return false;
+    }
+    *kind = (LispKind)values[0]->kind;
+    const char *type_name = *kind == LISP_KIND_INTEGER ? "Integer" : "Float";
+    for (size_t index = 1; index < count; index++) {
+        const Value *value = values[index];
+        if (value->kind == *kind) continue;
+        if (is_number(value)) {
+            lisp_error(state, "wrong-type", LISP_LIST(values[0], (Value *)value),
+                       "%s cannot mix Integers and Floats; convert with integer-to-float or truncate", function);
+        } else {
+            lisp_error(state, "wrong-type", LISP_LIST((Value *)value), "%s expects a %s, got a %s", function,
+                       type_name, lisp_type_name(value));
+        }
+        return false;
+    }
+    return true;
+}
+
 /* ---- arithmetic -------------------------------------------------------------------- */
 
 PRIMITIVE(add) {
-    if (!expect_integers(state, "+", argument_count, arguments)) return nullptr;
+    LispKind kind;
+    if (!expect_numbers(state, "+", argument_count, arguments, &kind)) return nullptr;
+    if (kind == LISP_KIND_FLOAT) {
+        double sum = 0.0;
+        for (size_t index = 0; index < argument_count; index++) {
+            sum += lisp_float_value(arguments[index]);
+            if (!isfinite(sum)) return float_overflow(state, "+");
+        }
+        return lisp_float(sum);
+    }
     int64_t sum = 0;
     for (size_t index = 0; index < argument_count; index++) {
         if (ckd_add(&sum, sum, lisp_integer_value(arguments[index]))) return overflow(state, "+");
@@ -64,7 +112,16 @@ PRIMITIVE(add) {
 }
 
 PRIMITIVE(multiply) {
-    if (!expect_integers(state, "*", argument_count, arguments)) return nullptr;
+    LispKind kind;
+    if (!expect_numbers(state, "*", argument_count, arguments, &kind)) return nullptr;
+    if (kind == LISP_KIND_FLOAT) {
+        double product = 1.0;
+        for (size_t index = 0; index < argument_count; index++) {
+            product *= lisp_float_value(arguments[index]);
+            if (!isfinite(product)) return float_overflow(state, "*");
+        }
+        return lisp_float(product);
+    }
     int64_t product = 1;
     for (size_t index = 0; index < argument_count; index++) {
         if (ckd_mul(&product, product, lisp_integer_value(arguments[index]))) return overflow(state, "*");
@@ -73,7 +130,17 @@ PRIMITIVE(multiply) {
 }
 
 PRIMITIVE(subtract) {
-    if (!expect_integers(state, "-", argument_count, arguments)) return nullptr;
+    LispKind kind;
+    if (!expect_numbers(state, "-", argument_count, arguments, &kind)) return nullptr;
+    if (kind == LISP_KIND_FLOAT) {
+        double difference = lisp_float_value(arguments[0]);
+        if (argument_count == 1) return lisp_float(-difference); /* (- 0.0) is -0.0 */
+        for (size_t index = 1; index < argument_count; index++) {
+            difference -= lisp_float_value(arguments[index]);
+            if (!isfinite(difference)) return float_overflow(state, "-");
+        }
+        return lisp_float(difference);
+    }
     int64_t difference = lisp_integer_value(arguments[0]);
     if (argument_count == 1) { /* (- x) negates */
         if (ckd_sub(&difference, (int64_t)0, difference)) return overflow(state, "-");
@@ -83,6 +150,32 @@ PRIMITIVE(subtract) {
         if (ckd_sub(&difference, difference, lisp_integer_value(arguments[index]))) return overflow(state, "-");
     }
     return lisp_integer(difference);
+}
+
+/* (/ a b c) divides a by b, then by c; (/ x) is 1.0 divided by x. Floats only:
+ * Integers are divided with quotient (§9). A zero divisor, 0.0 or -0.0, is an
+ * error, so no infinity or NaN appears. */
+PRIMITIVE(divide) {
+    for (size_t index = 0; index < argument_count; index++) {
+        const Value *value = arguments[index];
+        if (value->kind == LISP_KIND_FLOAT) continue;
+        if (value->kind == LISP_KIND_INTEGER) {
+            lisp_error(state, "wrong-type", LISP_LIST((Value *)value),
+                       "/ divides Floats; divide Integers with quotient and remainder");
+        } else {
+            lisp_error(state, "wrong-type", LISP_LIST((Value *)value), "/ expects a Float, got a %s",
+                       lisp_type_name(value));
+        }
+        return nullptr;
+    }
+    double result = argument_count == 1 ? 1.0 : lisp_float_value(arguments[0]);
+    for (size_t index = argument_count == 1 ? 0 : 1; index < argument_count; index++) {
+        double divisor = lisp_float_value(arguments[index]);
+        if (divisor == 0.0) return lisp_error(state, "division-by-zero", LISP_EMPTY, "/: division by zero");
+        result /= divisor;
+        if (!isfinite(result)) return float_overflow(state, "/");
+    }
+    return lisp_float(result);
 }
 
 /* Truncating toward zero, as C does. */
@@ -116,11 +209,25 @@ typedef enum Comparison { LESS, GREATER, LESS_OR_EQUAL, GREATER_OR_EQUAL, EQUAL 
 
 static Value *compare_chain(LispState *state, const char *function, Comparison comparison, size_t argument_count,
                             Value *const *arguments) {
-    if (!expect_integers(state, function, argument_count, arguments)) return nullptr;
+    LispKind kind;
+    if (!expect_numbers(state, function, argument_count, arguments, &kind)) return nullptr;
     for (size_t index = 0; index + 1 < argument_count; index++) {
+        bool holds;
+        if (kind == LISP_KIND_FLOAT) { /* never NaN, so the order is total; -0.0 equals 0.0 */
+            double left = lisp_float_value(arguments[index]);
+            double right = lisp_float_value(arguments[index + 1]);
+            switch (comparison) {
+            case LESS: holds = left < right; break;
+            case GREATER: holds = left > right; break;
+            case LESS_OR_EQUAL: holds = left <= right; break;
+            case GREATER_OR_EQUAL: holds = left >= right; break;
+            case EQUAL: holds = left == right; break;
+            }
+            if (!holds) return LISP_FALSE;
+            continue;
+        }
         int64_t left = lisp_integer_value(arguments[index]);
         int64_t right = lisp_integer_value(arguments[index + 1]);
-        bool holds;
         switch (comparison) {
         case LESS: holds = left < right; break;
         case GREATER: holds = left > right; break;
@@ -138,6 +245,39 @@ PRIMITIVE(greater) { return compare_chain(state, ">", GREATER, argument_count, a
 PRIMITIVE(less_or_equal) { return compare_chain(state, "<=", LESS_OR_EQUAL, argument_count, arguments); }
 PRIMITIVE(greater_or_equal) { return compare_chain(state, ">=", GREATER_OR_EQUAL, argument_count, arguments); }
 PRIMITIVE(numeric_equal) { return compare_chain(state, "=", EQUAL, argument_count, arguments); }
+
+/* ---- floats ---------------------------------------------------------------------------- */
+
+/* The nearest Float, ties to even: exact from -2^53 to 2^53. A conversion
+ * from int64_t rounds in the current rounding mode, which is to nearest. */
+PRIMITIVE(integer_to_float) {
+    (void)argument_count;
+    if (!lisp_expect_kind(state, "integer-to-float", arguments[0], LISP_KIND_INTEGER, "Integer")) return nullptr;
+    return lisp_float((double)lisp_integer_value(arguments[0]));
+}
+
+/* Toward zero. Every Float in [-2^63, 2^63) truncates to an Integer; 2^63
+ * itself, the first Float above the largest Integer, does not. */
+PRIMITIVE(truncate) {
+    (void)argument_count;
+    if (!lisp_expect_kind(state, "truncate", arguments[0], LISP_KIND_FLOAT, "Float")) return nullptr;
+    double whole = trunc(lisp_float_value(arguments[0]));
+    if (whole < -9223372036854775808.0 || whole >= 9223372036854775808.0) {
+        return lisp_error(state, "integer-overflow", LISP_LIST(arguments[0]), "truncate: result outside 64 bits");
+    }
+    return lisp_integer((int64_t)whole);
+}
+
+/* IEEE 754 requires sqrt to be correctly rounded, so every platform agrees. */
+PRIMITIVE(sqrt) {
+    (void)argument_count;
+    if (!lisp_expect_kind(state, "sqrt", arguments[0], LISP_KIND_FLOAT, "Float")) return nullptr;
+    double number = lisp_float_value(arguments[0]);
+    if (number < 0.0) {
+        return lisp_error(state, "domain-error", LISP_LIST(arguments[0]), "sqrt of a negative number");
+    }
+    return lisp_float(sqrt(number));
+}
 
 PRIMITIVE(equal) {
     (void)state;
@@ -158,6 +298,7 @@ PRIMITIVE(equal) {
 KIND_PREDICATE(is_boolean, value->kind == LISP_KIND_BOOLEAN)
 KIND_PREDICATE(is_void, value->kind == LISP_KIND_VOID)
 KIND_PREDICATE(is_integer, value->kind == LISP_KIND_INTEGER)
+KIND_PREDICATE(is_float, value->kind == LISP_KIND_FLOAT)
 KIND_PREDICATE(is_string, value->kind == LISP_KIND_STRING)
 KIND_PREDICATE(is_symbol, value->kind == LISP_KIND_SYMBOL)
 KIND_PREDICATE(is_keyword, value->kind == LISP_KIND_KEYWORD)
@@ -411,8 +552,8 @@ PRIMITIVE(to_string) {
     return result;
 }
 
-/* The whole text under the rules of §4: an Integer, #void if it is not one,
- * or :integer-overflow if it is out of range. */
+/* The whole text under the rules of §4: an Integer or a Float, #void if it is
+ * neither, or :integer-overflow or :float-overflow if it is out of range. */
 PRIMITIVE(string_to_number) {
     (void)argument_count;
     if (!lisp_expect_kind(state, "string-to-number", arguments[0], LISP_KIND_STRING, "String")) return nullptr;
@@ -421,7 +562,15 @@ PRIMITIVE(string_to_number) {
     switch (lisp_parse_integer(text->data, text->bytes, &value)) {
     case LISP_INTEGER_OK: return lisp_integer(value);
     case LISP_INTEGER_OVERFLOW: return overflow(state, "string-to-number");
-    case LISP_INTEGER_INVALID:
+    case LISP_INTEGER_INVALID: {
+        double number;
+        switch (lisp_parse_float(text->data, text->bytes, &number)) {
+        case LISP_FLOAT_OK: return lisp_float(number);
+        case LISP_FLOAT_OVERFLOW: return float_overflow(state, "string-to-number");
+        case LISP_FLOAT_INVALID: break;
+        }
+        break;
+    }
     case LISP_INTEGER_NOT_NUMERIC: break;
     }
     return LISP_VOID;
@@ -508,6 +657,7 @@ static const LispNativeFunction primitives[] = {
     {"+", 0, -1, primitive_add},
     {"*", 0, -1, primitive_multiply},
     {"-", 1, -1, primitive_subtract},
+    {"/", 1, -1, primitive_divide},
     {"quotient", 2, 2, primitive_quotient},
     {"remainder", 2, 2, primitive_remainder},
     {"<", 2, -1, primitive_less},
@@ -515,10 +665,14 @@ static const LispNativeFunction primitives[] = {
     {"<=", 2, -1, primitive_less_or_equal},
     {">=", 2, -1, primitive_greater_or_equal},
     {"=", 2, -1, primitive_numeric_equal},
+    {"integer-to-float", 1, 1, primitive_integer_to_float},
+    {"truncate", 1, 1, primitive_truncate},
+    {"sqrt", 1, 1, primitive_sqrt},
     {"equal?", 2, 2, primitive_equal},
     {"boolean?", 1, 1, primitive_is_boolean},
     {"void?", 1, 1, primitive_is_void},
     {"integer?", 1, 1, primitive_is_integer},
+    {"float?", 1, 1, primitive_is_float},
     {"string?", 1, 1, primitive_is_string},
     {"symbol?", 1, 1, primitive_is_symbol},
     {"keyword?", 1, 1, primitive_is_keyword},

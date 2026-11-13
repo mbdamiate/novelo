@@ -12,6 +12,7 @@
 #include "buffer.h"
 #include "utf8.h"
 
+#include <math.h>
 #include <stdarg.h>
 #include <stdckdint.h>
 #include <stdio.h>
@@ -31,6 +32,7 @@ static const char *const error_names[] = {
     [LISP_READ_UNTERMINATED_STRING] = "unterminated-string",
     [LISP_READ_INVALID_ESCAPE] = "invalid-escape",
     [LISP_READ_INTEGER_OVERFLOW] = "integer-overflow",
+    [LISP_READ_FLOAT_OVERFLOW] = "float-overflow",
     [LISP_READ_INVALID_NUMBER] = "invalid-number",
     [LISP_READ_DOTTED_PAIR] = "dotted-pair",
     [LISP_READ_EMPTY_KEYWORD] = "empty-keyword",
@@ -94,6 +96,46 @@ LispIntegerParse lisp_parse_integer(const char *text, size_t length, int64_t *va
         return LISP_INTEGER_OVERFLOW;
     }
     return LISP_INTEGER_OK;
+}
+
+/* ---- floats (§4.2) ------------------------------------------------------------- */
+
+static size_t skip_digits(const char *text, size_t length, size_t position) {
+    while (position < length && is_digit(text[position])) position++;
+    return position;
+}
+
+LispFloatParse lisp_parse_float(const char *text, size_t length, double *value) {
+    /* float    = [ "-" ] , digit , { digit } , "." , digit , { digit } , [ exponent ] ;
+     * exponent = "e" , [ "-" ] , digit , { digit } ; */
+    size_t position = (length > 0 && text[0] == '-') ? 1 : 0;
+    size_t digits_end = skip_digits(text, length, position);
+    if (digits_end == position || digits_end == length || text[digits_end] != '.') return LISP_FLOAT_INVALID;
+    position = digits_end + 1;
+    digits_end = skip_digits(text, length, position);
+    if (digits_end == position) return LISP_FLOAT_INVALID;
+    position = digits_end;
+    if (position < length) {
+        if (text[position] != 'e') return LISP_FLOAT_INVALID;
+        position++;
+        if (position < length && text[position] == '-') position++;
+        digits_end = skip_digits(text, length, position);
+        if (digits_end == position || digits_end != length) return LISP_FLOAT_INVALID;
+    }
+
+    /* The syntax is a subset of what strtod accepts, and strtod rounds to the
+     * nearest binary64. The interpreter never calls setlocale, so the decimal
+     * point is ".". strtod needs a terminated copy of exactly the token. */
+    char small[64];
+    char *copy = length < sizeof small ? small : malloc(length + 1);
+    if (!copy) abort();
+    memcpy(copy, text, length);
+    copy[length] = '\0';
+    double result = strtod(copy, nullptr);
+    if (copy != small) free(copy);
+    if (!isfinite(result)) return LISP_FLOAT_OVERFLOW;
+    *value = result;
+    return LISP_FLOAT_OK;
 }
 
 /* ---- reader state ---------------------------------------------------------------- */
@@ -446,8 +488,19 @@ static bool read_token(Reader *reader, Value **datum) {
         return true;
     case LISP_INTEGER_OVERFLOW:
         return fail(reader, LISP_READ_INTEGER_OVERFLOW, start, "integer outside 64 bits");
-    case LISP_INTEGER_INVALID:
-        return fail(reader, LISP_READ_INVALID_NUMBER, start, "invalid number");
+    case LISP_INTEGER_INVALID: {
+        double number;
+        switch (lisp_parse_float(token, length, &number)) {
+        case LISP_FLOAT_OK:
+            *datum = lisp_float(number);
+            return true;
+        case LISP_FLOAT_OVERFLOW:
+            return fail(reader, LISP_READ_FLOAT_OVERFLOW, start, "float too large for binary64");
+        case LISP_FLOAT_INVALID:
+            return fail(reader, LISP_READ_INVALID_NUMBER, start, "invalid number");
+        }
+        return false;
+    }
     case LISP_INTEGER_NOT_NUMERIC:
         break;
     }

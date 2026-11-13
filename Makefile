@@ -16,7 +16,8 @@ CFLAGS  += -std=c23 -Wall -Wextra -Wpedantic -Werror -MMD -MP
 # hides them on glibc unless asked for. On macOS, _POSIX_C_SOURCE alone hides
 # mkdtemp, so _DARWIN_C_SOURCE restores the full set; glibc ignores it.
 CFLAGS  += -D_POSIX_C_SOURCE=200809L -D_DARWIN_C_SOURCE
-LDFLAGS += -pthread
+# libm: sqrt (core §9) on glibc.
+LDFLAGS += -pthread -lm
 
 ifeq ($(SANITIZE),1)
 CFLAGS  += -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined

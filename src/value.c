@@ -103,6 +103,7 @@ const char *lisp_type_name(const Value *value) {
     case LISP_KIND_BOOLEAN: return "Boolean";
     case LISP_KIND_VOID: return "Void";
     case LISP_KIND_INTEGER: return "Integer";
+    case LISP_KIND_FLOAT: return "Float";
     case LISP_KIND_STRING: return "String";
     case LISP_KIND_SYMBOL: return "Symbol";
     case LISP_KIND_KEYWORD: return "Keyword";
@@ -140,6 +141,14 @@ Value *lisp_integer(int64_t value) {
     LispInteger *integer = (LispInteger *)lisp_object_new(LISP_KIND_INTEGER, sizeof(LispInteger));
     integer->value = value;
     return &integer->header;
+}
+
+/* ---- floats (core §2.5) ---------------------------------------------------------- */
+
+Value *lisp_float(double value) {
+    LispFloat *number = (LispFloat *)lisp_object_new(LISP_KIND_FLOAT, sizeof(LispFloat));
+    number->value = value;
+    return &number->header;
 }
 
 /* ---- strings ----------------------------------------------------------------- */
@@ -690,6 +699,9 @@ bool lisp_equal(const Value *left, const Value *right) {
         case LISP_KIND_INTEGER:
             equal = lisp_integer_value(first) == lisp_integer_value(second);
             break;
+        case LISP_KIND_FLOAT: /* numeric: 0.0 and -0.0 are equal (§2.4.1); there is no NaN */
+            equal = lisp_float_value(first) == lisp_float_value(second);
+            break;
         case LISP_KIND_STRING: {
             const LispString *first_string = lisp_as_string(first), *second_string = lisp_as_string(second);
             equal = first_string->bytes == second_string->bytes
@@ -738,6 +750,14 @@ static uint64_t hash_at(const Value *value, int depth) {
     case LISP_KIND_BOOLEAN: return value == LISP_TRUE ? 0x1001 : 0x1002;
     case LISP_KIND_VOID: return 0x1003;
     case LISP_KIND_INTEGER: return mix((uint64_t)lisp_integer_value(value) ^ 0x2000);
+    case LISP_KIND_FLOAT: {
+        /* -0.0 hashes like 0.0, since they are equal?. */
+        double number = lisp_float_value(value);
+        if (number == 0.0) number = 0.0;
+        uint64_t bits;
+        memcpy(&bits, &number, sizeof bits);
+        return mix(bits ^ 0x2100);
+    }
     case LISP_KIND_STRING: {
         const LispString *string = lisp_as_string(value);
         return mix(hash_bytes(string->data, string->bytes) ^ 0x3000);

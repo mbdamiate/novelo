@@ -26,6 +26,7 @@ typedef enum LispKind : uint8_t {
     LISP_KIND_BOOLEAN,
     LISP_KIND_VOID,
     LISP_KIND_INTEGER,
+    LISP_KIND_FLOAT,     /* finite binary64 (§2.5) */
     LISP_KIND_STRING,
     LISP_KIND_SYMBOL,
     LISP_KIND_KEYWORD,
@@ -55,6 +56,11 @@ typedef struct LispInteger {
     Value header;
     int64_t value;
 } LispInteger;
+
+typedef struct LispFloat {
+    Value header;
+    double value;   /* always finite */
+} LispFloat;
 
 typedef struct LispString {
     Value header;
@@ -173,6 +179,12 @@ const char *lisp_type_name(const Value *value);
 
 [[nodiscard]] Value *lisp_integer(int64_t value);
 static inline int64_t lisp_integer_value(const Value *integer) { return ((const LispInteger *)integer)->value; }
+
+/* ---- floats (core §2.5) ------------------------------------------------------ */
+
+/* `value` must be finite: callers check for overflow first (§8.5). */
+[[nodiscard]] Value *lisp_float(double value);
+static inline double lisp_float_value(const Value *number) { return ((const LispFloat *)number)->value; }
 
 /* ---- strings (valid UTF-8 only) ------------------------------------------- */
 

@@ -1,5 +1,5 @@
 {
-  "spec": "Core Specification — Novelo, version 0.8.1",
+  "spec": "Core Specification — Novelo, version 0.9.0",
   "format": {
     "read": "Read 'input' (UTF-8). With 'equivalent': also read that text and compare the two datum sequences with equal?. With 'types': the sequence read has exactly these types, in order.",
     "read-error": "Read 'input' (or the bytes of 'input_hex'). Reading MUST fail with the code 'error' at position [line, column].",
@@ -467,7 +467,7 @@
         1,
         1
       ],
-      "input": "3.14"
+      "input": "1.e3"
     },
     {
       "id": "read-error-020",
@@ -1398,7 +1398,7 @@
       "kind": "eval",
       "section": "9",
       "program": "(/ 4 2)",
-      "error": ":unbound-symbol",
+      "error": ":wrong-type",
       "output": ""
     },
     {
@@ -1590,7 +1590,7 @@
       "kind": "eval",
       "section": "9",
       "program": "(list (string-to-number \"42\") (string-to-number \"-7\") (string-to-number \"3.14\") (string-to-number \"abc\") (string-to-number \" 42\"))",
-      "value": "(42 -7 #void #void #void)",
+      "value": "(42 -7 3.14 #void #void)",
       "output": ""
     },
     {
@@ -3184,6 +3184,558 @@
       "section": "9",
       "program": "(define build (lambda (n acc) (if (= n 0) acc otherwise (build (- n 1) (prepend 233 acc)))))\n(define text (code-points-to-string (build 1000000 ())))\n(list (count text) (count (string-to-code-points text)))",
       "value": "(1000000 1000000)",
+      "output": ""
+    },
+    {
+      "id": "float-001",
+      "kind": "read",
+      "section": "4.2",
+      "input": "3.14 -0.5 6.02e23 1.0e-9 007.5",
+      "types": [
+        "Float",
+        "Float",
+        "Float",
+        "Float",
+        "Float"
+      ]
+    },
+    {
+      "id": "float-002",
+      "kind": "read",
+      "section": "4.2",
+      "input": "2.50 1.5e2 -0.0",
+      "equivalent": "2.5 150.0 -0.0"
+    },
+    {
+      "id": "float-003",
+      "kind": "read",
+      "section": "4.2",
+      "input": "0.1 0.10000000000000001",
+      "equivalent": "0.1 0.1"
+    },
+    {
+      "id": "float-004",
+      "kind": "read",
+      "section": "4.2",
+      "input": "1.0e-400 2.4703282292062328e-324",
+      "equivalent": "0.0 4.9406564584124654e-324"
+    },
+    {
+      "id": "float-005",
+      "kind": "read",
+      "section": "4.2",
+      "input": "1.7976931348623157e308 -1.7976931348623157e308",
+      "types": [
+        "Float",
+        "Float"
+      ]
+    },
+    {
+      "id": "float-006",
+      "kind": "read",
+      "section": "4.6",
+      "input": "(1 1.0)",
+      "types": [
+        "List"
+      ]
+    },
+    {
+      "id": "float-007",
+      "kind": "read-error",
+      "section": "4.2",
+      "error": "float-overflow",
+      "position": [
+        1,
+        1
+      ],
+      "input": "3.14e999"
+    },
+    {
+      "id": "float-008",
+      "kind": "read-error",
+      "section": "4.2",
+      "error": "float-overflow",
+      "position": [
+        1,
+        4
+      ],
+      "input": "(x -1.0e309)"
+    },
+    {
+      "id": "float-009",
+      "kind": "read-error",
+      "section": "4.2",
+      "error": "float-overflow",
+      "position": [
+        1,
+        1
+      ],
+      "input": "1.7976931348623159e308"
+    },
+    {
+      "id": "float-010",
+      "kind": "read-error",
+      "section": "4.6",
+      "error": "invalid-number",
+      "position": [
+        1,
+        1
+      ],
+      "input": "1.5e"
+    },
+    {
+      "id": "float-011",
+      "kind": "read-error",
+      "section": "4.6",
+      "error": "invalid-number",
+      "position": [
+        1,
+        4
+      ],
+      "input": "(x 1.5E3)"
+    },
+    {
+      "id": "float-012",
+      "kind": "read-error",
+      "section": "4.6",
+      "error": "invalid-number",
+      "position": [
+        1,
+        1
+      ],
+      "input": "1.5e+3"
+    },
+    {
+      "id": "float-013",
+      "kind": "read-error",
+      "section": "4.6",
+      "error": "invalid-number",
+      "position": [
+        1,
+        1
+      ],
+      "input": "5."
+    },
+    {
+      "id": "float-014",
+      "kind": "read-error",
+      "section": "4.6",
+      "error": "invalid-number",
+      "position": [
+        1,
+        1
+      ],
+      "input": "1.2.3"
+    },
+    {
+      "id": "float-015",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (+ 1.5 2.25) (- 10.0 0.5) (* 2.0 3.5) (/ 7.0 2.0) (- 2.5) (+ 4.0))",
+      "value": "(3.75 9.5 7.0 3.5 -2.5 4.0)",
+      "output": ""
+    },
+    {
+      "id": "float-016",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (/ 1.0 4.0 2.0) (/ 4.0) (+ 0.5 0.25 0.125))",
+      "value": "(0.125 0.25 0.875)",
+      "output": ""
+    },
+    {
+      "id": "float-017",
+      "kind": "eval",
+      "section": "9",
+      "program": "(equal? (+ 0.1 0.2) 0.30000000000000004)",
+      "value": "#true",
+      "output": ""
+    },
+    {
+      "id": "float-018",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (< 1.0 2.5 3.0) (< 1.0 1.0) (<= 1.0 1.0 2.0) (> 3.0 2.0 2.5) (>= -0.0 0.0) (= 0.5 0.5 0.5) (= 0.0 -0.0))",
+      "value": "(#true #false #true #false #true #true #true)",
+      "output": ""
+    },
+    {
+      "id": "float-019",
+      "kind": "eval",
+      "section": "2.5",
+      "program": "(+ 1 2.5)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "float-020",
+      "kind": "eval",
+      "section": "2.5",
+      "program": "(+ 2.5 1)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "float-021",
+      "kind": "eval",
+      "section": "2.5",
+      "program": "(* 2 0.5)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "float-022",
+      "kind": "eval",
+      "section": "2.5",
+      "program": "(- 1.0 1)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "float-023",
+      "kind": "eval",
+      "section": "2.5",
+      "program": "(< 1 2.0)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "float-024",
+      "kind": "eval",
+      "section": "2.4.2",
+      "program": "(= 1 1.0)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "float-025",
+      "kind": "eval",
+      "section": "9",
+      "program": "(/ 7 2)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "float-026",
+      "kind": "eval",
+      "section": "9",
+      "program": "(/ 7.0 2)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "float-027",
+      "kind": "eval",
+      "section": "9",
+      "program": "(quotient 7.0 2.0)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "float-028",
+      "kind": "eval",
+      "section": "9",
+      "program": "(remainder 7.0 2.0)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "float-029",
+      "kind": "eval",
+      "section": "9",
+      "program": "(+ 1.0 \"2\")",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "float-030",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(/ 1.0 0.0)",
+      "error": ":division-by-zero",
+      "output": ""
+    },
+    {
+      "id": "float-031",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(/ 0.0 -0.0)",
+      "error": ":division-by-zero",
+      "output": ""
+    },
+    {
+      "id": "float-032",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(/ 0.0)",
+      "error": ":division-by-zero",
+      "output": ""
+    },
+    {
+      "id": "float-033",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(* 1.0e308 10.0)",
+      "error": ":float-overflow",
+      "output": ""
+    },
+    {
+      "id": "float-034",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(+ 1.7976931348623157e308 1.7976931348623157e308)",
+      "error": ":float-overflow",
+      "output": ""
+    },
+    {
+      "id": "float-035",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(- -1.7976931348623157e308 1.0e300)",
+      "error": ":float-overflow",
+      "output": ""
+    },
+    {
+      "id": "float-036",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(/ 1.0e308 1.0e-10)",
+      "error": ":float-overflow",
+      "output": ""
+    },
+    {
+      "id": "float-037",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (* 1.0e-308 1.0e-308) (/ 5.0e-324 2.0))",
+      "value": "(0.0 0.0)",
+      "output": ""
+    },
+    {
+      "id": "float-038",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(catch (lambda () (* 1.0e308 10.0)) (lambda (problem) (list (get problem :kind) (get (get problem :position) :line) (get (get problem :position) :column))))",
+      "value": "(:float-overflow 1 19)",
+      "output": ""
+    },
+    {
+      "id": "float-039",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (integer-to-float 3) (integer-to-float -7) (integer-to-float 0) (integer-to-float 9007199254740993))",
+      "value": "(3.0 -7.0 0.0 9007199254740992.0)",
+      "output": ""
+    },
+    {
+      "id": "float-040",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (truncate 2.7) (truncate -2.7) (truncate 0.5) (truncate -0.0) (truncate 1.0e18))",
+      "value": "(2 -2 0 0 1000000000000000000)",
+      "output": ""
+    },
+    {
+      "id": "float-041",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (truncate 9.223372036854775e18) (truncate -9.223372036854775808e18))",
+      "value": "(9223372036854774784 -9223372036854775808)",
+      "output": ""
+    },
+    {
+      "id": "float-042",
+      "kind": "eval",
+      "section": "9",
+      "program": "(truncate 9.223372036854775808e18)",
+      "error": ":integer-overflow",
+      "output": ""
+    },
+    {
+      "id": "float-043",
+      "kind": "eval",
+      "section": "9",
+      "program": "(truncate 1.0e300)",
+      "error": ":integer-overflow",
+      "output": ""
+    },
+    {
+      "id": "float-044",
+      "kind": "eval",
+      "section": "9",
+      "program": "(truncate 3)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "float-045",
+      "kind": "eval",
+      "section": "9",
+      "program": "(integer-to-float 3.0)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "float-046",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (sqrt 4.0) (sqrt 2.0) (sqrt 0.0) (sqrt 1.0e-320))",
+      "value": "(2.0 1.4142135623730951 0.0 9.99994433575849e-161)",
+      "output": ""
+    },
+    {
+      "id": "float-047",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(sqrt -1.0)",
+      "error": ":domain-error",
+      "output": ""
+    },
+    {
+      "id": "float-048",
+      "kind": "eval",
+      "section": "9",
+      "program": "(sqrt 4)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "float-049",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (float? 1.0) (float? 1) (integer? 1.0))",
+      "value": "(#true #false #false)",
+      "output": ""
+    },
+    {
+      "id": "float-050",
+      "kind": "eval",
+      "section": "2.4.1",
+      "program": "(list (equal? 1 1.0) (equal? 0.0 -0.0) (equal? 0.1 0.1) (equal? (list 1.5) (list 1.5)))",
+      "value": "(#false #true #true #true)",
+      "output": ""
+    },
+    {
+      "id": "float-051",
+      "kind": "eval",
+      "section": "2.5",
+      "program": "(let ((m {1.5 :a 1 :b})) (list (get m 1.5) (get m 1) (contains? m 1.0) (get (associate m -0.0 :z) 0.0)))",
+      "value": "(:a :b #false :z)",
+      "output": ""
+    },
+    {
+      "id": "float-052",
+      "kind": "eval",
+      "section": "2.5",
+      "program": "(list (count #{0.0 1.0}) (contains? #{0.0} -0.0) (count (adjoin #{0.0} -0.0)))",
+      "value": "(2 #true 1)",
+      "output": ""
+    },
+    {
+      "id": "float-053",
+      "kind": "read-error",
+      "section": "5.2",
+      "error": "duplicate-key",
+      "position": [
+        1,
+        1
+      ],
+      "input": "{0.0 :a -0.0 :b}"
+    },
+    {
+      "id": "float-054",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(define describe (lambda (x) (match x 0.5 :half 1 :one (a 2.0) a otherwise :other)))\n(list (describe 0.5) (describe 1) (describe 1.0) (describe (list 3 2.0)))",
+      "value": "(:half :one :other 3)",
+      "output": ""
+    },
+    {
+      "id": "float-055",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "`(1.5 ,(+ 1.0 1.0))",
+      "value": "(1.5 2.0)",
+      "output": ""
+    },
+    {
+      "id": "float-056",
+      "kind": "eval",
+      "section": "9",
+      "program": "(list (string-to-number \"2.5\") (string-to-number \"-0.0\") (string-to-number \"1.0e3\") (string-to-number \"1e3\") (string-to-number \".5\") (string-to-number \"1.5 \"))",
+      "value": "(2.5 -0.0 1000.0 #void #void #void)",
+      "output": ""
+    },
+    {
+      "id": "float-057",
+      "kind": "eval",
+      "section": "9",
+      "program": "(string-to-number \"1.0e400\")",
+      "error": ":float-overflow",
+      "output": ""
+    },
+    {
+      "id": "float-058",
+      "kind": "eval",
+      "section": "10",
+      "program": "(list (to-string 0.1) (to-string -2.0) (to-string 1.0e21) (to-string 0.000001))",
+      "value": "(\"0.1\" \"-2.0\" \"1.0e21\" \"0.000001\")",
+      "output": ""
+    },
+    {
+      "id": "float-059",
+      "kind": "eval",
+      "section": "10",
+      "program": "(import io)\n(display! (list 3.0 0.1 -0.5 1234.5 0.0 -0.0))",
+      "value": "#void",
+      "output": "(3.0 0.1 -0.5 1234.5 0.0 -0.0)"
+    },
+    {
+      "id": "float-060",
+      "kind": "eval",
+      "section": "10",
+      "program": "(import io)\n(write! (+ 0.1 0.2))",
+      "value": "#void",
+      "output": "0.30000000000000004"
+    },
+    {
+      "id": "float-061",
+      "kind": "eval",
+      "section": "10",
+      "program": "(import io)\n(display! (list 1.0e20 1.0e21 123456789012345680000.0 1.5e300))",
+      "value": "#void",
+      "output": "(100000000000000000000.0 1.0e21 123456789012345680000.0 1.5e300)"
+    },
+    {
+      "id": "float-062",
+      "kind": "eval",
+      "section": "10",
+      "program": "(import io)\n(display! (list 0.000001 0.0000015 1.0e-7 1.5e-7 5.0e-324 -2.5e-10))",
+      "value": "#void",
+      "output": "(0.000001 0.0000015 1.0e-7 1.5e-7 5.0e-324 -2.5e-10)"
+    },
+    {
+      "id": "float-063",
+      "kind": "eval",
+      "section": "10",
+      "program": "(import io)\n(display! (list 1.7976931348623157e308 2.2250738585072014e-308 9007199254740993.0 (/ 1.0 3.0)))",
+      "value": "#void",
+      "output": "(1.7976931348623157e308 2.2250738585072014e-308 9007199254740992.0 0.3333333333333333)"
+    },
+    {
+      "id": "float-064",
+      "kind": "eval",
+      "section": "10",
+      "program": "(import io)\n(display! (list 5.0e-324 1.0e23 9.5e-5 (sqrt 2.0) 100.0))",
+      "value": "#void",
+      "output": "(5.0e-324 1.0e23 0.000095 1.4142135623730951 100.0)"
+    },
+    {
+      "id": "float-065",
+      "kind": "eval",
+      "section": "8.4",
+      "program": "(define sum (lambda (n total) (if (= n 0) total otherwise (sum (- n 1) (+ total 0.5)))))\n(sum 1000000 0.0)",
+      "value": "500000.0",
       "output": ""
     }
   ]

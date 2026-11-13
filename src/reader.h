@@ -19,6 +19,7 @@ typedef enum LispReadErrorCode {
     LISP_READ_UNTERMINATED_STRING,
     LISP_READ_INVALID_ESCAPE,
     LISP_READ_INTEGER_OVERFLOW,
+    LISP_READ_FLOAT_OVERFLOW,
     LISP_READ_INVALID_NUMBER,
     LISP_READ_DOTTED_PAIR,
     LISP_READ_EMPTY_KEYWORD,
@@ -67,3 +68,13 @@ typedef enum LispIntegerParse {
 } LispIntegerParse;
 
 LispIntegerParse lisp_parse_integer(const char *text, size_t length, int64_t *value);
+
+/* core §4.2 — float syntax, for a token that is numeric but not an integer,
+ * shared with string-to-number (§9). The value is the nearest binary64. */
+typedef enum LispFloatParse {
+    LISP_FLOAT_OK,
+    LISP_FLOAT_OVERFLOW,     /* matches `float` but is too large for binary64 */
+    LISP_FLOAT_INVALID,      /* does not match `float` */
+} LispFloatParse;
+
+LispFloatParse lisp_parse_float(const char *text, size_t length, double *value);

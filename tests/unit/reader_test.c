@@ -3,6 +3,7 @@
 
 #include "reader.h"
 
+#include <math.h>
 #include <string.h>
 
 /* Reads exactly one datum (a new reference), or nullptr after a failed check. */
@@ -54,12 +55,50 @@ static void t_token_classification(void) {
         CHECK(datum && datum->kind == LISP_KIND_SYMBOL);
         lisp_release(datum);
     }
-    const char *invalid_numbers[] = {"3.14", "1e3", "1+", "5.", ".5", "+5", "-.5", "12abc"};
+    const char *invalid_numbers[] = {"1e3", "1+", "5.", ".5", "+5", "-.5", "+5.0", "1.e3", "1.5e", "1.5E3",
+                                     "1.5e+3", "1.5e-", "1.2.3", "1.5x", "-1.0e3.0", "12abc"};
     for (size_t index = 0; index < sizeof invalid_numbers / sizeof invalid_numbers[0]; index++) {
         CHECK_READ_ERROR(invalid_numbers[index], "invalid-number", 1, 1);
     }
     CHECK_READ_ERROR(".", "dotted-pair", 1, 1);
     CHECK_READ_ERROR("(a . b)", "dotted-pair", 1, 4);
+}
+
+/* §4.2 */
+static void t_floats(void) {
+    Value *datum = read_one("3.14");
+    CHECK(datum && datum->kind == LISP_KIND_FLOAT && lisp_float_value(datum) == 3.14);
+    lisp_release(datum);
+    datum = read_one("-0.0");
+    CHECK(datum && lisp_float_value(datum) == 0.0 && signbit(lisp_float_value(datum)));
+    lisp_release(datum);
+    datum = read_one("007.50e-1");
+    CHECK(datum && lisp_float_value(datum) == 0.75);
+    lisp_release(datum);
+    datum = read_one("1.0e-400"); /* underflow rounds to zero */
+    CHECK(datum && lisp_float_value(datum) == 0.0);
+    lisp_release(datum);
+    CHECK_READ_ERROR("1.0e309", "float-overflow", 1, 1);
+    CHECK_READ_ERROR("(a -1.0e99999999999999999999)", "float-overflow", 1, 4);
+}
+
+static void t_parse_float(void) {
+    double value;
+    CHECK_INT(lisp_parse_float("2.5", 3, &value), LISP_FLOAT_OK);
+    CHECK(value == 2.5);
+    CHECK_INT(lisp_parse_float("2.5e10", 3, &value), LISP_FLOAT_OK); /* only the length given counts */
+    CHECK(value == 2.5);
+    CHECK_INT(lisp_parse_float("0.0e99999", 9, &value), LISP_FLOAT_OK);
+    CHECK(value == 0.0);
+    CHECK_INT(lisp_parse_float("1.5e400", 7, &value), LISP_FLOAT_OVERFLOW);
+    CHECK_INT(lisp_parse_float("1.5", 2, &value), LISP_FLOAT_INVALID);
+    CHECK_INT(lisp_parse_float("-", 1, &value), LISP_FLOAT_INVALID);
+    CHECK_INT(lisp_parse_float("", 0, &value), LISP_FLOAT_INVALID);
+    char long_text[400];
+    memset(long_text, '1', sizeof long_text);
+    long_text[1] = '.';
+    CHECK_INT(lisp_parse_float(long_text, sizeof long_text, &value), LISP_FLOAT_OK); /* longer than the stack copy */
+    CHECK(value > 1.11 && value < 1.12);
 }
 
 static void t_parse_integer(void) {
@@ -269,6 +308,8 @@ const TestSuite reader_suite = {"reader", (const TestCase[]){
     {"integers", t_integers},
     {"token classification", t_token_classification},
     {"integer parsing", t_parse_integer},
+    {"floats", t_floats},
+    {"float parsing", t_parse_float},
     {"booleans, void, keywords and dispatch", t_literals},
     {"strings and escapes", t_strings},
     {"lists and maps", t_collections},

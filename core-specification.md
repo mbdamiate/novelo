@@ -16,13 +16,15 @@ The core is a three-stage pipeline:
 
 **Libraries.** Nothing beyond the primitives (section 9) is visible to a program until it asks for it. A program declares each library it uses with `import` (8.9), much as a C program declares its headers. The core defines the mechanism and one native library, `io`, which holds the input and output functions.
 
-**Out of scope.** The standard library, with the libraries `list`, `text`, `function`, `map` and `set` and functions such as `map`, `filter` and `sort`, has its own specification. The extensions already planned, such as sum types and gradual typing, belong to the full specification. The core only reserves the names they use (section 8.2).
+**Out of scope.** The standard library, with libraries such as `list`, `text` and `map` and functions such as `map`, `filter` and `sort`, has its own specification. The extensions already planned, such as sum types and gradual typing, belong to the full specification. The core only reserves the names they use (section 8.2).
 
 **Name.** The language is called **Novelo**, Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as the lists of the language are. Source files use the extension `.nvl`; the extension is a convention, and `include` accepts any path (8.8).
 
 **Normative terms.** MUST indicates a mandatory requirement. MUST NOT indicates a prohibition. MAY indicates implementation freedom that does not affect observable behavior.
 
-**Version:** core 0.8.1, draft.
+**Version:** core 0.9.0, draft.
+
+**Changes since 0.8.1.** A new type, Float: a finite IEEE 754 binary64 number, written `3.14`, `-0.5` or `6.02e23` (2, 2.5, 4.2). A Float literal whose value is too large is the read error `float-overflow` (7.4). Integers and Floats never mix: `+`, `-`, `*`, the comparisons and `=` take all Integers or all Floats, and a mix is `:wrong-type` (2.4, 9). The division `/` comes back, for Floats only (9). There is no infinity and no NaN: an operation whose result would be one of them is an error, `:float-overflow`, `:division-by-zero` or `:domain-error` (8.5). New primitives `float?`, `/`, `integer-to-float`, `truncate` and `sqrt`; `string-to-number` also reads Floats (9). Floats print as the shortest decimal that reads back as the same value (10). Tokens such as `1e3`, `.5` and `5.` are still `invalid-number`. A program that runs on 0.8.1 gives the same result, unless it calls `/`, which was unbound, or calls `string-to-number` on a text such as `"3.14"`, which gave `#void`.
 
 **Changes since 0.8.0.** The REPL imports every library of the standard library, whatever their number, instead of a fixed list (8.7). Nothing else changes.
 
@@ -53,6 +55,7 @@ The reader produces values of nine types, and evaluation adds a tenth, Function,
 | Boolean | `#true`, `#false` | one of two values |
 | Void | `#void` | single value, result of side effects |
 | Integer | `42`, `-7` | signed 64-bit integer |
+| Float | `3.14`, `-0.5`, `6.02e23` | finite IEEE 754 binary64 number (2.5) |
 | String | `"hello"` | sequence of Unicode code points; there is no character type (2.5) |
 | Symbol | `define`, `&rest` | interned name |
 | Keyword | `:name` | interned name, a type distinct from Symbol |
@@ -80,13 +83,14 @@ The language has two equality predicates. Maps and the conformance tests use `eq
 | Predicate | Question | `(… 1 1)` | `(… (list 1) (list 1))` |
 | --- | --- | --- | --- |
 | `equal?` | same type and same content? | `#true` | `#true` |
-| `=` | integers with the same value? | `#true` | error: not integers |
+| `=` | numbers of one type with the same value? | `#true` | error: not numbers |
 
 ### 2.4.1 `equal?`
 
 `equal?` requires the same type: values of different types are never equal, so `foo` and `:foo`, or `"1"` and `1`, are different. Within each type:
 
 - **Boolean, Void, Integer:** the same value.
+- **Float:** the same numeric value, so `0.0` and `-0.0` are `equal?`. An Integer and a Float are never `equal?`: `(equal? 1 1.0)` is `#false`.
 - **String:** the same sequence of code points.
 - **Symbol, Keyword:** identity (because of interning).
 - **List:** same length and `equal?` elements, in order.
@@ -96,13 +100,13 @@ The language has two equality predicates. Maps and the conformance tests use `eq
 
 ### 2.4.2 `=`
 
-`=` accepts only Integer, with two or more arguments: `(= a b c)` is true when all of them are equal. An argument that is not an Integer is an error. Compared to `equal?`, `=` is meant for chained numeric comparisons and catches accidental use with other types.
+`=` accepts only numbers, with two or more arguments, all Integers or all Floats: `(= a b c)` is true when all of them are equal. An argument that is not a number, or a mix of Integers and Floats, is an error (`:wrong-type`). For Floats, `=` compares numeric values, like `equal?`. Compared to `equal?`, `=` is meant for chained numeric comparisons and catches accidental use with other types.
 
 ### 2.5 Text and numbers
 
 **There is no character type.** A character is a String of length 1: `(string-at "abc" 0)` returns `"a"`. String lengths and indices count code points.
 
-**There are only integers.** The core has no floating-point numbers. A literal such as `3.14` is a read error (`invalid-number`, 4.2), and division is done with `quotient` and `remainder`.
+**There are two numeric types that never mix.** An Integer is exact; a Float is an IEEE 754 binary64 number, always finite: there is no infinity and no NaN, so every Float is `equal?` to itself and can be a key of a Map or an element of a Set. Arithmetic and comparison take all Integers or all Floats; `(+ 1 2.5)` is `:wrong-type`, and a program converts explicitly with `integer-to-float` and `truncate` (9). Mixing is not allowed because it hides a loss: an Integer above 2^53 has no exact Float. Integer division is done with `quotient` and `remainder`, and `/` divides Floats.
 
 ## 3. Lexical syntax
 
@@ -166,9 +170,16 @@ integer = [ "-" ] , digit , { digit } ;
 
 The valid range is −2^63 to 2^63 − 1. A literal outside it MUST produce the `integer-overflow` error at the position of the start of the token, including `-9223372036854775809`. Leading zeros are allowed: `007` is `7`. There is no `+` sign.
 
-### 4.2 Non-integer numbers
+### 4.2 Floats
 
-The core has no floating-point numbers. Tokens such as `3.14`, `1e3` and `.5` are numeric under the rule in section 4.6 and, since they do not match `integer`, produce `invalid-number`. This reserves the syntax for a possible future extension.
+```
+float    = [ "-" ] , digit , { digit } , "." , digit , { digit } , [ exponent ] ;
+exponent = "e" , [ "-" ] , digit , { digit } ;
+```
+
+A Float literal has digits on both sides of the point; the optional exponent is a lowercase `e` followed by a decimal power of ten, which may be negative. As with integers, there is no `+` sign. `3.14`, `-0.5`, `007.5`, `6.02e23` and `1.0e-9` are Floats. `1e3`, `.5`, `5.`, `1.e3`, `1.5e`, `1.5E3` and `1.5e+3` are numeric under the rule in section 4.6 but do not match `float`, so they produce `invalid-number`.
+
+The value is the binary64 number nearest to the decimal value of the literal, with ties to the one whose last bit is even. A literal whose value rounds to a number too large for binary64 MUST produce the `float-overflow` error at the position of the start of the token. A value too small rounds, to a subnormal number or to zero, without error. `-0.0` is negative zero.
 
 ### 4.3 Strings
 
@@ -202,17 +213,19 @@ A keyword is `:` followed by one or more constituents, which form the name: `:na
 A token is **numeric** if, after removing a leading `+` or `-`, it starts with a digit or with `.` followed by a digit. Classification follows this order:
 
 1. Matches `integer`: Integer.
-2. Is numeric but does not match `integer`: `invalid-number` error.
-3. Is exactly `.`: `dotted-pair` error.
-4. Any other case: Symbol.
+2. Matches `float`: Float.
+3. Is numeric but matches neither: `invalid-number` error.
+4. Is exactly `.`: `dotted-pair` error.
+5. Any other case: Symbol.
 
-Rule 2 exists so that typos in numbers do not silently become symbols, and to reserve the syntax for non-integer numbers (4.2).
+Rule 3 exists so that typos in numbers do not silently become symbols, and to reserve the remaining numeric syntax for later extensions.
 
 | Token | Result |
 | --- | --- |
 | `42`, `-7`, `007` | Integer |
+| `3.14`, `-0.5`, `1.0e-9` | Float |
 | `-`, `-x`, `...`, `&rest`, `empty?`, `λ` | Symbol |
-| `3.14`, `1e3`, `1+`, `5.`, `.5`, `+5`, `-.5`, `12abc` | `invalid-number` error |
+| `1e3`, `1+`, `5.`, `.5`, `+5`, `-.5`, `1.e3`, `1.5E3`, `12abc` | `invalid-number` error |
 | `.` | `dotted-pair` error |
 
 ## 5. Collections and shorthands
@@ -327,7 +340,8 @@ The error reported is the first one detected in a left-to-right read. The `odd-m
 | `unterminated-string` | end of input before the closing `"` | opening quote | 4.3 |
 | `invalid-escape` | unknown escape | backslash | 4.3 |
 | `integer-overflow` | integer outside 64 bits | start of token | 4.1 |
-| `invalid-number` | numeric token that is not a valid integer | start of token | 4.2, 4.6 |
+| `float-overflow` | Float too large for binary64 | start of token | 4.2 |
+| `invalid-number` | numeric token that is neither an integer nor a float | start of token | 4.2, 4.6 |
 | `dotted-pair` | token `.` | the `.` | 4.6 |
 | `empty-keyword` | `:` with no name | the `:` | 4.5 |
 | `unknown-dispatch` | `#` with no valid continuation | the `#` | 5.5 |
@@ -344,7 +358,7 @@ The evaluator knows five special forms. Everything else is function application 
 
 | Datum | Result |
 | --- | --- |
-| Integer, String, Boolean, Void, Keyword | the value itself |
+| Integer, Float, String, Boolean, Void, Keyword | the value itself |
 | Symbol | the value bound to the name: first in the local environment, from the innermost `lambda` outward, then in the global one (8.2, lexical scope); unbound is an error |
 | `()` | the empty list itself |
 | Map | a new map with evaluated keys and values, left to right (8.4) |
@@ -433,7 +447,7 @@ In the `or` rewrite, `t` is a symbol created by `generate-symbol`, so that it do
 | --- | --- | --- |
 | `_` | any value | nothing |
 | a symbol `x` | any value | `x` to the value |
-| an Integer, String, Keyword, `#true`, `#false`, `#void` or `()` | a value `equal?` to it | nothing |
+| an Integer, Float, String, Keyword, `#true`, `#false`, `#void` or `()` | a value `equal?` to it | nothing |
 | `(quote datum)`, written `'datum` | a value `equal?` to the datum | nothing |
 | a list `(p …)` | a List with exactly one element per pattern, each element matching its pattern | the names of its patterns |
 | a list `(p … &rest r)` | a List with at least one element per pattern before `&rest`, matching them, whose remaining elements, as a List, match `r` | the names of its patterns |
@@ -475,7 +489,7 @@ These are expansion errors: no pattern and result pair; a pattern without a resu
 
 **Call depth.** Calls that are not in tail position nest: each one waits for the value of the next. An implementation MUST support at least 10,000 nested non-tail calls. When a chain of non-tail calls goes beyond the depth the implementation supports, evaluation MUST be interrupted with `:stack-overflow`, an ordinary error that `catch` can catch (8.5), never by ending the process. The exact depth at which this happens is up to the implementation; tail calls never count toward it.
 
-**Errors.** `error`, `raise`, integer overflow, unbound symbols and invalid applications interrupt evaluation. An error can be caught with `catch` (8.5). If it is not caught, the program terminates, or the REPL shows the message and reads the next input.
+**Errors.** `error`, `raise`, integer and Float overflow, unbound symbols and invalid applications interrupt evaluation. An error can be caught with `catch` (8.5). If it is not caught, the program terminates, or the REPL shows the message and reads the next input.
 
 ### 8.5 Side effects and errors
 
@@ -489,7 +503,7 @@ These are expansion errors: no pattern and result pair; a pattern without a resu
     (display! (concatenate "Hello, " name "\n"))))
 ```
 
-**Error descriptor.** Every error carries a descriptor: a Map with `:kind` (Keyword), `:message` (String) and `:values` (List), and, once the error has left an expression with a known position, `:position` (below). `(error message value …)` creates a descriptor with `:kind :error`. The `:kind`s of core errors are `:unbound-symbol`, `:not-a-function`, `:wrong-arguments`, `:wrong-type`, `:index-out-of-range`, `:missing-key`, `:integer-overflow`, `:division-by-zero`, `:invalid-code-point` (9), `:duplicate-key`, `:duplicate-element`, `:no-match` (8.3), `:expansion-error`, `:stack-overflow` (8.4), `:io-error` (section 9, `read-line!`), `:include-error` (8.8) and `:import-error` (8.9).
+**Error descriptor.** Every error carries a descriptor: a Map with `:kind` (Keyword), `:message` (String) and `:values` (List), and, once the error has left an expression with a known position, `:position` (below). `(error message value …)` creates a descriptor with `:kind :error`. The `:kind`s of core errors are `:unbound-symbol`, `:not-a-function`, `:wrong-arguments`, `:wrong-type`, `:index-out-of-range`, `:missing-key`, `:integer-overflow`, `:float-overflow`, `:division-by-zero`, `:domain-error`, `:invalid-code-point` (9), `:duplicate-key`, `:duplicate-element`, `:no-match` (8.3), `:expansion-error`, `:stack-overflow` (8.4), `:io-error` (section 9, `read-line!`), `:include-error` (8.8) and `:import-error` (8.9).
 
 **Positions in errors.** When an error leaves the expansion or the evaluation of an expression that has a source position, and its descriptor has no key `:position` yet, the descriptor gains `:position`: a Map with `:line` and `:column`, Integers with the coordinates of 6.1, and, when the expression was read from a file, `:file`, a String that names that file. The text of `:file` is implementation-defined; it names the program, the included file (8.8) or the source of a library (8.9).
 
@@ -651,15 +665,17 @@ Primitives are native functions bound in the global environment, except for the 
 
 | Group | Functions | Rules |
 | --- | --- | --- |
-| Arithmetic | `+`, `*`, `-` | `+` and `*` accept zero or more arguments: `(+)` is `0`, `(*)` is `1`. `-` accepts one or more: `(- x)` negates. Overflow is an error |
-| Integer division | `quotient`, `remainder` | truncating toward zero; a zero divisor is an error |
-| Comparison | `<`, `>`, `<=`, `>=`, `=` | Integer only, two or more arguments, chained: `(< a b c)` |
+| Arithmetic | `+`, `*`, `-` | all arguments Integers or all Floats (2.5); a mix, or an argument that is not a number, is `:wrong-type`. `+` and `*` accept zero or more arguments: `(+)` is `0`, `(*)` is `1`. `-` accepts one or more: `(- x)` negates, and `(- 0.0)` is `-0.0`. Integer overflow is `:integer-overflow`. Each Float operation is rounded to the nearest binary64, ties to even, as IEEE 754 requires; a result too large for binary64 is `:float-overflow` |
+| Float division | `/` | Floats only, one or more arguments: `(/ a b c)` is `a` divided by `b`, then by `c`, and `(/ x)` is `1.0` divided by `x`. A divisor equal to `0.0` or `-0.0` is `:division-by-zero`; Integers are `:wrong-type`, since they are divided with `quotient` |
+| Integer division | `quotient`, `remainder` | Integers only, truncating toward zero; a zero divisor is an error |
+| Comparison | `<`, `>`, `<=`, `>=`, `=` | numbers, all Integers or all Floats, two or more arguments, chained: `(< a b c)`. `-0.0` and `0.0` are equal |
+| Floats | `integer-to-float`, `truncate`, `sqrt` | `(integer-to-float n)` takes an Integer and returns the nearest Float, with ties to even, so it is exact for every Integer from −2^53 to 2^53. `(truncate x)` takes a Float and returns the Integer obtained by discarding its fractional part, toward zero: `(truncate -2.7)` is `-2`; a result outside the range of Integer is `:integer-overflow`. `(sqrt x)` takes a Float and returns its square root, correctly rounded as IEEE 754 requires; a Float less than zero is `:domain-error`, and `(sqrt -0.0)` is `-0.0` |
 | Equality | `equal?` | section 2.4 |
-| Types | `boolean?`, `void?`, `integer?`, `string?`, `symbol?`, `keyword?`, `list?`, `map?`, `set?`, `function?` | one predicate per type; `function?` holds for closures and primitives |
+| Types | `boolean?`, `void?`, `integer?`, `float?`, `string?`, `symbol?`, `keyword?`, `list?`, `map?`, `set?`, `function?` | one predicate per type; `function?` holds for closures and primitives |
 | Lists | `list`, `prepend`, `first`, `rest` | `(prepend x xs)` puts `x` in front of `xs`; `first` and `rest` of `()` are errors |
 | Maps and sizes | `count`, `empty?`, `get`, `contains?`, `associate`, `dissociate`, `keys` | `count` and `empty?` work on List, Map, Set and String. `(get m k default)` returns `default` if `k` does not exist; without a default, it is an error. `contains?` tests whether the map has the key, or whether the set has the element. `keys` returns a new list with each key of the map exactly once, in the iteration order of 2.3, and `(keys {})` is `()`; together with `get`, it is how a program traverses a map |
 | Strings | `concatenate`, `string-at`, `substring`, `to-string` | indices count code points; `(substring s start end)` excludes `end`; `to-string` returns the text `display!` would print; `concatenate` accepts zero or more strings, and `(concatenate)` returns `""` |
-| Number parsing | `string-to-number` | reads the whole text under the rules of section 4 and returns an Integer; if the text is not an integer, returns `#void`; if it is out of range, it is an error (`:integer-overflow`) |
+| Number parsing | `string-to-number` | reads the whole text under the rules of section 4 and returns an Integer or a Float; if the text is neither an integer nor a float, returns `#void`; if it is out of range, it is an error (`:integer-overflow` or `:float-overflow`) |
 | Code points | `string-to-code-points`, `code-points-to-string` | `(string-to-code-points s)` returns a new List with the code point of each character of `s`, in order, as Integers: `(string-to-code-points "aé")` is `(97 233)`, and `(string-to-code-points "")` is `()`. `(code-points-to-string xs)` returns the String whose code points are the elements of `xs`, in order; `(code-points-to-string ())` is `""`. An element that is not an Integer produces `:wrong-type`; an Integer that is not a Unicode scalar value (3.2), that is, negative, above U+10FFFF or a surrogate from U+D800 to U+DFFF, produces `:invalid-code-point` with `:values` `(n)`. The elements are checked in order, and the first invalid one is reported |
 | Symbols | `string-to-symbol`, `symbol-to-string`, `generate-symbol` | `generate-symbol` creates a new symbol, different from all others and not interned, so macros can avoid capture |
 | Sets | `adjoin`, `disjoin`, `elements` | `(adjoin s x)` returns the set with `x`, and `(disjoin s x)` the set without `x`; each returns the same set when there is nothing to change. `elements` returns a new list with each element of the set exactly once, in the iteration order of 2.3, and `(elements #{})` is `()`. `get`, `keys`, `associate` and `dissociate` take only maps |
@@ -676,10 +692,19 @@ Primitives are native functions bound in the global environment, except for the 
 | --- | --- |
 | Boolean, Void | `#true`, `#false`, `#void` |
 | Integer | decimal, with `-` if negative |
+| Float | the shortest decimal that reads back as the same Float, laid out as below |
 | String | in double quotes, with `\n`, `\t`, `\r`, `\"` and `\\` escaped; every other character from U+0000 to U+001F, and U+007F, comes out as `\u{H…}` with uppercase hexadecimal digits and no leading zeros, such as `\u{0}` and `\u{1B}`; all other characters come out as they are |
 | Symbol, Keyword | the name, preceded by `:` for keywords |
 | List, Map, Set | delimiters of section 5.1, elements separated by one space; Map and Set order unspecified |
 | Function | `#<function>` |
+
+**Floats.** A Float `x` other than zero prints from the shortest sequence of decimal digits d₁…dₙ, with d₁ not zero, and the exponent e such that d₁.d₂…dₙ × 10^e reads back (4.2) as `x`. When several sequences of that length read back as `x`, the one closest to `x` is used, and between two equally close, the one whose last digit is even. Then:
+
+- When −6 ≤ e < 21, the number is written without an exponent: the digits, with the point after the digit of 10⁰, padded with zeros where needed. At least one digit is written on each side of the point: `3.0`, `0.1`, `1234.5`, `100000000000000000000.0`, `0.000001`.
+- Otherwise it is written as d₁, a point, the remaining digits or `0` when there are none, `e` and the exponent in decimal, with `-` if negative: `1.0e21`, `1.5e-7`, `5.0e-324`.
+- A negative Float starts with `-`. Zero prints as `0.0`, and negative zero as `-0.0`.
+
+Every printed Float has a point with digits on both sides, so it reads back as a Float and never as an Integer. `to-string` and `display!` use the same text.
 
 The exceptions to reading back are:
 
@@ -728,6 +753,9 @@ An implementation is conformant when it passes all the cases below. Results are 
 | `9223372036854775807` | maximum Integer |
 | `-9223372036854775808` | minimum Integer |
 | `42 -7` | Integer, Integer |
+| `3.14 -0.5 6.02e23` | Float, Float, Float |
+| `2.50` | ≡ `2.5` |
+| `1.0e-400` | ≡ `0.0` |
 | `-x`, `-`, `...`, `&rest`, `λ` | Symbol |
 | `:1`, `:a:b` | Keyword |
 | `#true #false #void` | Boolean, Boolean, Void |
@@ -776,7 +804,9 @@ An implementation is conformant when it passes all the cases below. Results are 
 | `"\u{D800` | `unterminated-string` | 1:1 |
 | `9223372036854775808` | `integer-overflow` | 1:1 |
 | `-9223372036854775809` | `integer-overflow` | 1:1 |
-| `3.14` | `invalid-number` | 1:1 |
+| `3.14e999` | `float-overflow` | 1:1 |
+| `-1.0e309` | `float-overflow` | 1:1 |
+| `1.e3` | `invalid-number` | 1:1 |
 | `(x 1e3)` | `invalid-number` | 1:4 |
 | `(x 1+)` | `invalid-number` | 1:4 |
 | `+5` | `invalid-number` | 1:1 |
@@ -801,18 +831,18 @@ An implementation is conformant when it passes all the cases below. Results are 
 
 ### 12.4 Conformance file
 
-The file `conformance.json` has 357 cases, each with an `id`, the section it tests and a kind:
+The file `conformance.json` has 422 cases, each with an `id`, the section it tests and a kind:
 
 | Kind | Cases | What it checks |
 | --- | --- | --- |
-| `read` | 22 | `input` produces the same sequence of datums as `equivalent`, or datums with the types in `types` |
-| `read-error` | 45 | reading `input`, or the bytes of `input_hex`, fails with the code `error` at `position` |
+| `read` | 28 | `input` produces the same sequence of datums as `equivalent`, or datums with the types in `types` |
+| `read-error` | 54 | reading `input`, or the bytes of `input_hex`, fails with the code `error` at `position` |
 | `read-positions` | 3 | the node indicated by each `path` is in the position table with the expected `position` |
-| `eval` | 287 | `program` runs as a file, with `input` (or the bytes of `input_hex`) on standard input; it imports at most the library `io`; the output is exactly `output`, and the program ends with the value `value` or with an uncaught error of the `:kind` given in `error`; with `error_position`, the descriptor of that error has a `:position` whose `:line` and `:column` are the given pair, or, when `error_position` is `null`, no `:position` |
+| `eval` | 337 | `program` runs as a file, with `input` (or the bytes of `input_hex`) on standard input; it imports at most the library `io`; the output is exactly `output`, and the program ends with the value `value` or with an uncaught error of the `:kind` given in `error`; with `error_position`, the descriptor of that error has a `:position` whose `:line` and `:column` are the given pair, or, when `error_position` is `null`, no `:position` |
 
 An `eval` case that tests `include` (8.8) also has `files`, an object that maps each relative path, with `/` as separator, to the text of that file. The program is the file `main.nvl`, and the paths are relative to its directory. A path missing from `files` cannot be opened.
 
-The `eval` cases cover the special and derived forms, including `if` with several pairs and `match`, tail calls with one million iterations, a traversal of a list of one million elements with `empty?`, `first` and `rest` (8.6), a map of one million keys built with `associate`, persistence and `dissociate` on large maps, keys whose hashes may collide (8.6), sets: reading, literals, equality, printing, quasiquote, the primitives and a set of one million elements, 10,000 nested non-tail calls and `:stack-overflow`, equality, arithmetic and overflows, primitives, `read-line!` with invalid UTF-8, the code point conversions, including a String of one million code points, printing (including `display!` of strings inside collections), `catch` and `raise`, the positions in errors (8.5), both callback patterns, `include` with and without prefixes, and `import` (8.9). Some cases check that what was removed from the core does not exist: `/`, `same?`, named `lambda`, the names without `!`, the standard library functions without `import`, and the `io` functions without `import`. The library has its own cases, in the file `stdlib-conformance.json`.
+The `eval` cases cover the special and derived forms, including `if` with several pairs and `match`, tail calls with one million iterations, a traversal of a list of one million elements with `empty?`, `first` and `rest` (8.6), a map of one million keys built with `associate`, persistence and `dissociate` on large maps, keys whose hashes may collide (8.6), sets: reading, literals, equality, printing, quasiquote, the primitives and a set of one million elements, 10,000 nested non-tail calls and `:stack-overflow`, equality, arithmetic and overflows, primitives, `read-line!` with invalid UTF-8, the code point conversions, including a String of one million code points, Floats: arithmetic, comparisons, every mix of Integers and Floats, the errors that keep them finite, the conversions, `sqrt`, Floats as keys and in patterns, and how they print, printing (including `display!` of strings inside collections), `catch` and `raise`, the positions in errors (8.5), both callback patterns, `include` with and without prefixes, and `import` (8.9). Some cases check that what was removed from the core does not exist: `same?`, named `lambda`, the names without `!`, the standard library functions without `import`, and the `io` functions without `import`. The library has its own cases, in the file `stdlib-conformance.json`.
 
 **Behaviors fixed by the tests.** While writing the cases, these points needed an answer that the text above does not give yet:
 
@@ -821,4 +851,4 @@ The `eval` cases cover the special and derived forms, including `if` with severa
 - `dissociate` of a missing key returns the map unchanged.
 - A `raise` with a valid descriptor and a custom `:kind`, such as `:custom`, terminates the program with that `:kind`.
 
-Version 0.2.1 settled the remaining points in the text (see its list of changes), and the cases cover them. Version 0.3.0 added the positions in errors, version 0.4.0 the persistent maps, version 0.5.0 the type Set and version 0.6.0 the `if` with several pairs, version 0.7.0 `match` and version 0.8.0 the code point conversions; their cases cover them too.
+Version 0.2.1 settled the remaining points in the text (see its list of changes), and the cases cover them. Version 0.3.0 added the positions in errors, version 0.4.0 the persistent maps, version 0.5.0 the type Set and version 0.6.0 the `if` with several pairs, version 0.7.0 `match`, version 0.8.0 the code point conversions and version 0.9.0 the type Float; their cases cover them too.

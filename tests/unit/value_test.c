@@ -57,6 +57,21 @@ static void t_integers(void) {
     CHECK_INT(lisp_live_objects(), live);
 }
 
+/* §2.4.1, §2.5 */
+static void t_floats(void) {
+    Value *zero = lisp_float(0.0), *negative_zero = lisp_float(-0.0), *half = lisp_float(0.5);
+    Value *other_half = lisp_float(0.5), *one = lisp_float(1.0), *integer_one = lisp_integer(1);
+    CHECK_STR(lisp_type_name(half), "Float");
+    CHECK(lisp_float_value(half) == 0.5);
+    CHECK(lisp_equal(half, other_half));
+    CHECK(lisp_hash(half) == lisp_hash(other_half));
+    CHECK(lisp_equal(zero, negative_zero)); /* numeric, so -0.0 is 0.0 */
+    CHECK(lisp_hash(zero) == lisp_hash(negative_zero));
+    CHECK(!lisp_equal(one, integer_one)); /* never across types */
+    CHECK(!lisp_equal(half, one));
+    RELEASE_ALL(zero, negative_zero, half, other_half, one, integer_one);
+}
+
 static void t_reference_counting(void) {
     size_t live = lisp_live_objects();
     Value *string = lisp_string_cstr("hello");
@@ -449,6 +464,7 @@ static void t_hash_consistent(void) {
 const TestSuite value_suite = {"value", (const TestCase[]){
     {"singletons", t_singletons},
     {"integers", t_integers},
+    {"floats", t_floats},
     {"reference counting", t_reference_counting},
     {"strings count code points", t_strings},
     {"symbols and keywords are interned", t_interning},

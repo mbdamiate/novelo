@@ -1,6 +1,6 @@
 # Novelo
 
-An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.8.1) and the standard library (`standard-library.md`, v0.5.0).
+An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.9.0) and the standard library (`standard-library.md`, v0.5.0).
 
 *Novelo* is Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as Novelo's lists are. Source files end in `.nvl`.
 
@@ -8,7 +8,7 @@ Every case of both conformance suites passes:
 
 | Suite | Cases |
 | --- | --- |
-| core | 357 |
+| core | 422 |
 | stdlib | 64 |
 
 Those runs report no leaks, and they also pass under AddressSanitizer and UndefinedBehaviorSanitizer.
@@ -161,6 +161,12 @@ make examples
 - Trie nodes are internal reference-counted objects, so a large map is released through the same iterative work stack as a long list.
 - A Set (`#{…}`) is the same structure with its own type tag and every value `#true`, so it is persistent in the same way and never `equal?` to a map.
 - Each entry keeps the sequence number of its insertion. The first iteration over a map sorts the entries by it once and keeps that order with the map.
+
+**Floats** (core §2.5, §10) are boxed binary64 values, like large integers, and never infinite or NaN: every operation checks `isfinite` and raises `:float-overflow` instead.
+
+- Reading checks the grammar of §4.2 first and then calls `strtod`, which rounds correctly on glibc and macOS. The interpreter never calls `setlocale`, so the decimal point is always `.`.
+- Printing finds the shortest digits that read back. For each length from 1 to 17, `printf("%.*e")` gives the closest digits of that length, and `strtod` checks whether they read back. Next to a power of two, the closest digits can miss while their neighbor of the same length reads back, so both neighbors are tried too.
+- `sqrt` is the only libm function used, because IEEE 754 requires it to be correctly rounded, so every platform prints the same digits.
 
 **Positions** live in a side table keyed by node address. Freeing a node removes its entry, so a reused address never inherits a stale position (core §6.4). Each entry also names its file, as an index into a list of file names that the reader fills.
 
