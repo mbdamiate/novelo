@@ -1,0 +1,47 @@
+; FizzBuzz.
+;
+; Counts from 1 to 15. A multiple of 3 prints "Fizz", a multiple of 5
+; prints "Buzz", a multiple of both prints "FizzBuzz", and any other number
+; prints itself.
+;
+;   build/novelo examples/02-fizzbuzz.nvl
+
+(import io)
+
+(define limit 15)
+
+; Arithmetic and comparison are ordinary functions in prefix form:
+; (+ 1 2) is 3, (= a b) compares two integers. `remainder` is what is left
+; of an integer division, so a number is a multiple of `d` when the
+; remainder is 0.
+(define multiple?
+  (lambda (number divisor)
+    (= (remainder number divisor) 0)))
+
+; There is no `cond` or `else if`: each `otherwise` branch holds the next
+; `if`. `and` holds when both of its tests hold. `to-string` turns the
+; number into text, so every branch returns a String.
+(define fizzbuzz
+  (lambda (number)
+    (if (and (multiple? number 3) (multiple? number 5)) "FizzBuzz"
+        otherwise (if (multiple? number 3) "Fizz"
+                      otherwise (if (multiple? number 5) "Buzz"
+                                    otherwise (to-string number))))))
+
+; There are no loops either: a function that calls itself is the loop. The
+; call to count-from! is the last thing the function does (a tail call), so
+; it reuses the same space: counting to ten million uses no more memory
+; than counting to 15.
+;
+; Each branch of `if` is one expression. `sequence` runs several in order
+; and returns the value of the last, so the branch can print and then
+; continue. When the count is done the function returns #void, the value
+; that means "nothing".
+(define count-from!
+  (lambda (number)
+    (if (> number limit) #void
+        otherwise (sequence
+                    (display! (concatenate (fizzbuzz number) "\n"))
+                    (count-from! (+ number 1))))))
+
+(count-from! 1)
