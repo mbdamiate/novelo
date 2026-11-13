@@ -1,0 +1,67 @@
+; Sets: who came, and when.
+;
+; Two days of a visitor log, with repeats. Sets answer the questions a log
+; raises: who came at all, who came both days, who came only once.
+;
+;   build/novelo examples/06-unique.nvl
+
+(import io)
+(import list)      ; map, filter
+(import set)       ; from-list, union, intersection, difference, subset?
+
+(define show!
+  (lambda (label value)
+    (display! label)
+    (display! ": ")
+    (write! value)
+    (display! "\n")))
+
+; A log is a list: order matters and repeats are kept.
+(define monday '("ana" "bruno" "ana" "carla" "bruno" "ana"))
+(define tuesday '("carla" "davi" "carla" "elisa"))
+
+; A set holds each value at most once. `from-list` drops the repeats.
+(define monday-visitors (from-list monday))
+(define tuesday-visitors (from-list tuesday))
+(show! "monday" monday-visitors)
+(show! "visits vs visitors" (list (count monday) (count monday-visitors)))
+
+; A set literal is written #{…}. Writing the same element twice in one is a
+; read error, so a literal never hides a repeat. The order in which a set
+; prints is left open by the language; this interpreter keeps the order of
+; insertion.
+(define staff #{"ana" "elisa"})
+
+; Sets compare by their elements, never by order.
+(show! "same set?" (equal? #{"a" "b"} #{"b" "a"}))
+
+; ---- membership ----------------------------------------------------------
+
+; `contains?` barely slows down as a set grows: its cost is logarithmic, so
+; a million elements take only a few more steps than a thousand. Searching
+; a list instead walks it from the start.
+(show! "carla on monday?" (contains? monday-visitors "carla"))
+(show! "davi on monday?" (contains? monday-visitors "davi"))
+
+; `adjoin` and `disjoin` return a new set with or without one element. Like
+; every value, the original set stays as it was.
+(define with-felipe (adjoin tuesday-visitors "felipe"))
+(show! "with felipe" with-felipe)
+(show! "tuesday, unchanged" tuesday-visitors)
+(show! "without carla" (disjoin tuesday-visitors "carla"))
+
+; ---- combining -----------------------------------------------------------
+
+(define everyone (union monday-visitors tuesday-visitors))
+(show! "everyone" everyone)
+(show! "both days" (intersection monday-visitors tuesday-visitors))
+(show! "only monday" (difference monday-visitors tuesday-visitors))
+(show! "only tuesday" (difference tuesday-visitors monday-visitors))
+(show! "staff all came?" (subset? staff everyone))
+
+; ---- back to lists ------------------------------------------------------------
+
+; `elements` turns a set into a list, so the functions of `list` apply.
+(show! "guests" (filter (lambda (name) (not (contains? staff name)))
+                        (elements everyone)))
+(show! "name lengths" (map count (elements everyone)))

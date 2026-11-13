@@ -1,0 +1,15 @@
+monday: #{"ana" "bruno" "carla"}
+visits vs visitors: (6 3)
+same set?: #true
+carla on monday?: #true
+davi on monday?: #false
+with felipe: #{"carla" "davi" "elisa" "felipe"}
+tuesday, unchanged: #{"carla" "davi" "elisa"}
+without carla: #{"davi" "elisa"}
+everyone: #{"ana" "bruno" "carla" "davi" "elisa"}
+both days: #{"carla"}
+only monday: #{"ana" "bruno"}
+only tuesday: #{"davi" "elisa"}
+staff all came?: #true
+guests: ("bruno" "carla" "davi")
+name lengths: (3 5 5 4 5)
