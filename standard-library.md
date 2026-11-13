@@ -10,7 +10,9 @@ The standard library is made of six libraries, in the sense of core section 8.9:
 
 The reference definitions in section 4 are normative. The implementation MAY replace any of them with a native version, as long as the observable behavior is identical, including errors and the names each library binds.
 
-**Version:** 0.5.0, draft, on top of core 0.8.1.
+**Version:** 0.6.0, draft, on top of core 0.9.0.
+
+**Changes since 0.5.0.** The library `number` follows the type Float of core 0.9.0: `max` and `min` take all Integers or all Floats, and four new functions, `abs`, `floor`, `ceiling` and `round`, are written over `truncate` and `integer-to-float` (sections 3 and 4.6). `floor`, `ceiling` and `round` take a Float and return an Integer, and `round` takes a value exactly halfway to the integer farther from zero. The other libraries are unchanged.
 
 **Changes since 0.4.0.** The library `text` compares, classifies and changes the case of text, over the code point conversions of core 0.8.0: `precedes?`, `uppercase`, `lowercase`, `letter?` and `digit?`. Letters and case cover ASCII and Latin-1 (section 2). A new library, `number`, with `max` and `min` (sections 3 and 4.6). The other libraries are unchanged.
 
@@ -65,7 +67,10 @@ The reference definitions in section 4 are normative. The implementation MAY rep
 | `set` | `intersection` | `(intersection a b)` | the elements in both `a` and `b` |
 | `set` | `difference` | `(difference a b)` | the elements of `a` that are not in `b` |
 | `set` | `subset?` | `(subset? a b)` | `#true` if every element of `a` is in `b` |
-| `number` | `max`, `min` | `(max n …)` | the largest, or smallest, of one or more Integers; with no argument, `:wrong-arguments`; an argument that is not an Integer, `:wrong-type`. For a list, `(apply max xs)` |
+| `number` | `max`, `min` | `(max n …)` | the largest, or smallest, of one or more numbers, all Integers or all Floats; with no argument, `:wrong-arguments`; an argument that is not a number, or a mix of Integers and Floats, `:wrong-type`. For a list, `(apply max xs)` |
+| `number` | `abs` | `(abs n)` | the absolute value of an Integer or a Float, of the same type; `(abs -0.0)` is `0.0`, and the smallest Integer gives `:integer-overflow` |
+| `number` | `floor`, `ceiling` | `(floor x)` | the largest Integer not greater than the Float `x`, or the smallest not less than it: `(floor -2.5)` is `-3`, `(ceiling 2.1)` is `3`; an Integer gives `:wrong-type`, a result outside the range of Integer `:integer-overflow` |
+| `number` | `round` | `(round x)` | the Integer nearest to the Float `x`; exactly halfway, the one farther from zero: `(round 2.5)` is `3`, `(round -2.5)` is `-3`; errors as `floor` |
 
 There is no `find`. To get the first element that satisfies a predicate, take `first` of the `filter` result after checking that it is not empty; to only ask whether such an element exists, use `any?`. To combine from last to first, `fold` the `reverse` of the list.
 
@@ -326,24 +331,56 @@ The functions build on `elements`, `adjoin`, `disjoin` and `contains?`, which ar
 
 ### 4.6 `number`
 
-`max` and `min` take their arguments like `+`, so a list goes through `apply`. The first argument is checked explicitly, because with a single argument no comparison would check it.
+`max` and `min` take their arguments like `+`, so a list goes through `apply`. The first argument is checked explicitly, because with a single argument no comparison would check it; the comparisons check the others, including a mix of Integers and Floats.
 
 ```lisp
 (import list)
 
 (define max
   (lambda (number &rest more)
-    (if (integer? number) (fold (lambda (best x) (if (> x best) x otherwise best)) number more)
-        otherwise (raise {:kind :wrong-type :message "max: expected an Integer" :values (list number)}))))
+    (if (or (integer? number) (float? number)) (fold (lambda (best x) (if (> x best) x otherwise best)) number more)
+        otherwise (raise {:kind :wrong-type :message "max: expected a number" :values (list number)}))))
 
 (define min
   (lambda (number &rest more)
-    (if (integer? number) (fold (lambda (best x) (if (< x best) x otherwise best)) number more)
-        otherwise (raise {:kind :wrong-type :message "min: expected an Integer" :values (list number)}))))
+    (if (or (integer? number) (float? number)) (fold (lambda (best x) (if (< x best) x otherwise best)) number more)
+        otherwise (raise {:kind :wrong-type :message "min: expected a number" :values (list number)}))))
+```
+
+`abs` keeps the type of its argument. Adding `0.0` turns `-0.0` into `0.0`, since `-0.0` is not less than zero but its absolute value is positive zero.
+
+```lisp
+(define abs
+  (lambda (number)
+    (if (integer? number) (if (< number 0) (- number) otherwise number)
+        (float? number) (if (< number 0.0) (- number) otherwise (+ number 0.0))
+        otherwise (raise {:kind :wrong-type :message "abs: expected a number" :values (list number)}))))
+```
+
+`floor`, `ceiling` and `round` start from `truncate`, which rejects an Integer and a Float out of range, and correct its result. The Integer `whole` came from the Float `x`, so `(integer-to-float whole)` is exact, and so is the fraction `x - whole`: the two are within a factor of two of each other, or `whole` is zero. `round` therefore compares the exact fraction with `0.5`, so `0.49999999999999994` rounds to `0`, where adding `0.5` and taking the floor would give `1`.
+
+```lisp
+(define floor
+  (lambda (x)
+    (let ((whole (truncate x)))
+      (if (< x (integer-to-float whole)) (- whole 1) otherwise whole))))
+
+(define ceiling
+  (lambda (x)
+    (let ((whole (truncate x)))
+      (if (> x (integer-to-float whole)) (+ whole 1) otherwise whole))))
+
+(define round
+  (lambda (x)
+    (let ((whole (truncate x)))
+      (let ((fraction (- x (integer-to-float whole))))
+        (if (>= fraction 0.5) (+ whole 1)
+            (<= fraction -0.5) (- whole 1)
+            otherwise whole)))))
 ```
 
 ## 5. Conformance
 
-The file `stdlib-conformance.json` has 64 cases, in the same format as the core `eval` cases, with one difference: the libraries `list`, `text`, `function`, `map`, `set` and `number` are available to `import`. Each program imports what it uses. An implementation that provides the library MUST pass all of them, in addition to the core cases.
+The file `stdlib-conformance.json` has 85 cases, in the same format as the core `eval` cases, with one difference: the libraries `list`, `text`, `function`, `map`, `set` and `number` are available to `import`. Each program imports what it uses. An implementation that provides the library MUST pass all of them, in addition to the core cases.
 
-The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that imports a library, a traversal of one hundred thousand elements, which only passes if the functions run in constant memory, every function of `map` with its errors, a map of one hundred thousand keys built with `from-entries` and reduced with `filter-entries`, every function of `set`, sets of one hundred thousand elements, the order of `precedes?` and its stable use in `sort`, `uppercase`, `lowercase`, `letter?` and `digit?` at the edges of the ASCII and Latin-1 ranges, `max` and `min` with their errors and over one hundred thousand arguments, and `import` itself: names unbound without it, prefixes, the dependencies of `text`, `function`, `map`, `set` and `number` on `list`, and repeated imports.
+The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that imports a library, a traversal of one hundred thousand elements, which only passes if the functions run in constant memory, every function of `map` with its errors, a map of one hundred thousand keys built with `from-entries` and reduced with `filter-entries`, every function of `set`, sets of one hundred thousand elements, the order of `precedes?` and its stable use in `sort`, `uppercase`, `lowercase`, `letter?` and `digit?` at the edges of the ASCII and Latin-1 ranges, `max` and `min` with Integers, with Floats, with their errors and over one hundred thousand arguments, `abs`, `floor`, `ceiling` and `round` at negative numbers, `-0.0`, halfway values, Floats above 2^52 and the edges of the range of Integer, and `import` itself: names unbound without it, prefixes, the dependencies of `text`, `function`, `map`, `set` and `number` on `list`, and repeated imports.

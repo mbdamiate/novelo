@@ -1,5 +1,5 @@
 {
-  "spec": "Standard Library — Novelo, version 0.5.0",
+  "spec": "Standard Library — Novelo, version 0.6.0",
   "format": {
     "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text, function, map, set and number available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
   },
@@ -517,6 +517,174 @@
       "section": "3",
       "program": "(import list)\n(import text)\n(import function)\n(import map)\n(import set)\n(import number)\n(list (precedes? \"a\" \"b\") (max 1 2) (from-list (list 1 1)) (values {:a 1}))",
       "value": "(#true 2 #{1} (1))",
+      "output": ""
+    },
+    {
+      "id": "library-065",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(list (max 1.5 -2.0 0.25) (min 1.5 -2.0 0.25) (max 2.5) (apply min (list 0.5 0.125)) (max -0.0 -1.0))",
+      "value": "(1.5 -2.0 2.5 0.125 -0.0)",
+      "output": ""
+    },
+    {
+      "id": "library-066",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(max 1 2.0)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-067",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(min 1.0 2)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-068",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(list (abs -5) (abs 5) (abs 0) (abs -2.5) (abs 2.5) (abs -0.0) (abs 9223372036854775807))",
+      "value": "(5 5 0 2.5 2.5 0.0 9223372036854775807)",
+      "output": ""
+    },
+    {
+      "id": "library-069",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import io)\n(import number)\n(display! (list (abs -0.0) (abs 0.0) (abs -1.0e-320)))",
+      "value": "#void",
+      "output": "(0.0 0.0 1.0e-320)"
+    },
+    {
+      "id": "library-070",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(abs -9223372036854775808)",
+      "error": ":integer-overflow",
+      "output": ""
+    },
+    {
+      "id": "library-071",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(abs \"x\")",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-072",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(list (floor 2.7) (floor -2.7) (floor 2.0) (floor -2.0) (floor 0.5) (floor -0.5) (floor -0.0) (floor 5.0e-324) (floor -5.0e-324))",
+      "value": "(2 -3 2 -2 0 -1 0 0 -1)",
+      "output": ""
+    },
+    {
+      "id": "library-073",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(list (ceiling 2.1) (ceiling -2.1) (ceiling 2.0) (ceiling -0.5) (ceiling 0.5) (ceiling -0.0) (ceiling 5.0e-324))",
+      "value": "(3 -2 2 0 1 0 1)",
+      "output": ""
+    },
+    {
+      "id": "library-074",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(list (round 2.5) (round -2.5) (round 1.5) (round 0.5) (round -0.5) (round 2.4) (round -2.6) (round 0.49999999999999994) (round -0.49999999999999994) (round 0.0))",
+      "value": "(3 -3 2 1 -1 2 -3 0 0 0)",
+      "output": ""
+    },
+    {
+      "id": "library-075",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(list (round 4503599627370495.5) (round -4503599627370495.5) (floor 4503599627370495.5) (ceiling 4503599627370495.5) (round 9007199254740993.0))",
+      "value": "(4503599627370496 -4503599627370496 4503599627370495 4503599627370496 9007199254740992)",
+      "output": ""
+    },
+    {
+      "id": "library-076",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(list (floor -9.223372036854775808e18) (ceiling 9.223372036854774784e18) (round 9.223372036854774784e18))",
+      "value": "(-9223372036854775808 9223372036854774784 9223372036854774784)",
+      "output": ""
+    },
+    {
+      "id": "library-077",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(floor 9.223372036854775808e18)",
+      "error": ":integer-overflow",
+      "output": ""
+    },
+    {
+      "id": "library-078",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(ceiling -1.0e300)",
+      "error": ":integer-overflow",
+      "output": ""
+    },
+    {
+      "id": "library-079",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(round 1.0e19)",
+      "error": ":integer-overflow",
+      "output": ""
+    },
+    {
+      "id": "library-080",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(floor 2)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-081",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(round 2)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-082",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(ceiling \"2.5\")",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-083",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(map round (list 0.5 1.5 2.5 3.5 -0.5 -1.5))",
+      "value": "(1 2 3 4 -1 -2)",
+      "output": ""
+    },
+    {
+      "id": "library-084",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number)\n(define total (fold + 0.0 (map integer-to-float (range 0 100000))))\n(list total (round (/ total 100000.0)) (floor (/ total 100000.0)))",
+      "value": "(4999950000.0 50000 49999)",
+      "output": ""
+    },
+    {
+      "id": "library-085",
+      "kind": "eval",
+      "section": "4.6",
+      "program": "(import number n)\n(list (n/abs -3) (n/round 1.5) (catch (lambda () round) (lambda (problem) (get problem :kind))))",
+      "value": "(3 2 :unbound-symbol)",
       "output": ""
     }
   ]
