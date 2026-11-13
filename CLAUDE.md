@@ -29,11 +29,12 @@ make asan          # rebuild in build/asan with ASan + UBSan and run `make test`
 make coverage      # rebuild in build/coverage (clang), run `make test`, print llvm-cov's report
 make stress        # tests/stress at full size (~2 min): volume, depth, constant memory by peak RSS
 make asan-stress   # the same at 1/100 of the size under ASan + UBSan, without the memory check
+make fuzz          # mutated programs (ITERATIONS=20000 SEED=1) under ASan + UBSan: no crash, report or leak
 ./build/unit-tests -k reader/strings --no-fork   # one unit test, in-process for a debugger
 ./build/conformance -v -k read-error conformance.json
 ```
 
-Before each phase commit, run `make stress` and `make asan-stress`. After adding behavior, run `make coverage` and give each new reachable line a case (conformance for spec behavior, unit or `tests/cli.sh` for the implementation's). Both test runners take `-k TEXT` to filter tests or cases by name or id (substring match), and `-v` to list each one. The unit runner forks one process per test; pass `--no-fork` to debug a single test. To add a unit suite, export a `TestSuite` from `tests/unit/<module>_test.c` and list it by hand in `tests/unit/test.c`. Make decides what to rebuild from timestamps, so after reverting a file within the same second, run `make clean` first.
+Before each phase commit, run `make stress`, `make asan-stress` and `make fuzz`; a fuzz failure leaves its input in `build/fuzz/crashes/`, and `build/fuzz/fuzz --only eval:INDEX …` replays it in-process. After adding behavior, run `make coverage` and give each new reachable line a case (conformance for spec behavior, unit or `tests/cli.sh` for the implementation's). Both test runners take `-k TEXT` to filter tests or cases by name or id (substring match), and `-v` to list each one. The unit runner forks one process per test; pass `--no-fork` to debug a single test. To add a unit suite, export a `TestSuite` from `tests/unit/<module>_test.c` and list it by hand in `tests/unit/test.c`. Make decides what to rebuild from timestamps, so after reverting a file within the same second, run `make clean` first.
 
 ## Code style
 

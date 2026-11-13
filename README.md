@@ -38,6 +38,7 @@ make asan       # the same, rebuilt in build/asan with ASan + UBSan
 make coverage   # the same, rebuilt in build/coverage with clang's coverage, then a report
 make stress     # the programs of tests/stress at full size, about two minutes
 make asan-stress # the same at a hundredth of the size, under ASan + UBSan
+make fuzz       # mutated programs under ASan + UBSan, about a minute
 make clean
 ```
 
@@ -159,6 +160,32 @@ The programs cover:
   - a chain of 500 includes.
 
 `make asan-stress` runs them under ASan + UBSan at a hundredth of the size, at least 1, without the memory check.
+
+### Fuzzing
+
+`make fuzz` builds `build/fuzz/fuzz` with ASan + UBSan and feeds the interpreter mutated programs. Neither Apple clang nor gcc ships libFuzzer, so it is a small mutation fuzzer of its own, with no dependencies, and it is deterministic: an input depends only on `SEED` and its number. `make fuzz ITERATIONS=20000 SEED=1` are the defaults; another seed explores other inputs.
+
+The seeds are every `program` of both conformance files, with its `files` and standard input, the `input` of every read case, and the examples. The tokens to splice come from their code, leaving out comments and strings. The mutations are:
+- flipping, inserting and deleting bytes;
+- deleting or duplicating a delimiter;
+- replacing a token with another of the same input, with a name another seed calls, or with any token of another seed;
+- replacing an argument with a value of another type, such as `""`, `'()`, `{:kind :custom}`, `#{}`, `#void` or a lambda, so that calls reach their error paths;
+- replacing a number with an edge value, such as `9223372036854775808`, `-0.0` or `5.0e-324`;
+- inserting invalid UTF-8, `\u{…}` escapes and bare special forms;
+- copying a stretch elsewhere, and wrapping one in a call or a collection.
+
+There are two modes:
+- **Reader**, 10 × `ITERATIONS` inputs through `lisp_read` alone, in batches of 500 per process. A read error must be at a line and column inside the input. Every datum read must print as text that reads back `equal?` and prints the same again.
+- **Eval**, `ITERATIONS` programs, one process each, on the command line's 512 MB stack with a 32 MB limit for evaluation. Inputs that do not read are drawn again, up to 8 times, so most of them expand and run. A program may finish, fail to read, or raise an uncaught error whose descriptor is a Map with a Keyword `:kind`. A run longer than 2 seconds is counted but not failed, because a mutated bound easily makes a loop that never ends. In the default run, about 22% of the programs finish and 76% end in an uncaught error, a third of them an unbound name.
+
+In both modes, every object and position entry must be freed afterwards. Anything else fails: a signal, a sanitizer report, a broken check. The input is saved as `build/fuzz/crashes/MODE-INDEX.nvl`, with the process's standard error beside it; past 20 failures they are only counted. `build/fuzz/fuzz --only eval:INDEX conformance.json stdlib-conformance.json examples` prints that input and its outcome, running it in the fuzzer's own process, for a debugger.
+
+What it found:
+- In the interpreter, nothing: the default run of 220,000 inputs passes, and so do seeds 2 to 4 at 40,000 programs each.
+- Planted bugs show what it catches:
+  - A leak on the reader's `:duplicate-element` path failed 6 reader inputs.
+  - An extra release of a borrowed String in `substring`'s out-of-range error was caught as a use-after-free, once in the 20,000 programs. The path is rare in the seeds.
+- What it does not catch is a wrong value. An off-by-one that let `substring` end one past the text returned `"bc\u{0}"` for `(substring "abc" 1 4)`. It read the NUL terminator, inside the allocation, so nothing failed. Values are what the conformance cases check.
 
 ### Coverage
 

@@ -10,6 +10,7 @@
 #   make coverage     everything above, rebuilt with clang's coverage in build/coverage, then a report
 #   make stress       the programs of tests/stress at full size: volume, depth, constant memory
 #   make asan-stress  the same at a hundredth of the size, with AddressSanitizer + UBSan
+#   make fuzz         mutated programs under AddressSanitizer + UBSan (ITERATIONS=20000 SEED=1)
 #   make clean
 
 CC      ?= cc
@@ -49,9 +50,13 @@ CONFORMANCE_BIN := $(BUILD)/conformance
 STRESS_SRC := tests/stress/stress.c
 STRESS_OBJ := $(BUILD)/tests/stress/stress.o
 STRESS_BIN := $(BUILD)/stress
+FUZZ_OBJ := $(BUILD)/tests/fuzz/fuzz.o $(BUILD)/tests/conformance/json.o
+FUZZ_BIN := $(BUILD)/fuzz
 CLI_BIN := $(BUILD)/novelo
+ITERATIONS ?= 20000
+SEED ?= 1
 
-.PHONY: all test unit conformance examples cli asan coverage stress asan-stress clean
+.PHONY: all test unit conformance examples cli asan coverage stress asan-stress fuzz fuzz-run clean
 
 all: $(CLI_BIN)
 
@@ -78,6 +83,13 @@ stress: $(STRESS_BIN)
 asan-stress:
 	$(MAKE) stress BUILD=build/asan SANITIZE=1 STRESS_FLAGS=--quick
 
+# The fuzzer always runs with the sanitizers: a crash it finds is a report.
+fuzz:
+	$(MAKE) fuzz-run BUILD=build/fuzz SANITIZE=1
+
+fuzz-run: $(FUZZ_BIN)
+	./$(FUZZ_BIN) --iterations $(ITERATIONS) --seed $(SEED) conformance.json stdlib-conformance.json examples
+
 # Every process writes its own profile (%p): the unit runner forks per test.
 coverage:
 	rm -rf $(COVERAGE_DIR)/profiles
@@ -103,6 +115,9 @@ $(CONFORMANCE_BIN): $(CONFORMANCE_OBJ) $(LIB_OBJ)
 $(STRESS_BIN): $(STRESS_OBJ) $(LIB_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
+$(FUZZ_BIN): $(FUZZ_OBJ) $(LIB_OBJ)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
 # The standard library document read by import (stdlib §4); NOVELO_STDLIB overrides it.
 $(BUILD)/src/library.o: CFLAGS += -DLISP_STDLIB_DEFAULT='"$(CURDIR)/standard-library.md"'
 
@@ -122,4 +137,8 @@ $(BUILD)/tests/stress/%.o: tests/stress/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -Isrc -c -o $@ $<
 
--include $(BUILD)/src/main.d $(LIB_OBJ:.o=.d) $(UNIT_OBJ:.o=.d) $(CONFORMANCE_OBJ:.o=.d) $(STRESS_OBJ:.o=.d)
+$(BUILD)/tests/fuzz/%.o: tests/fuzz/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -Isrc -Itests/conformance -c -o $@ $<
+
+-include $(BUILD)/src/main.d $(LIB_OBJ:.o=.d) $(UNIT_OBJ:.o=.d) $(CONFORMANCE_OBJ:.o=.d) $(STRESS_OBJ:.o=.d) $(FUZZ_OBJ:.o=.d)
