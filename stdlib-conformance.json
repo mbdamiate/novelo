@@ -1,5 +1,5 @@
 {
-  "spec": "Standard Library — Novelo, version 0.7.0",
+  "spec": "Standard Library — Novelo, version 0.7.1",
   "format": {
     "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text, function, map, set and number available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
   },
@@ -773,6 +773,22 @@
       "section": "4.2",
       "program": "(import text t)\n(list (t/pad-left 3 \"0\" \"7\") (t/format \"[{}]\" (t/pad-right 3 \"_\" \"a\")))",
       "value": "(\"007\" \"[a__]\")",
+      "output": ""
+    },
+    {
+      "id": "library-097",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import text)\n(define kind (lambda (thunk) (catch thunk (lambda (problem) (get problem :kind)))))\n(list (join \",\" (list 5)) (join 5 (list \"a\")) (join \"\" ()) (kind (lambda () (join \",\" (list \"a\" 5)))) (kind (lambda () (join 5 (list \"a\" \"b\")))))",
+      "value": "(5 \"a\" \"\" :wrong-type :wrong-type)",
+      "output": ""
+    },
+    {
+      "id": "library-098",
+      "kind": "eval",
+      "section": "4.2",
+      "program": "(import list)\n(import text)\n(define joined (join \", \" (map to-string (range 0 200000))))\n(list (count joined) (substring joined 0 10) (count (split \", \" joined)) (count (apply format (prepend (join \"\" (map (lambda (n) \"{}\") (range 0 10000))) (range 0 10000)))))",
+      "value": "(1488888 \"0, 1, 2, 3\" 200000 38890)",
       "output": ""
     }
   ]

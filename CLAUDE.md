@@ -4,14 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-This repository specifies **Novelo**, an immutable Lisp (core v0.10.1, standard library v0.7.0); the name means "ball of yarn" in Portuguese, and source files use `.nvl`, and implements an interpreter for it in **C23**. The interpreter was built in six phases, all done; the language is now being extended one feature at a time (core 0.3.0 added source positions to runtime errors, core 0.4.0 persistent maps and the stdlib library `map`, core 0.5.0 the type Set `#{…}` and the library `set`, core 0.6.0 the `if` with several pairs, core 0.7.0 `match`, core 0.8.0 `string-to-code-points`/`code-points-to-string`, stdlib 0.5.0 text comparison, case and classification over ASCII + Latin-1 and the library `number`, core 0.9.0 the type Float, finite binary64 that never mixes with Integer, stdlib 0.6.0 `abs`, `floor`, `ceiling`, `round` and `max`/`min` over Floats, core 0.10.0 `float-to-fixed`, stdlib 0.7.0 `pad-left`, `pad-right` and `format` in `text`, core 0.10.1 cases for the paths `make coverage` found untested): all 499 core and 96 stdlib cases and the unit tests pass, also under `make asan`. `README.md` covers building, running, the source map, the design and the behavior the spec leaves to the implementation. Core 0.2.1 settled the points 0.2.0 left open; when a new gap appears, decide it with the user, write it into the spec and add conformance cases rather than only documenting the choice.
+This repository specifies **Novelo**, an immutable Lisp (core v0.10.1, standard library v0.7.1); the name means "ball of yarn" in Portuguese, and source files use `.nvl`, and implements an interpreter for it in **C23**. The interpreter was built in six phases, all done; the language is now being extended one feature at a time (core 0.3.0 added source positions to runtime errors, core 0.4.0 persistent maps and the stdlib library `map`, core 0.5.0 the type Set `#{…}` and the library `set`, core 0.6.0 the `if` with several pairs, core 0.7.0 `match`, core 0.8.0 `string-to-code-points`/`code-points-to-string`, stdlib 0.5.0 text comparison, case and classification over ASCII + Latin-1 and the library `number`, core 0.9.0 the type Float, finite binary64 that never mixes with Integer, stdlib 0.6.0 `abs`, `floor`, `ceiling`, `round` and `max`/`min` over Floats, core 0.10.0 `float-to-fixed`, stdlib 0.7.0 `pad-left`, `pad-right` and `format` in `text`, core 0.10.1 cases for the paths `make coverage` found untested, stdlib 0.7.1 `join` and `format` in linear time, found by `make stress`): all 499 core and 98 stdlib cases and the unit tests pass, also under `make asan`. `README.md` covers building, running, the source map, the design and the behavior the spec leaves to the implementation. Core 0.2.1 settled the points 0.2.0 left open; when a new gap appears, decide it with the user, write it into the spec and add conformance cases rather than only documenting the choice.
 
 | File | Role |
 | --- | --- |
 | `core-specification.md` | Normative core: reader (§2–7), positions (§6), read errors (§7), evaluation (§8), primitives (§9), printing (§10), conformance (§12) |
 | `standard-library.md` | Normative stdlib: the libraries `list`, `text`, `function`, `map`, `set`, `number`, whose sources are the `lisp` code blocks of §4.1–4.6 |
 | `conformance.json` | 499 core cases (`read`, `read-error`, `read-positions`, `eval`, with an optional `error_position`); programs import at most `io` |
-| `stdlib-conformance.json` | 96 stdlib `eval` cases; programs import `list`, `text`, `function`, `map`, `set` or `number` |
+| `stdlib-conformance.json` | 98 stdlib `eval` cases; programs import `list`, `text`, `function`, `map`, `set` or `number` |
 | `README.md` | Building, running, source map, design, implementation-defined behavior |
 | `examples/` | Commented example programs, numbered by complexity, each adding one idea: one directory per example, `NN-name/main.nvl` with an optional `input.txt`, the expected `output.txt`, and any files it includes. The friction they show picks the next extension |
 
@@ -27,11 +27,13 @@ make conformance   # both conformance suites
 make examples      # run examples/*/main.nvl with build/novelo and compare with output.txt
 make asan          # rebuild in build/asan with ASan + UBSan and run `make test` there
 make coverage      # rebuild in build/coverage (clang), run `make test`, print llvm-cov's report
+make stress        # tests/stress at full size (~2 min): volume, depth, constant memory by peak RSS
+make asan-stress   # the same at 1/100 of the size under ASan + UBSan, without the memory check
 ./build/unit-tests -k reader/strings --no-fork   # one unit test, in-process for a debugger
 ./build/conformance -v -k read-error conformance.json
 ```
 
-After adding behavior, run `make coverage` and give each new reachable line a case (conformance for spec behavior, unit or `tests/cli.sh` for the implementation's). Both test runners take `-k TEXT` to filter tests or cases by name or id (substring match), and `-v` to list each one. The unit runner forks one process per test; pass `--no-fork` to debug a single test. To add a unit suite, export a `TestSuite` from `tests/unit/<module>_test.c` and list it by hand in `tests/unit/test.c`. Make decides what to rebuild from timestamps, so after reverting a file within the same second, run `make clean` first.
+Before each phase commit, run `make stress` and `make asan-stress`. After adding behavior, run `make coverage` and give each new reachable line a case (conformance for spec behavior, unit or `tests/cli.sh` for the implementation's). Both test runners take `-k TEXT` to filter tests or cases by name or id (substring match), and `-v` to list each one. The unit runner forks one process per test; pass `--no-fork` to debug a single test. To add a unit suite, export a `TestSuite` from `tests/unit/<module>_test.c` and list it by hand in `tests/unit/test.c`. Make decides what to rebuild from timestamps, so after reverting a file within the same second, run `make clean` first.
 
 ## Code style
 
@@ -67,4 +69,4 @@ The CLI (`main.c`): `build/novelo file.nvl` runs a file, `build/novelo` alone st
 - `eval` cases must match the exact stdout in `output`. They also check either `value` (the last form's value) or `error` (the `:kind` of the uncaught error). `input` is fed as stdin. The stdin line reader splits only on U+000A, so a CR stays in the line.
 - With `files`, the program is `main.nvl` and paths are relative to it. A path missing from `files` cannot be opened.
 - Each case uses a fresh interpreter state, and the live-object count must be zero after it is destroyed.
-- Constant-memory check, done by hand: a 10M-iteration tail loop must keep a stable RSS (`/usr/bin/time -l` on macOS).
+- Constant memory is checked by `make stress`: a program marked `; memory: constant` runs at N and 10 × N, and its peak RSS may not grow by more than 25% plus 16 MB.

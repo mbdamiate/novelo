@@ -1,0 +1,24 @@
+; format, pad-left and float-to-fixed at every step of a loop.
+; scale: 100000
+; memory: constant
+(import io)
+(import text t)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define line
+  (lambda (n)
+    (t/format "{}|{}|{}" (t/pad-left 8 "0" (to-string n)) (t/pad-right 3 "." "x")
+              (float-to-fixed (/ (integer-to-float n) 3.0) 2))))
+(define loop
+  (lambda (n)
+    (if (= n 0) #true
+        otherwise
+        (let ((text (line n)))
+          (check "width" (substring text 0 13) (concatenate (t/pad-left 8 "0" (to-string n)) "|x..|"))
+          (loop (- n 1))))))
+(loop size)
+(display! "ok\n")

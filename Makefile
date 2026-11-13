@@ -8,6 +8,8 @@
 #   make cli          check the command line: exit codes and messages
 #   make asan         everything above, rebuilt with AddressSanitizer + UBSan in build/asan
 #   make coverage     everything above, rebuilt with clang's coverage in build/coverage, then a report
+#   make stress       the programs of tests/stress at full size: volume, depth, constant memory
+#   make asan-stress  the same at a hundredth of the size, with AddressSanitizer + UBSan
 #   make clean
 
 CC      ?= cc
@@ -44,9 +46,12 @@ UNIT_BIN := $(BUILD)/unit-tests
 CONFORMANCE_SRC := $(wildcard tests/conformance/*.c)
 CONFORMANCE_OBJ := $(CONFORMANCE_SRC:tests/conformance/%.c=$(BUILD)/tests/conformance/%.o)
 CONFORMANCE_BIN := $(BUILD)/conformance
+STRESS_SRC := tests/stress/stress.c
+STRESS_OBJ := $(BUILD)/tests/stress/stress.o
+STRESS_BIN := $(BUILD)/stress
 CLI_BIN := $(BUILD)/novelo
 
-.PHONY: all test unit conformance examples cli asan coverage clean
+.PHONY: all test unit conformance examples cli asan coverage stress asan-stress clean
 
 all: $(CLI_BIN)
 
@@ -66,6 +71,12 @@ cli: $(CLI_BIN)
 
 asan:
 	$(MAKE) test BUILD=build/asan SANITIZE=1
+
+stress: $(STRESS_BIN)
+	./$(STRESS_BIN) $(STRESS_FLAGS) tests/stress
+
+asan-stress:
+	$(MAKE) stress BUILD=build/asan SANITIZE=1 STRESS_FLAGS=--quick
 
 # Every process writes its own profile (%p): the unit runner forks per test.
 coverage:
@@ -89,6 +100,9 @@ $(UNIT_BIN): $(UNIT_OBJ) $(LIB_OBJ)
 $(CONFORMANCE_BIN): $(CONFORMANCE_OBJ) $(LIB_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
+$(STRESS_BIN): $(STRESS_OBJ) $(LIB_OBJ)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
 # The standard library document read by import (stdlib §4); NOVELO_STDLIB overrides it.
 $(BUILD)/src/library.o: CFLAGS += -DLISP_STDLIB_DEFAULT='"$(CURDIR)/standard-library.md"'
 
@@ -104,4 +118,8 @@ $(BUILD)/tests/conformance/%.o: tests/conformance/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -Isrc -c -o $@ $<
 
--include $(BUILD)/src/main.d $(LIB_OBJ:.o=.d) $(UNIT_OBJ:.o=.d) $(CONFORMANCE_OBJ:.o=.d)
+$(BUILD)/tests/stress/%.o: tests/stress/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -Isrc -c -o $@ $<
+
+-include $(BUILD)/src/main.d $(LIB_OBJ:.o=.d) $(UNIT_OBJ:.o=.d) $(CONFORMANCE_OBJ:.o=.d) $(STRESS_OBJ:.o=.d)

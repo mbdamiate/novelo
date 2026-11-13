@@ -1,0 +1,21 @@
+; Non-tail recursion until :stack-overflow, caught and repeated: the
+; stack comes back each time.
+; scale: 3
+; memory: constant
+(import io)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define forever (lambda (n) (+ 1 (forever n))))
+(define overflow-kind (lambda () (catch (lambda () (forever 0)) (lambda (problem) (get problem :kind)))))
+(define loop
+  (lambda (n)
+    (if (= n 0) #true
+        otherwise (sequence (check "kind" (overflow-kind) :stack-overflow) (loop (- n 1))))))
+(loop size)
+(define depth (lambda (n) (if (= n 0) 0 otherwise (+ 1 (depth (- n 1))))))
+(check "deep but not too deep" (depth 200000) 200000) ; also within reach under ASan, whose frames are larger
+(display! "ok\n")

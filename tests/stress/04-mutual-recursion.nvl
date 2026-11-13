@@ -1,0 +1,15 @@
+; Two functions that call each other in tail position.
+; scale: 1000000
+; memory: constant
+(import io)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define even-step? (lambda (n) (if (= n 0) #true otherwise (odd-step? (- n 1)))))
+(define odd-step? (lambda (n) (if (= n 0) #false otherwise (even-step? (- n 1)))))
+(check "even" (even-step? size) (= (remainder size 2) 0))
+(check "odd" (odd-step? (+ size 1)) (= (remainder size 2) 0))
+(display! "ok\n")

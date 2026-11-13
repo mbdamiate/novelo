@@ -1,0 +1,21 @@
+; Macros that expand into deep forms and into long chains of macro calls.
+; scale: 100000
+(import io)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define nest (lambda (n inner) (if (= n 0) inner otherwise (nest (- n 1) (list 'list inner)))))
+(define-macro deep (lambda () (nest size 7)))
+(define unwrap (lambda (value depth) (if (list? value) (unwrap (first value) (+ depth 1)) otherwise (list value depth))))
+(check "deep" (unwrap (deep) 0) (list 7 size))
+(define-macro count-down (lambda (n) (if (= n 0) 0 otherwise (list 'count-down (- n 1)))))
+(define-macro start (lambda () (list 'count-down size)))
+(check "chain" (start) 0)
+(define-macro sum-of (lambda (&rest terms) (prepend '+ terms)))
+(define-macro many-terms (lambda () (prepend 'sum-of (nest-terms size ()))))
+(define nest-terms (lambda (n terms) (if (= n 0) terms otherwise (nest-terms (- n 1) (prepend n terms)))))
+(check "many arguments" (many-terms) (quotient (* size (+ size 1)) 2))
+(display! "ok\n")

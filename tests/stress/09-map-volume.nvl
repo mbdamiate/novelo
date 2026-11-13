@@ -1,0 +1,26 @@
+; A large map built, read, transformed and emptied again.
+; scale: 500000
+(import io)
+(import list)
+(import map)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define keys-in-order (range 0 size))
+(define squares (fold (lambda (table k) (associate table k (* k k))) {} keys-in-order))
+(check "count" (count squares) size)
+(check "get" (get squares (- size 1)) (* (- size 1) (- size 1)))
+(check "values" (fold + 0 (values squares)) (quotient (* (- size 1) size (- (* 2 size) 1)) 6))
+(check "keys in insertion order" (keys squares) keys-in-order)
+(define halved (filter-entries (lambda (k v) (= (remainder k 2) 0)) squares))
+(check "filter-entries" (count halved) (quotient (+ size 1) 2))
+(check "map-values" (get (map-values (lambda (v) (+ v 1)) squares) 3) 10)
+(define by-name (from-entries (map (lambda (k) (list (to-string k) k)) keys-in-order)))
+(check "string keys" (get by-name (to-string (- size 1))) (- size 1))
+(check "merge" (count (merge squares by-name)) (* 2 size))
+(check "emptied" (fold dissociate squares keys-in-order) {})
+(check "persistent" (count squares) size)
+(display! "ok\n")

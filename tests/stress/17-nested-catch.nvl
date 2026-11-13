@@ -1,0 +1,18 @@
+; Errors re-raised through ten nested catches at every step.
+; scale: 100000
+; memory: constant
+(import io)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define nested
+  (lambda (depth n)
+    (if (= depth 0) (raise {:kind :inner :message "inner" :values (list n)})
+        otherwise (catch (lambda () (nested (- depth 1) n)) (lambda (problem) (raise problem))))))
+(define outer (lambda (n) (catch (lambda () (nested 10 n)) (lambda (problem) (first (get problem :values))))))
+(define loop (lambda (n total) (if (= n 0) total otherwise (loop (- n 1) (+ total (outer n))))))
+(check "sum" (loop size 0) (quotient (* size (+ size 1)) 2))
+(display! "ok\n")

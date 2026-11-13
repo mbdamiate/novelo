@@ -1,6 +1,6 @@
 # Novelo
 
-An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.10.1) and the standard library (`standard-library.md`, v0.7.0).
+An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.10.1) and the standard library (`standard-library.md`, v0.7.1).
 
 *Novelo* is Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as Novelo's lists are. Source files end in `.nvl`.
 
@@ -9,7 +9,7 @@ Every case of both conformance suites passes:
 | Suite | Cases |
 | --- | --- |
 | core | 499 |
-| stdlib | 96 |
+| stdlib | 98 |
 
 Those runs report no leaks, and they also pass under AddressSanitizer and UndefinedBehaviorSanitizer.
 
@@ -36,6 +36,8 @@ make            # builds build/novelo
 make test       # unit tests + both conformance suites + the examples + the command line
 make asan       # the same, rebuilt in build/asan with ASan + UBSan
 make coverage   # the same, rebuilt in build/coverage with clang's coverage, then a report
+make stress     # the programs of tests/stress at full size, about two minutes
+make asan-stress # the same at a hundredth of the size, under ASan + UBSan
 make clean
 ```
 
@@ -117,6 +119,46 @@ make coverage
   - `NOVELO_STDLIB`;
   - the REPL with standard input that is not a terminal.
 - **Examples (`examples/`):** numbered by complexity, each adding one idea, starting at `01-hello`. Each example is a directory: `main.nvl` is a complete program, commented, run by `build/novelo` through `tests/examples.sh`. It must exit with 0 and print exactly `output.txt`; `input.txt`, when present, is its standard input. Any other file is part of the example, such as the files `08-modules` includes.
+
+### Stress
+
+`make stress` runs the programs of `tests/stress` with `build/stress`. Each program runs in its own process. The run passes only if:
+- the program prints exactly `ok`, which it does only after checking its own results;
+- it ends without an uncaught error;
+- once its state is freed, no object or position entry is left alive.
+
+The runner prints the time and the peak memory (`ru_maxrss`) of each one. Comments at the top of a program set how it runs:
+
+| Comment | Effect |
+| --- | --- |
+| `; scale: N` | standard input is the line `N`, the size the program reads |
+| `; memory: constant` | it also runs with `10 × N`, and its peak memory may grow by at most 25% plus 16 MB |
+| `; include-chain: K` | an in-memory chain of `K` files, each defining a name and including the next |
+
+The programs cover:
+- **tail loops of ten million steps**, in constant memory:
+  - a plain `if`;
+  - `match`;
+  - a Float accumulator;
+  - mutual recursion;
+  - `catch` at every step;
+  - calls from `let`, `sequence`, `and`, `or` and `match`;
+  - errors re-raised through ten catches;
+  - text formatting;
+- **volume:**
+  - lists of a million elements;
+  - maps and sets of half a million, emptied again;
+  - `sort`;
+  - a text of a million characters;
+  - a million closures, and a chain of a million;
+- **depth:**
+  - a list nested a million levels deep, compared, hashed, printed and freed;
+  - `:stack-overflow` caught and repeated, with memory stable;
+  - macro expansions a hundred thousand levels deep;
+  - the reader's nesting limit;
+  - a chain of 500 includes.
+
+`make asan-stress` runs them under ASan + UBSan at a hundredth of the size, at least 1, without the memory check.
 
 ### Coverage
 

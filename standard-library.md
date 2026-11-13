@@ -10,7 +10,9 @@ The standard library is made of six libraries, in the sense of core section 8.9:
 
 The reference definitions in section 4 are normative. The implementation MAY replace any of them with a native version, as long as the observable behavior is identical, including errors and the names each library binds.
 
-**Version:** 0.7.0, draft, on top of core 0.10.0.
+**Version:** 0.7.1, draft, on top of core 0.10.1.
+
+**Changes since 0.7.0.** No observable change. `join` and `format` gather their pieces and call `concatenate` once, so their time grows with the length of the result; the reference definitions of 0.7.0 copied the text built so far at every part, which took seconds to join a hundred thousand words (section 4.2).
 
 **Changes since 0.6.0.** The library `text` lays out text: `pad-left` and `pad-right` fill a text up to a width, and `format` puts values into a template at each `{}` (sections 3 and 4.2). With `float-to-fixed` of core 0.10.0, they print tables and numbers with fixed decimals. The other libraries are unchanged.
 
@@ -179,8 +181,10 @@ The source of each library is the concatenation, in order, of the `lisp` code bl
 (define join
   (lambda (separator parts)
     (if (empty? parts) ""
-        otherwise (fold (lambda (acc part) (concatenate acc separator part))
-                        (first parts) (rest parts)))))
+        (empty? (rest parts)) (first parts)
+        otherwise (apply concatenate
+                         (reverse (fold (lambda (acc part) (prepend part (prepend separator acc)))
+                                        (list (first parts)) (rest parts)))))))
 
 (define split
   (lambda (separator text)
@@ -198,6 +202,8 @@ The source of each library is the concatenation, in order, of the `lisp` code bl
                         (prepend (substring text start position) acc))
             otherwise (split-step separator width text limit start (+ position 1) acc)))))
 ```
+
+`join` gathers the parts and separators in a list and calls `concatenate` once, so its time grows with the length of the result; concatenating step by step would copy the text built so far at every part. A single part comes back as it is.
 
 The functions that look at characters convert the text to its code points once (core section 9), instead of reading it one `string-at` at a time.
 
@@ -272,14 +278,14 @@ The functions that look at characters convert the text to its code points once (
         otherwise (repeat-step element (- times 1) (prepend element acc)))))
 ```
 
-`format` splits the template at each `{}` with `split`, so a template with n of them has n + 1 parts, and puts the values between the parts. `split` reads `{}` from left to right without overlap, so `"{{}}"` is `"{"`, a value and `"}"`.
+`format` splits the template at each `{}` with `split`, so a template with n of them has n + 1 parts, and puts the values between the parts, gathering the pieces for one `concatenate` as `join` does. `split` reads `{}` from left to right without overlap, so `"{{}}"` is `"{"`, a value and `"}"`.
 
 ```lisp
 (define format
   (lambda (template &rest arguments)
     (let ((parts (split "{}" template)))
       (if (= (count parts) (+ (count arguments) 1))
-          (format-step (rest parts) arguments (first parts))
+          (apply concatenate (reverse (format-step (rest parts) arguments (list (first parts)))))
           otherwise (error "format: the number of values differs from the number of {}"
                            template (count arguments))))))
 
@@ -287,7 +293,7 @@ The functions that look at characters convert the text to its code points once (
   (lambda (parts arguments acc)
     (if (empty? parts) acc
         otherwise (format-step (rest parts) (rest arguments)
-                               (concatenate acc (to-string (first arguments)) (first parts))))))
+                               (prepend (first parts) (prepend (to-string (first arguments)) acc))))))
 ```
 
 ### 4.3 `function`
@@ -426,6 +432,6 @@ The functions build on `elements`, `adjoin`, `disjoin` and `contains?`, which ar
 
 ## 5. Conformance
 
-The file `stdlib-conformance.json` has 96 cases, in the same format as the core `eval` cases, with one difference: the libraries `list`, `text`, `function`, `map`, `set` and `number` are available to `import`. Each program imports what it uses. An implementation that provides the library MUST pass all of them, in addition to the core cases.
+The file `stdlib-conformance.json` has 98 cases, in the same format as the core `eval` cases, with one difference: the libraries `list`, `text`, `function`, `map`, `set` and `number` are available to `import`. Each program imports what it uses. An implementation that provides the library MUST pass all of them, in addition to the core cases.
 
-The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that imports a library, a traversal of one hundred thousand elements, which only passes if the functions run in constant memory, every function of `map` with its errors, a map of one hundred thousand keys built with `from-entries` and reduced with `filter-entries`, every function of `set`, sets of one hundred thousand elements, the order of `precedes?` and its stable use in `sort`, `uppercase`, `lowercase`, `letter?` and `digit?` at the edges of the ASCII and Latin-1 ranges, `pad-left` and `pad-right` with texts wider than the width, accented fills and fills of the wrong length, `format` with values of every type, braces outside `{}` and too few or too many values, `max` and `min` with Integers, with Floats, with their errors and over one hundred thousand arguments, `abs`, `floor`, `ceiling` and `round` at negative numbers, `-0.0`, halfway values, Floats above 2^52 and the edges of the range of Integer, and `import` itself: names unbound without it, prefixes, the dependencies of `text`, `function`, `map`, `set` and `number` on `list`, and repeated imports.
+The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that imports a library, a traversal of one hundred thousand elements, which only passes if the functions run in constant memory, every function of `map` with its errors, a map of one hundred thousand keys built with `from-entries` and reduced with `filter-entries`, every function of `set`, sets of one hundred thousand elements, the order of `precedes?` and its stable use in `sort`, `uppercase`, `lowercase`, `letter?` and `digit?` at the edges of the ASCII and Latin-1 ranges, `pad-left` and `pad-right` with texts wider than the width, accented fills and fills of the wrong length, `format` with values of every type, braces outside `{}` and too few or too many values, `join` of a single part that is returned as it is, and `join` of two hundred thousand parts and `format` of ten thousand values, which only pass in reasonable time if they grow linearly, `max` and `min` with Integers, with Floats, with their errors and over one hundred thousand arguments, `abs`, `floor`, `ceiling` and `round` at negative numbers, `-0.0`, halfway values, Floats above 2^52 and the edges of the range of Integer, and `import` itself: names unbound without it, prefixes, the dependencies of `text`, `function`, `map`, `set` and `number` on `list`, and repeated imports.

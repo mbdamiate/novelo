@@ -1,0 +1,19 @@
+; A list nested N levels deep: equality, hashing, printing and release.
+; scale: 1000000
+(import io)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define nest (lambda (n inner) (if (= n 0) inner otherwise (nest (- n 1) (list inner)))))
+(define one (nest size ()))
+(define other (nest size ()))
+(check "equal" (equal? one other) #true)
+(check "different" (equal? one (nest size (list 1))) #false)
+(check "map key" (get (associate {} one :found) other) :found)
+(check "set element" (contains? (adjoin #{} one) other) #true)
+(check "printed" (count (to-string one)) (* 2 (+ size 1)))
+(check "quoted" (equal? `(1 ,one) (list 1 other)) #true)
+(display! "ok\n")

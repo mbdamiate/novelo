@@ -1,0 +1,19 @@
+; An error raised and caught at every step, by error and by raise.
+; scale: 1000000
+; memory: constant
+(import io)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define attempt
+  (lambda (n)
+    (catch (lambda ()
+             (if (= (remainder n 2) 0) (error "even" n)
+                 otherwise (raise {:kind :odd :message "odd" :values (list n)})))
+           (lambda (problem) (first (get problem :values))))))
+(define loop (lambda (n total) (if (= n 0) total otherwise (loop (- n 1) (+ total (attempt n))))))
+(check "sum" (loop size 0) (quotient (* size (+ size 1)) 2))
+(display! "ok\n")

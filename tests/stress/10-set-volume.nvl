@@ -1,0 +1,22 @@
+; Large sets: union, intersection, difference and subset.
+; scale: 500000
+(import io)
+(import list)
+(import set)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define half (quotient size 2))
+(define low (from-list (range 0 size)))
+(define high (from-list (range half (+ size half))))
+(check "count" (count low) size)
+(check "union" (count (union low high)) (+ size half))
+(check "intersection" (count (intersection low high)) (- size half))
+(check "difference" (count (difference low high)) half)
+(check "subset" (subset? (intersection low high) low) #true)
+(check "not subset" (subset? low high) (= half 0))
+(check "emptied" (fold disjoin low (range 0 size)) #{})
+(display! "ok\n")

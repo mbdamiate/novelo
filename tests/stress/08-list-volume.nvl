@@ -1,0 +1,25 @@
+; The list functions over one large list.
+; scale: 1000000
+(import io)
+(import list)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define numbers (range 0 size))
+(define triangle (quotient (* size (- size 1)) 2))
+(check "count" (count numbers) size)
+(check "fold" (fold + 0 numbers) triangle)
+(check "reverse" (first (reverse numbers)) (- size 1))
+(check "map" (fold + 0 (map (lambda (x) (* 2 x)) numbers)) (* 2 triangle))
+(check "filter" (count (filter (lambda (x) (= (remainder x 2) 0)) numbers)) (quotient (+ size 1) 2))
+(check "append" (count (append numbers numbers)) (* 2 size))
+(check "take" (count (take (quotient size 2) numbers)) (quotient size 2))
+(check "drop" (drop (- size 1) numbers) (list (- size 1)))
+(check "any?" (any? (lambda (x) (= x (- size 1))) numbers) #true)
+(check "every?" (every? (lambda (x) (>= x 0)) numbers) #true)
+(check "apply" (apply + numbers) triangle)
+(check "printed" (count (to-string (map (lambda (x) 7) numbers))) (- (* 2 size) -1))
+(display! "ok\n")

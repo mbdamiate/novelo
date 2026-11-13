@@ -1,0 +1,13 @@
+; A counting loop of N tail calls runs in constant memory.
+; scale: 1000000
+; memory: constant
+(import io)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define sum-to (lambda (n total) (if (= n 0) total otherwise (sum-to (- n 1) (+ total n)))))
+(check "sum" (sum-to size 0) (quotient (* size (+ size 1)) 2))
+(display! "ok\n")

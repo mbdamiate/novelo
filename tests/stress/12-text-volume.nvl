@@ -1,0 +1,26 @@
+; Long text: code points, case, split and join, concatenation.
+; scale: 1000000
+(import io)
+(import list)
+(import text t)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define code-points (map (lambda (i) (+ 97 (remainder i 26))) (range 0 size)))
+(define letters (code-points-to-string code-points))
+(check "count" (count letters) size)
+(check "round trip" (string-to-code-points letters) code-points)
+(check "uppercase" (count (t/uppercase letters)) size)
+(check "letter?" (t/letter? letters) #true)
+(check "string-at" (string-at letters (- size 1)) (code-points-to-string (list (+ 97 (remainder (- size 1) 26)))))
+(check "substring" (count (substring letters (quotient size 2) size)) (- size (quotient size 2)))
+(define words (quotient size 10))
+(define joined (t/join " " (map to-string (range 0 words))))
+(define parts (t/split " " joined))
+(check "split" (count parts) words)
+(check "numbers" (fold + 0 (map string-to-number parts)) (quotient (* words (- words 1)) 2))
+(check "concatenate" (count (apply concatenate (map (lambda (i) "ab") (range 0 words)))) (* 2 words))
+(display! "ok\n")

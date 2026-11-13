@@ -1,0 +1,13 @@
+; A Float accumulator; halves add up exactly, so the sum is known.
+; scale: 1000000
+; memory: constant
+(import io)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define add-halves (lambda (n total) (if (= n 0) total otherwise (add-halves (- n 1) (+ total 0.5)))))
+(check "sum" (add-halves size 0.0) (* 0.5 (integer-to-float size)))
+(display! "ok\n")

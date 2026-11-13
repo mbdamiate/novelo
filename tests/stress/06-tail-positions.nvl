@@ -1,0 +1,23 @@
+; Tail calls from inside let, sequence, a several-pair if, and, or and match.
+; scale: 1000000
+; memory: constant
+(import io)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define loop
+  (lambda (n total)
+    (let ((next (- n 1)))
+      (sequence
+        (if (= n 0) total
+            (= (remainder n 4) 0) (and #true (loop next (+ total 1)))
+            (= (remainder n 4) 1) (or #false (loop next (+ total 2)))
+            (= (remainder n 4) 2) (match next _ (loop next (+ total 3)))
+            otherwise (let ((more 4)) (loop next (+ total more))))))))
+(define expected
+  (lambda (n total) (if (= n 0) total otherwise (expected (- n 1) (+ total (+ 1 (remainder n 4)))))))
+(check "total" (loop size 0) (expected size 0))
+(display! "ok\n")

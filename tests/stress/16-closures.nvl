@@ -1,0 +1,15 @@
+; A million closures, and a chain of a million closures each calling the next.
+; scale: 1000000
+(import io)
+(import list)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define adders (map (lambda (i) (lambda (x) (+ x i))) (range 0 size)))
+(check "adders" (fold (lambda (total adder) (+ total (adder 1))) 0 adders) (+ size (quotient (* size (- size 1)) 2)))
+(define chain (lambda (n f) (if (= n 0) f otherwise (chain (- n 1) (lambda (x) (f (+ x 1)))))))
+(check "chain" ((chain size (lambda (x) x)) 0) size)
+(display! "ok\n")

@@ -1,0 +1,33 @@
+; sort over pseudo-random integers, checked for order and contents.
+; scale: 100000
+(import io)
+(import list)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define random-list
+  (lambda (n seed numbers)
+    (if (= n 0) numbers
+        otherwise
+        (let ((next (remainder (+ (* seed 1103515245) 12345) 2147483648)))
+          (random-list (- n 1) next (prepend next numbers))))))
+(define ascending?
+  (lambda (numbers)
+    (if (or (empty? numbers) (empty? (rest numbers))) #true
+        (> (first numbers) (first (rest numbers))) #false
+        otherwise (ascending? (rest numbers)))))
+(define numbers (random-list size 42 ()))
+(define sorted (sort < numbers))
+(check "count" (count sorted) size)
+(check "order" (ascending? sorted) #true)
+(check "contents" (fold + 0 sorted) (fold + 0 numbers))
+(check "descending" (first (sort > numbers)) (first (reverse sorted)))
+; stability: equal keys keep their order
+(define pairs (map (lambda (n) (list (remainder n 10) n)) numbers))
+(define by-digit (sort (lambda (a b) (< (first a) (first b))) pairs))
+(check "stable" (map (lambda (pair) (first (rest pair))) (filter (lambda (pair) (= (first pair) 3)) by-digit))
+       (map (lambda (pair) (first (rest pair))) (filter (lambda (pair) (= (first pair) 3)) pairs)))
+(display! "ok\n")

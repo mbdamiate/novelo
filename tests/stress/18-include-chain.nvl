@@ -1,0 +1,12 @@
+; A chain of 500 files, each including the next.
+; include-chain: 500
+(import io)
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(include "chain-1.nvl")
+(check "first and last" (list chain-1 chain-250 chain-500) (list 1 250 500))
+(include "chain-1.nvl")
+(display! "ok\n")

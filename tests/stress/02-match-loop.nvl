@@ -1,0 +1,17 @@
+; A loop whose state is a list taken apart by match at every step.
+; scale: 1000000
+; memory: constant
+(import io)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define step
+  (lambda (state)
+    (match state
+      (0 total) total
+      (n total) (step (list (- n 1) (+ total 1))))))
+(check "steps" (step (list size 0)) size)
+(display! "ok\n")
