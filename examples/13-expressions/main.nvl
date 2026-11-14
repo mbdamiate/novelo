@@ -24,13 +24,29 @@
 (import text t)    ; t/characters, t/digit?, t/join, t/letter?, t/pad-left, t/precedes?
 (import map)       ; from-entries, merge
 
-; A problem raises the error :expression, whose value is the column where
-; it was found. Every step below knows the column of what it works on: a
-; token keeps the column where it starts, and a node of the tree the column
-; of its token.
-(define fail
-  (lambda (message column)
-    (raise {:kind :expression :message message :values (list column)})))
+; A line with a problem is an answer this program expects, not a mistake,
+; so the steps below return it as a value, as example 12 does: each one
+; that can fail returns a result, (:ok value) when it worked, or
+; (:error message column) with the column where it found the problem.
+; Every step knows the column of what it works on: a token keeps the column
+; where it starts, and a node of the tree the column of its token.
+(define ok (lambda (value) (list :ok value)))
+
+(define fail (lambda (message column) (list :error message column)))
+
+; `then` passes the value of a result to the rest of the work and returns a
+; failure as it is; `chain` (core 0.14.0) writes the steps that depend on
+; each other one under the other. Anything that is not a result is a
+; mistake in this program, and stops it.
+;
+; Friction: these three definitions are the ones example 12 wrote, word
+; for word; a second program needed them.
+(define then
+  (lambda (result next)
+    (match result
+      (:ok value) (next value)
+      (:error &rest _) result
+      otherwise (error "not a result" result))))
 
 ; ---- tokens ---------------------------------------------------------------------
 
@@ -58,19 +74,15 @@
 (define tokenize
   (lambda (characters column tokens)
     (match characters
-      () (reverse (prepend {:kind :end :column column} tokens))
+      () (ok (reverse (prepend {:kind :end :column column} tokens)))
       (character &rest more)
       (if (or (equal? character " ") (equal? character "\t"))
           (tokenize more (+ column 1) tokens)
           (t/digit? character)
-          (let (((digits after) (span number-character? characters))
-                (text (apply concatenate digits))
-                (value (try (string-to-number text)
-                         {:kind :integer-overflow} (fail (concatenate "number too large " text) column)
-                         {:kind :float-overflow} (fail (concatenate "number too large " text) column))))
-            (if (void? value) (fail (concatenate "invalid number " text) column)
-                otherwise (tokenize after (+ column (count digits))
-                                    (prepend {:kind :number :value value :column column} tokens))))
+          (let (((digits after) (span number-character? characters)))
+            (chain then ((value (number-value (apply concatenate digits) column)))
+              (tokenize after (+ column (count digits))
+                        (prepend {:kind :number :value value :column column} tokens))))
           (t/letter? character)
           (let (((letters after) (span name-character? characters)))
             (tokenize after (+ column (count letters))
@@ -78,6 +90,16 @@
           (contains? symbols character)
           (tokenize more (+ column 1) (prepend {:kind :symbol :text character :column column} tokens))
           otherwise (fail (concatenate "unexpected character " character) column)))))
+
+; `string-to-number` raises an error for a number too large, the one place
+; where the tokenizer meets one; `try` turns it into a failure.
+(define number-value
+  (lambda (text column)
+    (try (let ((value (string-to-number text)))
+           (if (void? value) (fail (concatenate "invalid number " text) column)
+               otherwise (ok value)))
+      {:kind :integer-overflow} (fail (concatenate "number too large " text) column)
+      {:kind :float-overflow} (fail (concatenate "number too large " text) column))))
 
 ; How a token is named in a message.
 (define describe
@@ -99,8 +121,8 @@
 ;   {:kind :call :name "area" :arguments (tree …)}
 ;
 ; each with the :column of its token. As in example 12, each parse function
-; takes the tokens left and returns the tree it read and the tokens after
-; it, and `let` names the two with a pattern.
+; takes the tokens left, and the value of its result is the tree it read
+; and the tokens after it, which a `chain` pattern names.
 ;
 ; The binary operators, by precedence: the higher binds tighter, so
 ; 1 + 2 * 3 is 1 + (2 * 3). All of them group from the left, 8 - 2 - 1 is
@@ -118,7 +140,7 @@
 ; operators out of it.
 (define parse-expression
   (lambda (tokens minimum)
-    (let (((left after) (parse-operand tokens)))
+    (chain then (((left after) (parse-operand tokens)))
       (parse-operators left after minimum))))
 
 (define parse-operators
@@ -126,37 +148,38 @@
     (match tokens
       ({:kind :symbol :text operator :column column} &rest more)
       (let ((precedence (get precedences operator 0)))
-        (if (or (= precedence 0) (< precedence minimum)) (list left tokens)
+        (if (or (= precedence 0) (< precedence minimum)) (ok (list left tokens))
             otherwise
-            (let (((right after) (parse-expression more (if (right-grouping? operator) precedence
-                                                            otherwise (+ precedence 1))))
-                  (tree {:kind :binary :operator operator :left left :right right :column column}))
-              (parse-operators tree after minimum))))
-      otherwise (list left tokens))))
+            (chain then (((right after) (parse-expression more (if (right-grouping? operator) precedence
+                                                                   otherwise (+ precedence 1)))))
+              (parse-operators {:kind :binary :operator operator :left left :right right :column column}
+                               after minimum))))
+      otherwise (ok (list left tokens)))))
 
 (define parse-operand
   (lambda (tokens)
     (match tokens
       ({:kind :number :value value :column column} &rest more)
-      (list {:kind :number :value value :column column} more)
+      (ok (list {:kind :number :value value :column column} more))
       ({:kind :name :text name :column column} {:kind :symbol :text "("} &rest more)
-      (let (((arguments after) (parse-arguments more)))
-        (list {:kind :call :name name :arguments arguments :column column} after))
+      (chain then (((arguments after) (parse-arguments more)))
+        (ok (list {:kind :call :name name :arguments arguments :column column} after)))
       ({:kind :name :text name :column column} &rest more)
-      (list {:kind :variable :name name :column column} more)
+      (ok (list {:kind :variable :name name :column column} more))
       ({:kind :symbol :text "-" :column column} &rest more)
-      (let (((operand after) (parse-expression more negate-precedence)))
-        (list {:kind :negate :operand operand :column column} after))
+      (chain then (((operand after) (parse-expression more negate-precedence)))
+        (ok (list {:kind :negate :operand operand :column column} after)))
       ({:kind :symbol :text "("} &rest more)
-      (let (((tree after) (parse-expression more 1)))
-        (list tree (expect ")" after)))
+      (chain then (((tree after) (parse-expression more 1))
+                   (after-parenthesis (expect ")" after)))
+        (ok (list tree after-parenthesis)))
       (token &rest more) (fail (concatenate "expected a value, found " (describe token)) (get token :column)))))
 
 (define expect
   (lambda (text tokens)
     (match tokens
       ({:kind :symbol :text found} &rest more)
-      (if (equal? found text) more
+      (if (equal? found text) (ok more)
           otherwise (fail (concatenate "expected " text ", found " found) (get (first tokens) :column)))
       (token &rest more) (fail (concatenate "expected " text ", found " (describe token)) (get token :column)))))
 
@@ -165,16 +188,17 @@
 (define parse-arguments
   (lambda (tokens)
     (match tokens
-      ({:kind :symbol :text ")"} &rest more) (list () more)
+      ({:kind :symbol :text ")"} &rest more) (ok (list () more))
       otherwise (parse-more-arguments tokens ()))))
 
 (define parse-more-arguments
   (lambda (tokens arguments)
-    (let (((argument after) (parse-expression tokens 1))
-          (arguments (prepend argument arguments)))
-      (match after
-        ({:kind :symbol :text ","} &rest more) (parse-more-arguments more arguments)
-        otherwise (list (reverse arguments) (expect ")" after))))))
+    (chain then (((argument after) (parse-expression tokens 1)))
+      (let ((arguments (prepend argument arguments)))
+        (match after
+          ({:kind :symbol :text ","} &rest more) (parse-more-arguments more arguments)
+          otherwise (chain then ((after-parenthesis (expect ")" after)))
+                      (ok (list (reverse arguments) after-parenthesis))))))))
 
 ; The parameters of a function: names separated by commas, up to the ")".
 ; A name given twice would leave the function no way to tell them apart.
@@ -187,13 +211,14 @@
           otherwise
           (match more
             ({:kind :symbol :text ","} &rest after) (parse-parameters after (prepend name parameters))
-            otherwise (list (reverse (prepend name parameters)) (expect ")" more))))
+            otherwise (chain then ((after-parenthesis (expect ")" more)))
+                        (ok (list (reverse (prepend name parameters)) after-parenthesis)))))
       (token &rest more) (fail (concatenate "expected a parameter, found " (describe token)) (get token :column)))))
 
 (define expect-end
   (lambda (tokens)
     (match tokens
-      ({:kind :end}) #true
+      ({:kind :end}) (ok #true)
       (token &rest more) (fail (concatenate "unexpected " (describe token)) (get token :column)))))
 
 ; A statement is one of three shapes, told apart by its first tokens.
@@ -201,22 +226,23 @@
   (lambda (tokens)
     (match tokens
       ({:kind :name :text "let"} {:kind :name :text name} {:kind :symbol :text "="} &rest more)
-      (let (((tree after) (parse-expression more 1))
-            (_ (expect-end after)))
-        {:kind :define-variable :name name :tree tree})
+      (chain then (((tree after) (parse-expression more 1))
+                   (_ (expect-end after)))
+        (ok {:kind :define-variable :name name :tree tree}))
       ({:kind :name :text "let"} {:kind :name :text name} {:kind :symbol :text "("} &rest more)
-      (let (((parameters after) (match more
-                                  ({:kind :symbol :text ")"} &rest after) (list () after)
-                                  otherwise (parse-parameters more ())))
-            ((tree after) (parse-expression (expect "=" after) 1))
-            (_ (expect-end after)))
-        {:kind :define-function :name name :parameters parameters :tree tree})
+      (chain then (((parameters after) (match more
+                                         ({:kind :symbol :text ")"} &rest after) (ok (list () after))
+                                         otherwise (parse-parameters more ())))
+                   (after-equals (expect "=" after))
+                   ((tree after) (parse-expression after-equals 1))
+                   (_ (expect-end after)))
+        (ok {:kind :define-function :name name :parameters parameters :tree tree}))
       ({:kind :name :text "let"} token &rest more)
       (fail (concatenate "expected a name after let, found " (describe token)) (get token :column))
       otherwise
-      (let (((tree after) (parse-expression tokens 1))
-            (_ (expect-end after)))
-        {:kind :expression :tree tree}))))
+      (chain then (((tree after) (parse-expression tokens 1))
+                   (_ (expect-end after)))
+        (ok {:kind :expression :tree tree})))))
 
 ; ---- printing a tree ----------------------------------------------------------------
 
@@ -272,27 +298,28 @@
 (define operate
   (lambda (operator left right column)
     (if (equal? operator "^")
-        (if (and (integer? right) (>= right 0)) (power left right (if (integer? left) 1 otherwise 1.0))
+        (if (and (integer? right) (>= right 0)) (ok (power left right (if (integer? left) 1 otherwise 1.0)))
             otherwise (fail "the exponent must be a whole number, 0 or more" column))
         otherwise
         (let (((left right) (same-type left right)))
           (match operator
-            "+" (+ left right)
-            "-" (- left right)
-            "*" (* left right)
-            "/" (if (integer? left) (quotient left right) otherwise (/ left right))
-            "%" (if (integer? left) (remainder left right)
+            "+" (ok (+ left right))
+            "-" (ok (- left right))
+            "*" (ok (* left right))
+            "/" (ok (if (integer? left) (quotient left right) otherwise (/ left right)))
+            "%" (if (integer? left) (ok (remainder left right))
                     otherwise (fail "% takes whole numbers" column)))))))
 
 ; Arithmetic can fail inside Novelo itself: a result too large for an
-; Integer or a Float, or a division by zero. Those errors become problems
+; Integer or a Float, or a division by zero. Those errors become failures
 ; of this language, at the column of the operator.
 ;
 ; Friction: the only way to know which error happened was to catch every
 ; error and look at its :kind, and a :expression raised inside, by `fail`,
 ; had to be passed on by hand. It became `try` (core 0.13.0), which catches
-; only the kinds its patterns name; every other error, a :expression or a
-; mistake in this program, goes on by itself.
+; only the kinds its patterns name; every other error, a mistake in this
+; program, goes on by itself. The problems of this language are now
+; results, so `try` is left only where Novelo's own errors come in.
 (define arithmetic
   (lambda (compute column)
     (try (compute)
@@ -307,23 +334,37 @@
 (define evaluate
   (lambda (tree scope)
     (match tree
-      {:kind :number :value value} value
+      {:kind :number :value value} (ok value)
       {:kind :variable :name name :column column}
       (let ((variables (get scope :variables)))
-        (if (contains? variables name) (get variables name)
+        (if (contains? variables name) (ok (get variables name))
             otherwise (fail (concatenate "unknown variable " name) column)))
       {:kind :negate :operand operand :column column}
-      (let ((value (evaluate operand scope)))
-        (arithmetic (lambda () (- value)) column))
+      (chain then ((value (evaluate operand scope)))
+        (arithmetic (lambda () (ok (- value))) column))
       {:kind :binary :operator operator :left left :right right :column column}
-      (let ((left-value (evaluate left scope))
-            (right-value (evaluate right scope)))
+      (chain then ((left-value (evaluate left scope))
+                   (right-value (evaluate right scope)))
         (arithmetic (lambda () (operate operator left-value right-value column)) column))
       {:kind :call :name name :arguments arguments :column column}
       (let ((functions (get scope :functions)))
         (if (not (contains? functions name)) (fail (concatenate "unknown function " name) column)
-            otherwise (call (get functions name) name (map (lambda (argument) (evaluate argument scope)) arguments)
-                            scope column))))))
+            otherwise (chain then ((values (evaluate-all arguments scope ())))
+                        (call (get functions name) name values scope column)))))))
+
+; The values of the arguments, in order, or the first that fails; the
+; arguments after it are not evaluated.
+;
+; Friction: `map` over the arguments would give a list of results, not a
+; result with a list of values; going from one to the other is this loop,
+; and example 12 wrote its own with `fold`.
+(define evaluate-all
+  (lambda (trees scope values)
+    (match trees
+      () (ok (reverse values))
+      (tree &rest more)
+      (chain then ((value (evaluate tree scope)))
+        (evaluate-all more scope (prepend value values))))))
 
 ; Friction: binding each parameter to its argument needs the two lists
 ; side by side, and the library list had no function that walks two lists
@@ -352,15 +393,16 @@
   (lambda (statement scope)
     (match statement
       {:kind :expression :tree tree}
-      (list (to-string (evaluate tree scope)) scope)
+      (chain then ((value (evaluate tree scope)))
+        (ok (list (to-string value) scope)))
       {:kind :define-variable :name name :tree tree}
-      (let ((value (evaluate tree scope)))
-        (list (t/format "{} = {}" name value)
-              (associate scope :variables (associate (get scope :variables) name value))))
+      (chain then ((value (evaluate tree scope)))
+        (ok (list (t/format "{} = {}" name value)
+                  (associate scope :variables (associate (get scope :variables) name value)))))
       {:kind :define-function :name name :parameters parameters :tree tree}
       (let ((function {:parameters parameters :tree tree}))
-        (list (show-function name function)
-              (associate scope :functions (associate (get scope :functions) name function)))))))
+        (ok (list (show-function name function)
+                  (associate scope :functions (associate (get scope :functions) name function))))))))
 
 ; ---- the loop -------------------------------------------------------------------------
 
@@ -368,17 +410,26 @@
 ; further right than the column it names, falls under the right character.
 ; `report` prints nothing: it returns the text for the line, echo
 ; included, with the new scope, as (text scope).
+;
+; A function of this language that calls itself without end runs out of
+; Novelo's stack: that is an error, :stack-overflow, and the one `try` here
+; turns it into a line of the answer. Any other error is a mistake in this
+; program and stops it.
+(define answer
+  (lambda (line scope)
+    (try (chain then ((tokens (tokenize (t/characters line) 1 ()))
+                      (statement (parse-statement tokens)))
+           (run statement scope))
+      {:kind :stack-overflow :message message} (ok (list (concatenate "error: " message) scope)))))
+
 (define report
   (lambda (line scope)
-    (let (((answer scope)
-           (catch (lambda () (run (parse-statement (tokenize (t/characters line) 1 ())) scope))
-                  (lambda (problem)
-                    (match problem
-                      {:kind :expression :values (column)}
-                      (list (concatenate (t/pad-left (+ column 2) " " "^") " " (get problem :message)) scope)
-                      otherwise
-                      (list (concatenate "error: " (get problem :message)) scope))))))
-      (list (concatenate "> " line "\n" answer "\n") scope))))
+    (let (((text scope)
+           (match (answer line scope)
+             (:ok outcome) outcome
+             (:error message column)
+             (list (concatenate (t/pad-left (+ column 2) " " "^") " " message) scope))))
+      (list (concatenate "> " line "\n" text "\n") scope))))
 
 ; Blank lines, and lines starting with #, are skipped.
 (define comment?
