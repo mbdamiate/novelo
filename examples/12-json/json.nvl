@@ -7,8 +7,8 @@
 ; array is a List, a string a String, true and false the Booleans, null
 ; #void, and a number an Integer or a Float.
 ;
-;   (read text)    the value the text holds, or the error :json, whose
-;                  :values are (column)
+;   (read text)    (:ok value) with the value the text holds, or
+;                  (:error message column) when it holds none
 ;   (write value)  the value as JSON text
 ;   (string text)  the text as a JSON string, quoted and escaped
 ;   (blank? text)  whether the text is only spaces
@@ -43,16 +43,33 @@
 
 ; ---- parsing ------------------------------------------------------------------
 
-; Each parse function takes the characters left and returns a list of two
-; things: the value it read and the characters after it. A list of
-; characters matches patterns well: ("{" &rest more) is a text that starts
-; with a brace, and more is the rest of it.
+; Each parse function takes the characters left and returns a result, a
+; value that says how it went: (:ok value more) when it read `value` and
+; `more` are the characters after it, (:error message left) when it found a
+; problem with `left` characters still to read. A failure is an ordinary
+; value, not an error: a text that is not JSON is an answer the parser
+; expects, and the function says so in what it returns. `read`, at the end,
+; turns `left` into a column.
 ;
-; A problem raises the error :json, whose value is the number of characters
-; left where it was found; `read`, at the end, turns that into a column.
-(define fail
-  (lambda (message text)
-    (raise {:kind :json :message message :values (list (count text))})))
+; A list of characters matches patterns well: ("{" &rest more) is a text
+; that starts with a brace, and more is the rest of it.
+(define ok (lambda (value more) (list :ok value more)))
+
+(define fail (lambda (message text) (list :error message (count text))))
+
+; Most steps need the result of the step before. `then` passes the value
+; and the characters after it to the next step, a function of both; a
+; failure skips the steps after it and is the result of the whole chain.
+;
+; Friction: every step that depends on another is a `then` and a lambda,
+; nested one inside the other, so a chain of four steps is four levels deep.
+; A step whose value is not needed still names it, `_`, and a step that
+; reads nothing but checks, such as `expect`, still returns a value.
+(define then
+  (lambda (result next)
+    (match result
+      (:ok value more) (next value more)
+      otherwise result)))
 
 (define parse-value
   (lambda (text)
@@ -61,42 +78,39 @@
         ("{" &rest more) (parse-object (skip-space more) {})
         ("[" &rest more) (parse-array (skip-space more) ())
         ("\"" &rest more) (parse-string more ())
-        ("t" "r" "u" "e" &rest more) (list #true more)
-        ("f" "a" "l" "s" "e" &rest more) (list #false more)
-        ("n" "u" "l" "l" &rest more) (list #void more)
+        ("t" "r" "u" "e" &rest more) (ok #true more)
+        ("f" "a" "l" "s" "e" &rest more) (ok #false more)
+        ("n" "u" "l" "l" &rest more) (ok #void more)
         () (fail "expected a value, found the end" text)
         otherwise (parse-number text)))))
 
 (define expect
   (lambda (expected text)
     (let ((text (skip-space text)))
-      (if (and (not (empty? text)) (equal? (first text) expected)) (rest text)
+      (if (and (not (empty? text)) (equal? (first text) expected)) (ok expected (rest text))
           otherwise (fail (concatenate "expected " expected) text)))))
 
 ; An object is a key, a colon and a value, then a comma and another, or the
-; closing brace. Each step starts where the step before stopped, so each
-; needs both parts of the result before it.
-;
-; A `let` binding takes a pattern, as `match` does: (key after-key) names
-; the two elements of the list `parse-key` returns. The bindings are
-; sequential, so the next one already sees `after-key`. A result of another
-; shape would be the error :no-match; here every parse function returns a
-; pair or raises :json.
+; closing brace. Each step starts where the step before stopped.
 ;
 ; A key that appears twice keeps its last value, as most JSON readers do.
 (define parse-object
   (lambda (text object)
     (match text
-      ("}" &rest more) (list object more)
+      ("}" &rest more) (ok object more)
       otherwise
-      (let (((key after-key) (parse-key text))
-            ((value after-value) (parse-value (expect ":" after-key)))
-            (object (associate object key value))
-            (after (skip-space after-value)))
-        (match after
-          ("," &rest more) (parse-object (skip-space more) object)
-          ("}" &rest more) (list object more)
-          otherwise (fail "expected , or }" after))))))
+      (then (parse-key text)
+            (lambda (key after-key)
+              (then (expect ":" after-key)
+                    (lambda (_ after-colon)
+                      (then (parse-value after-colon)
+                            (lambda (value after-value)
+                              (let ((object (associate object key value))
+                                    (after (skip-space after-value)))
+                                (match after
+                                  ("," &rest more) (parse-object (skip-space more) object)
+                                  ("}" &rest more) (ok object more)
+                                  otherwise (fail "expected , or }" after))))))))))))
 
 (define parse-key
   (lambda (text)
@@ -108,15 +122,16 @@
 (define parse-array
   (lambda (text elements)
     (match text
-      ("]" &rest more) (list (reverse elements) more)
+      ("]" &rest more) (ok (reverse elements) more)
       otherwise
-      (let (((value after-value) (parse-value text))
-            (elements (prepend value elements))
-            (after (skip-space after-value)))
-        (match after
-          ("," &rest more) (parse-array (skip-space more) elements)
-          ("]" &rest more) (list (reverse elements) more)
-          otherwise (fail "expected , or ]" after))))))
+      (then (parse-value text)
+            (lambda (value after-value)
+              (let ((elements (prepend value elements))
+                    (after (skip-space after-value)))
+                (match after
+                  ("," &rest more) (parse-array (skip-space more) elements)
+                  ("]" &rest more) (ok (reverse elements) more)
+                  otherwise (fail "expected , or ]" after))))))))
 
 ; ---- strings ------------------------------------------------------------------
 
@@ -124,6 +139,8 @@
 
 ; \u is followed by four hexadecimal digits, which `digits-to-integer`
 ; reads. It would also take a sign before them, which JSON does not allow.
+; The result keeps `text` as the characters after it, only so that it has
+; the shape `then` takes; the caller knows where the escape ends.
 ;
 ; Friction: there was no way to read a number in another base, so the
 ; digits went through a Map of the sixteen digits in both cases; it became
@@ -133,7 +150,7 @@
     (let ((value (if (equal? (first digits) "-") #void
                      otherwise (digits-to-integer (apply concatenate digits) 16))))
       (if (void? value) (fail "invalid \\u escape" text)
-          otherwise value))))
+          otherwise (ok value text)))))
 
 ; \uXXXX names a UTF-16 unit. A character above U+FFFF is written as two:
 ; a high surrogate, from D800 to DBFF, then a low one, from DC00 to DFFF,
@@ -146,14 +163,18 @@
 (define parse-string
   (lambda (text gathered)
     (match text
-      ("\"" &rest more) (list (apply concatenate (reverse gathered)) more)
+      ("\"" &rest more) (ok (apply concatenate (reverse gathered)) more)
       ("\\" "u" a b c d "\\" "u" e f g h &rest more)
-      (let ((high (hexadecimal-value (list a b c d) text))
-            (low (hexadecimal-value (list e f g h) text)))
-        (if (and (<= 55296 high 56319) (<= 56320 low 57343))
-            (parse-string more (prepend (code-points-to-string (list (surrogate-pair high low))) gathered))
-            otherwise (parse-unit high text (drop 6 text) gathered)))
-      ("\\" "u" a b c d &rest more) (parse-unit (hexadecimal-value (list a b c d) text) text more gathered)
+      (then (hexadecimal-value (list a b c d) text)
+            (lambda (high _)
+              (then (hexadecimal-value (list e f g h) text)
+                    (lambda (low _)
+                      (if (and (<= 55296 high 56319) (<= 56320 low 57343))
+                          (parse-string more (prepend (code-points-to-string (list (surrogate-pair high low))) gathered))
+                          otherwise (parse-unit high text (drop 6 text) gathered))))))
+      ("\\" "u" a b c d &rest more)
+      (then (hexadecimal-value (list a b c d) text)
+            (lambda (unit _) (parse-unit unit text more gathered)))
       ("\\" escape &rest more)
       (if (contains? escapes escape) (parse-string more (prepend (get escapes escape) gathered))
           otherwise (fail "invalid escape" text))
@@ -175,7 +196,9 @@
 ; A JSON number is an optional minus, then 0 or digits that do not start
 ; with 0, then optionally a point and digits, then optionally e or E, a
 ; sign and digits. Each step below takes the characters left and returns
-; those after its part, or fails.
+; a result whose characters are those after its part; its value is the
+; part it read, which nothing uses: the number is read from the text at the
+; end.
 (define digits
   (lambda (text)
     (if (and (not (empty? text)) (t/digit? (first text))) (digits (rest text))
@@ -183,27 +206,27 @@
 
 (define some-digits
   (lambda (text)
-    (if (and (not (empty? text)) (t/digit? (first text))) (digits text)
+    (if (and (not (empty? text)) (t/digit? (first text))) (ok #void (digits text))
         otherwise (fail "expected a digit" text))))
 
 (define integer-part
   (lambda (text)
     (match text
-      ("0" &rest more) more
+      ("0" &rest more) (ok #void more)
       otherwise (some-digits text))))
 
 (define fraction-part
   (lambda (text)
     (match text
       ("." &rest more) (some-digits more)
-      otherwise text)))
+      otherwise (ok #void text))))
 
 (define exponent-part
   (lambda (text)
     (match text
       ("e" &rest more) (exponent-digits more)
       ("E" &rest more) (exponent-digits more)
-      otherwise text)))
+      otherwise (ok #void text))))
 
 (define exponent-digits
   (lambda (text)
@@ -214,15 +237,15 @@
 
 (define number-end
   (lambda (text)
-    (exponent-part
-      (fraction-part
-        (integer-part (match text ("-" &rest more) more otherwise text))))))
+    (then (integer-part (match text ("-" &rest more) more otherwise text))
+          (lambda (_ after-integer)
+            (then (fraction-part after-integer)
+                  (lambda (_ after-fraction)
+                    (exponent-part after-fraction)))))))
 
 ; The text is then read with `string-to-number`, but Novelo's syntax is not
 ; JSON's: Novelo wants a point before the exponent, a lowercase e and no +
 ; sign, so 1e3 becomes 1.0e3, 2E-1 becomes 2.0e-1 and 0.5e+1 becomes 0.5e1.
-; A number too large for an Integer or a Float is an error, and so is
-; reported here.
 ;
 ; Friction: a second number syntax, close to Novelo's but not the same.
 ; This one stays: Novelo never writes a + sign, and a Float always has
@@ -241,36 +264,39 @@
                      otherwise exponent))
       otherwise number-text)))
 
+; A number too large for an Integer or a Float is an error of
+; `string-to-number`, the one place where this parser meets an error: `try`
+; turns it into a failure, a value like the others.
 (define parse-number
   (lambda (text)
     (if (not (or (equal? (first text) "-") (t/digit? (first text))))
         (fail (concatenate "unexpected " (first text)) text)
         otherwise
-        (let ((after (number-end text))
-              (number-text (apply concatenate (take (- (count text) (count after)) text)))
-              (number (try (string-to-number (novelo-number number-text))
-                        {:kind :integer-overflow} (fail (concatenate "number out of range: " number-text) text)
-                        {:kind :float-overflow} (fail (concatenate "number out of range: " number-text) text))))
-          (if (void? number) (fail (concatenate "invalid number: " number-text) text)
-              otherwise (list number after))))))
+        (then (number-end text)
+              (lambda (_ after)
+                (let ((number-text (apply concatenate (take (- (count text) (count after)) text))))
+                  (try (let ((number (string-to-number (novelo-number number-text))))
+                         (if (void? number) (fail (concatenate "invalid number: " number-text) text)
+                             otherwise (ok number after)))
+                    {:kind :integer-overflow} (fail (concatenate "number out of range: " number-text) text)
+                    {:kind :float-overflow} (fail (concatenate "number out of range: " number-text) text))))))))
 
 ; ---- reading a text -----------------------------------------------------------
 
 ; A text holds one value and nothing after it but spaces. The parse
 ; functions count what is left when they fail; here, where the whole text
-; is known, that becomes the column of the problem. `try` catches only the
-; :json errors; any other goes on as it is, with its own position.
+; is known, that becomes the column of the problem.
 (define read
   (lambda (text)
-    (let ((characters-of-text (t/characters text)))
-      (try (let (((value after) (parse-value characters-of-text))
-                 (after (skip-space after)))
-             (if (empty? after) value
-                 otherwise (fail "text after the value" after)))
-        {:kind :json :message message :values (left)}
-        (raise {:kind :json
-                :message message
-                :values (list (+ 1 (- (count characters-of-text) left)))})))))
+    (let ((characters-of-text (t/characters text))
+          (result (then (parse-value characters-of-text)
+                        (lambda (value after)
+                          (let ((after (skip-space after)))
+                            (if (empty? after) (ok value after)
+                                otherwise (fail "text after the value" after)))))))
+      (match result
+        (:ok value _) (list :ok value)
+        (:error message left) (list :error message (+ 1 (- (count characters-of-text) left)))))))
 
 ; A text of spaces alone, which holds no value.
 (define blank?

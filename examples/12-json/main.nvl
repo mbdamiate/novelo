@@ -9,8 +9,11 @@
 ;   build/novelo examples/12-json/main.nvl < examples/12-json/input.txt
 ;
 ; Reading and writing JSON is in json.nvl, next to this file, written with
-; what the earlier examples used: lists and `match` (04, 05), errors (07),
-; modules (08), the text library (10, 11). This file is only about orders.
+; what the earlier examples used: lists and `match` (04, 05), modules (08),
+; the text library (10, 11). This file is only about orders. A line that
+; is not JSON, or an order of the wrong shape, is not an error here: the
+; functions that read and check return a result, (:ok value) or
+; (:error …), and the program looks at it with `match`.
 ;
 ; Writing it showed where the language was awkward; the notes marked
 ; "friction" in json.nvl say where. Naming the parts of a result became the
@@ -33,6 +36,10 @@
 ; objects with a "price" (any number) and a "quantity" (a whole number).
 ; Other fields are allowed and ignored. A map pattern matches a Map that
 ; has the keys it names, whatever else it has.
+;
+; Checking an order gives a result, as reading JSON does: (:ok value), or
+; (:error message values) for an order of the wrong shape, which is an
+; answer the program expects, not an error.
 (define as-float
   (lambda (number)
     (if (integer? number) (integer-to-float number)
@@ -44,18 +51,37 @@
     (match item
       {"price" price "quantity" quantity}
       (if (and (not (void? (as-float price))) (integer? quantity) (>= quantity 0))
-          (* (as-float price) (integer-to-float quantity))
-          otherwise (error "an item needs a price and a whole quantity" (json/write item)))
-      otherwise (error "an item needs a price and a quantity" (json/write item)))))
+          (list :ok (* (as-float price) (integer-to-float quantity)))
+          otherwise (list :error "an item needs a price and a whole quantity" (list (json/write item))))
+      otherwise (list :error "an item needs a price and a quantity" (list (json/write item))))))
+
+; The sum of the items, or the first item that fails. `fold` goes through
+; every item, but once the sum has failed it only carries the failure on.
+;
+; Friction: a list of results becomes one result, the values or the first
+; failure, with a `match` on both the running sum and each item.
+(define items-total
+  (lambda (items)
+    (fold (lambda (sum item)
+            (match sum
+              (:ok total)
+              (match (item-total item)
+                (:ok item-amount) (list :ok (+ total item-amount))
+                failure failure)
+              failure failure))
+          (list :ok 0.0)
+          items)))
 
 (define order-total
   (lambda (order)
     (match order
       {"customer" customer "items" items}
-      (if (not (string? customer)) (error "the customer must be a string")
-          (not (list? items)) (error "the items must be a list")
-          otherwise (list customer (count items) (fold + 0.0 (map item-total items))))
-      otherwise (error "an order needs a customer and items"))))
+      (if (not (string? customer)) (list :error "the customer must be a string" ())
+          (not (list? items)) (list :error "the items must be a list" ())
+          otherwise (match (items-total items)
+                      (:ok total) (list :ok (list customer (count items) total))
+                      failure failure))
+      otherwise (list :error "an order needs a customer and items" ()))))
 
 ; Money is shown with two decimals; the report keeps the total rounded to
 ; cents as a Float.
@@ -66,30 +92,33 @@
 ; The state carried from line to line: the totals per customer, the
 ; numbers of the lines rejected, and the lines of text to print, newest
 ; first. Nothing is printed while the orders are read; the text is printed
-; once, at the end, with the report. A JSON error gives a column; any other
-; error, from checking the order, gives its message and values.
-(define reason
-  (lambda (problem)
-    (match problem
-      {:kind :json :values (column)}
-      (t/format "column {}: {}" column (get problem :message))
-      otherwise (t/join " " (prepend (get problem :message) (map to-string (get problem :values ())))))))
-
+; once, at the end, with the report.
 (define say
   (lambda (state text)
     (associate state :output (prepend text (get state :output)))))
 
+(define accept
+  (lambda (state number customer item-count total)
+    (let ((totals (get state :totals)))
+      (say (associate state :totals (associate totals customer (+ total (get totals customer 0.0))))
+           (t/format "{}: {}, {} {}, {}\n" number (json/string customer) item-count
+                     (if (= item-count 1) "item" otherwise "items") (float-to-fixed total 2))))))
+
+(define reject
+  (lambda (state number reason)
+    (say (associate state :rejected (prepend number (get state :rejected)))
+         (t/format "{}: rejected, {}\n" number reason))))
+
+; A line that is not JSON gives the column of the problem; an order of the
+; wrong shape gives its message and values.
 (define record
   (lambda (state number line)
-    (catch (lambda ()
-             (let (((customer item-count total) (order-total (json/read line)))
-                   (totals (get state :totals)))
-               (say (associate state :totals (associate totals customer (+ total (get totals customer 0.0))))
-                    (t/format "{}: {}, {} {}, {}\n" number (json/string customer) item-count
-                              (if (= item-count 1) "item" otherwise "items") (float-to-fixed total 2)))))
-           (lambda (problem)
-             (say (associate state :rejected (prepend number (get state :rejected)))
-                  (t/format "{}: rejected, {}\n" number (reason problem)))))))
+    (match (json/read line)
+      (:error message column) (reject state number (t/format "column {}: {}" column message))
+      (:ok order)
+      (match (order-total order)
+        (:error message values) (reject state number (t/join " " (prepend message (map to-string values))))
+        (:ok (customer item-count total)) (accept state number customer item-count total)))))
 
 (define read-orders
   (lambda (state number)
