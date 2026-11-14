@@ -60,7 +60,9 @@
 
 ; Most steps need the value of the step before. `then` passes the value of
 ; a result to the rest of the work, a function of one argument; a failure
-; skips the rest and is the result of the whole.
+; skips the rest and is the result of the whole. Anything else is not a
+; result, but a mistake in the program, such as a step that forgot its :ok;
+; `then` stops there with an error, so it never passes on as a failure.
 ;
 ; `chain` (core 0.14.0) writes such steps one under the other, as `let`
 ; does: (chain then ((pattern step) …) body …) calls `then` with each step
@@ -74,7 +76,8 @@
   (lambda (result next)
     (match result
       (:ok value) (next value)
-      otherwise result)))
+      (:error &rest _) result
+      otherwise (error "not a result" result))))
 
 (define parse-value
   (lambda (text)
