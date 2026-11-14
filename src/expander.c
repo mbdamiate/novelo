@@ -46,6 +46,7 @@ const LispSymbols *lisp_symbols(void) {
             .declare_type = lisp_symbol_cstr("declare-type"),
             .match = lisp_symbol_cstr("match"),
             .try_ = lisp_symbol_cstr("try"),
+            .chain = lisp_symbol_cstr("chain"),
             .wildcard = lisp_symbol_cstr("_"),
         };
         ready = true;
@@ -704,6 +705,77 @@ static Value *expand_try(LispState *state, Value *form, const Scope *scope, Valu
     return node;
 }
 
+/* ---- chain (§8.3, core 0.14.0) ----------------------------------------------------------------- */
+
+/* (chain step ((p1 e1) (p2 e2) …) body …) is rewritten into datums and
+ * expanded again:
+ *
+ *   (let ((f step))
+ *     (f e1 (lambda (v) (let ((p1 v))
+ *       (f e2 (lambda (v) (let ((p2 v))
+ *         (let () body …)))))))))
+ *
+ * with `f` and `v` generated symbols, so `step` is evaluated once and no
+ * name of the program is captured. The chain is built from the last
+ * binding outward. */
+static Value *expand_chain(LispState *state, Value *form, const Scope *scope, Value *context) {
+    size_t length = lisp_list_length(form);
+    if (length < 4 || !lisp_is_list(element(form, 2))) {
+        return lisp_expansion_error(state, form, "chain must be (chain step ((pattern expression) …) body …)");
+    }
+    Value *bindings = element(form, 2);
+    size_t count = lisp_list_length(bindings);
+    for (const Value *rest = bindings; rest->kind == LISP_KIND_PAIR; rest = lisp_rest(rest)) {
+        Value *binding = lisp_first(rest);
+        if (binding->kind != LISP_KIND_PAIR || lisp_list_length(binding) != 2) {
+            return lisp_expansion_error(state, form, "each chain binding must be (pattern expression)");
+        }
+        /* checked here, so that an invalid pattern names the chain, not its rewrite */
+        const char *problem = pattern_problem(lisp_first(binding));
+        if (problem) return lisp_expansion_error(state, form, problem);
+    }
+
+    const LispSymbols *symbols = lisp_symbols();
+    Value *step_name = lisp_generate_symbol();
+    Value *value_name = lisp_generate_symbol();
+    Value **ordered = lisp_xcalloc(count > 0 ? count : 1, sizeof(Value *));
+    size_t index = 0;
+    for (const Value *rest = bindings; rest->kind == LISP_KIND_PAIR; rest = lisp_rest(rest)) ordered[index++] = lisp_first(rest);
+
+    Value *body_with_bindings = lisp_prepend(LISP_EMPTY, lisp_rest(lisp_rest(lisp_rest(form))));
+    Value *inner = lisp_prepend(symbols->let, body_with_bindings); /* (let () body …) */
+    lisp_release(body_with_bindings);
+    for (size_t position = count; position > 0; position--) {
+        Value *binding = ordered[position - 1];
+        Value *pattern_binding = LISP_LIST(lisp_first(binding), value_name);
+        Value *pattern_bindings = LISP_LIST(pattern_binding);
+        Value *let_form = LISP_LIST(symbols->let, pattern_bindings, inner);
+        Value *parameters = LISP_LIST(value_name);
+        Value *continuation = LISP_LIST(symbols->lambda, parameters, let_form);
+        Value *call = LISP_LIST(step_name, element(binding, 1), continuation);
+        lisp_release(continuation);
+        lisp_release(parameters);
+        lisp_release(let_form);
+        lisp_release(pattern_bindings);
+        lisp_release(pattern_binding);
+        lisp_release(inner);
+        inner = call;
+    }
+    Value *step_binding = LISP_LIST(step_name, element(form, 1));
+    Value *step_bindings = LISP_LIST(step_binding);
+    Value *rewritten = LISP_LIST(symbols->let, step_bindings, inner);
+    Value *node = expand(state, rewritten, scope, context);
+
+    lisp_release(rewritten);
+    lisp_release(step_bindings);
+    lisp_release(step_binding);
+    lisp_release(inner);
+    free(ordered);
+    lisp_release(value_name);
+    lisp_release(step_name);
+    return node;
+}
+
 /* ---- quasiquote (§8.3) ----------------------------------------------------------------------- */
 
 static bool is_marker_form(const Value *form, const Value *marker) {
@@ -959,6 +1031,7 @@ static Value *expand_form(LispState *state, Value *form, const Scope *scope, Val
     if (head == symbols->or_) return expand_or(state, lisp_rest(form), scope, context);
     if (head == symbols->match) return expand_match(state, form, scope, context);
     if (head == symbols->try_) return expand_try(state, form, scope, context);
+    if (head == symbols->chain) return expand_chain(state, form, scope, context);
     if (head == symbols->quasiquote) {
         if (lisp_list_length(form) != 2) return lisp_expansion_error(state, form, "quasiquote takes one argument");
         return quasi(state, element(form, 1), 1, scope, context);

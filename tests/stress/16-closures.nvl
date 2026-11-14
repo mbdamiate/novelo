@@ -10,6 +10,6 @@
 
 (define adders (map (lambda (i) (lambda (x) (+ x i))) (range 0 size)))
 (check "adders" (fold (lambda (total adder) (+ total (adder 1))) 0 adders) (+ size (quotient (* size (- size 1)) 2)))
-(define chain (lambda (n f) (if (= n 0) f otherwise (chain (- n 1) (lambda (x) (f (+ x 1)))))))
-(check "chain" ((chain size (lambda (x) x)) 0) size)
+(define nest (lambda (n f) (if (= n 0) f otherwise (nest (- n 1) (lambda (x) (f (+ x 1)))))))
+(check "chain" ((nest size (lambda (x) x)) 0) size)
 (display! "ok\n")

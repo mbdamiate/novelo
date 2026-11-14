@@ -22,7 +22,9 @@ The core is a three-stage pipeline:
 
 **Normative terms.** MUST indicates a mandatory requirement. MUST NOT indicates a prohibition. MAY indicates implementation freedom that does not affect observable behavior.
 
-**Version:** core 0.13.0, draft.
+**Version:** core 0.14.0, draft.
+
+**Changes since 0.13.0.** A new derived form, `chain`, writes a sequence of dependent steps flat, each one passed to the next by a function the program gives, as `let` writes nested `lambda`s flat (8.3). With a function that stops at the first failure, failures can be values a function returns, instead of errors it raises, without nesting a `lambda` for every step. `chain` is now the name of a derived form, so it cannot name a function called as `(chain …)`.
 
 **Changes since 0.12.0.** A new derived form, `try`, catches only the errors whose descriptor matches one of its patterns: `(try (quotient a b) {:kind :division-by-zero} 0)` (8.3). The patterns are those of `match`, so they also name the parts of the descriptor a handler needs, such as `{:kind :json :values (column)}`. An error that no pattern matches goes on unchanged, keeping its `:position`, with no `raise` written by the program. `catch` is unchanged, and still catches everything. `try` is now the name of a derived form, so it cannot name a function called as `(try …)`.
 
@@ -418,7 +420,7 @@ The tests are evaluated in order, and the first one that is not `#false` selects
 
 ### 8.3 Derived forms
 
-Every implementation MUST provide `let`, `sequence`, `and`, `or`, `quasiquote`, `match` and `try`. They are defined by rewriting into the special forms; the implementation MAY implement them differently, as long as the behavior is the same.
+Every implementation MUST provide `let`, `sequence`, `and`, `or`, `quasiquote`, `match`, `try` and `chain`. They are defined by rewriting into the special forms; the implementation MAY implement them differently, as long as the behavior is the same.
 
 **`let`** has the form `(let ((pattern value) …) body …)`. Bindings are sequential: each value sees the previous names, and a repeated name shadows the previous one. The pattern is usually a symbol, which binds the whole value. Any other pattern of `match` (below) takes the value apart, and binds the names it contains; a value that does not match is the error `:no-match`, whose `:values` are `(value)`. `_` is the pattern that matches anything and binds nothing, so `(let ((_ e)) …)` evaluates `e` only for its effects. The rewrite is:
 
@@ -499,6 +501,33 @@ In the rewrite, `e` is a symbol created by `generate-symbol`, and `catch` and `r
 ```
 
 Neither `body` nor the results are in tail position. These are expansion errors: no pattern and result pair; a pattern without a result; `otherwise` anywhere in the form, since a `try` that catches everything is written with a name as its last pattern, or with `catch`; and every invalid pattern of `match`.
+
+**`chain`** runs steps that each depend on the one before, through a function that decides how one step leads to the next. It has the form `(chain step ((pattern expression) …) body …)`. `step` is evaluated once, first. Each binding then calls it with two arguments: the value of its expression and a function of one argument, the rest of the chain. What `step` passes to that function is bound to the pattern, as by `let`, and the next binding, or the body after the last one, is evaluated with the names bound so far. A value that does not match the pattern is the error `:no-match`. When `step` does not call the function, the rest of the chain is not evaluated, and the value `step` returns is the value of the `chain`.
+
+```lisp
+(chain s () body …)               ; ≡ (let ((f s)) body …)
+(chain s ((p e) more …) body …)   ; ≡ (let ((f s)) (f e (lambda (v) (let ((p v)) (chain f (more …) body …)))))
+```
+
+In the rewrite, `f` and `v` are symbols created by `generate-symbol`, so that `step` is evaluated only once and no name of the program is captured. The meaning of the steps is entirely the program's: with results written `(:ok value)` or `(:error message)`, a `step` that passes the value of an `(:ok …)` on and returns any other result as it is stops at the first failure.
+
+```lisp
+(define then
+  (lambda (result next)
+    (match result
+      (:ok value) (next value)
+      otherwise result)))
+
+(chain then ((a (list :ok 1))
+             (b (list :ok (+ a 1))))
+  (list :ok (+ a b)))             ; → (:ok 3)
+
+(chain then ((a (list :error "no a"))
+             (b (list :ok (+ a 1))))
+  (list :ok (+ a b)))             ; → (:error "no a"), and (+ a 1) is never evaluated
+```
+
+The call of `step` for the first binding is in tail position when the `chain` is. The body is the last expression of the function passed to `step`, so a `step` that calls that function in tail position, as `then` does, keeps a recursion through `chain` in constant memory. These are expansion errors: no `step`; bindings that are not a List; a binding that is not a List of a pattern and an expression; an invalid pattern, as in `match`; and no body.
 
 ### 8.4 General rules
 
@@ -868,18 +897,18 @@ An implementation is conformant when it passes all the cases below. Results are 
 
 ### 12.4 Conformance file
 
-The file `conformance.json` has 551 cases, each with an `id`, the section it tests and a kind:
+The file `conformance.json` has 574 cases, each with an `id`, the section it tests and a kind:
 
 | Kind | Cases | What it checks |
 | --- | --- | --- |
 | `read` | 28 | `input` produces the same sequence of datums as `equivalent`, or datums with the types in `types` |
 | `read-error` | 55 | reading `input`, or the bytes of `input_hex`, fails with the code `error` at `position` |
 | `read-positions` | 3 | the node indicated by each `path` is in the position table with the expected `position` |
-| `eval` | 465 | `program` runs as a file, with `input` (or the bytes of `input_hex`) on standard input; it imports at most the library `io`; the output is exactly `output`, and the program ends with the value `value` or with an uncaught error of the `:kind` given in `error`; with `error_position`, the descriptor of that error has a `:position` whose `:line` and `:column` are the given pair, or, when `error_position` is `null`, no `:position` |
+| `eval` | 488 | `program` runs as a file, with `input` (or the bytes of `input_hex`) on standard input; it imports at most the library `io`; the output is exactly `output`, and the program ends with the value `value` or with an uncaught error of the `:kind` given in `error`; with `error_position`, the descriptor of that error has a `:position` whose `:line` and `:column` are the given pair, or, when `error_position` is `null`, no `:position` |
 
 An `eval` case that tests `include` (8.8) also has `files`, an object that maps each relative path, with `/` as separator, to the text of that file. The program is the file `main.nvl`, and the paths are relative to its directory. A path missing from `files` cannot be opened.
 
-The `eval` cases cover the special and derived forms, including `if` with several pairs, `match` and the patterns of `let`, `try`: errors caught, passed on with their position, nested and raised by a result, tail calls with one million iterations, a traversal of a list of one million elements with `empty?`, `first` and `rest` (8.6), a map of one million keys built with `associate`, persistence and `dissociate` on large maps, keys whose hashes may collide (8.6), sets: reading, literals, equality, printing, quasiquote, the primitives and a set of one million elements, 10,000 nested non-tail calls and `:stack-overflow`, equality, arithmetic and overflows, primitives, `read-line!` with invalid UTF-8, `read-lines!`, alone, after `read-line!`, with invalid UTF-8 and over 10,000 lines, the code point conversions, including a String of one million code points, Floats: arithmetic, comparisons, every mix of Integers and Floats, the errors that keep them finite, the conversions, `sqrt`, Floats as keys and in patterns, and how they print, `float-to-fixed`: rounding from the exact binary value, ties away from zero, carries, signs, the extremes and the errors, printing (including `display!` of strings inside collections), `catch` and `raise`, the positions in errors (8.5), both callback patterns, `include` with and without prefixes, and `import` (8.9). Some cases check that what was removed from the core does not exist: `same?`, named `lambda`, the names without `!`, the standard library functions without `import`, and the `io` functions without `import`. The library has its own cases, in the file `stdlib-conformance.json`.
+The `eval` cases cover the special and derived forms, including `if` with several pairs, `match` and the patterns of `let`, `try`: errors caught, passed on with their position, nested and raised by a result, `chain`: steps that go on and stop, patterns, a step evaluated once, a step of another meaning, a loop of a million steps through it, tail calls with one million iterations, a traversal of a list of one million elements with `empty?`, `first` and `rest` (8.6), a map of one million keys built with `associate`, persistence and `dissociate` on large maps, keys whose hashes may collide (8.6), sets: reading, literals, equality, printing, quasiquote, the primitives and a set of one million elements, 10,000 nested non-tail calls and `:stack-overflow`, equality, arithmetic and overflows, primitives, `read-line!` with invalid UTF-8, `read-lines!`, alone, after `read-line!`, with invalid UTF-8 and over 10,000 lines, the code point conversions, including a String of one million code points, Floats: arithmetic, comparisons, every mix of Integers and Floats, the errors that keep them finite, the conversions, `sqrt`, Floats as keys and in patterns, and how they print, `float-to-fixed`: rounding from the exact binary value, ties away from zero, carries, signs, the extremes and the errors, printing (including `display!` of strings inside collections), `catch` and `raise`, the positions in errors (8.5), both callback patterns, `include` with and without prefixes, and `import` (8.9). Some cases check that what was removed from the core does not exist: `same?`, named `lambda`, the names without `!`, the standard library functions without `import`, and the `io` functions without `import`. The library has its own cases, in the file `stdlib-conformance.json`.
 
 **Behaviors fixed by the tests.** While writing the cases, these points needed an answer that the text above does not give yet:
 
@@ -888,4 +917,4 @@ The `eval` cases cover the special and derived forms, including `if` with severa
 - `dissociate` of a missing key returns the map unchanged.
 - A `raise` with a valid descriptor and a custom `:kind`, such as `:custom`, terminates the program with that `:kind`.
 
-Version 0.2.1 settled the remaining points in the text (see its list of changes), and the cases cover them. Version 0.3.0 added the positions in errors, version 0.4.0 the persistent maps, version 0.5.0 the type Set and version 0.6.0 the `if` with several pairs, version 0.7.0 `match`, version 0.8.0 the code point conversions and version 0.9.0 the type Float and version 0.10.0 `float-to-fixed` and version 0.11.0 the patterns in `let` and version 0.12.0 `read-lines!` and version 0.13.0 `try`; their cases cover them too. Version 0.10.1 added cases for the behaviors that a measurement of the implementation's coverage found untested.
+Version 0.2.1 settled the remaining points in the text (see its list of changes), and the cases cover them. Version 0.3.0 added the positions in errors, version 0.4.0 the persistent maps, version 0.5.0 the type Set and version 0.6.0 the `if` with several pairs, version 0.7.0 `match`, version 0.8.0 the code point conversions and version 0.9.0 the type Float and version 0.10.0 `float-to-fixed` and version 0.11.0 the patterns in `let` and version 0.12.0 `read-lines!` and version 0.13.0 `try` and version 0.14.0 `chain`; their cases cover them too. Version 0.10.1 added cases for the behaviors that a measurement of the implementation's coverage found untested.

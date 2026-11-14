@@ -1,5 +1,5 @@
 {
-  "spec": "Core Specification — Novelo, version 0.13.0",
+  "spec": "Core Specification — Novelo, version 0.14.0",
   "format": {
     "read": "Read 'input' (UTF-8). With 'equivalent': also read that text and compare the two datum sequences with equal?. With 'types': the sequence read has exactly these types, in order.",
     "read-error": "Read 'input' (or the bytes of 'input_hex'). Reading MUST fail with the code 'error' at position [line, column].",
@@ -4795,6 +4795,194 @@
       "kind": "eval",
       "section": "8.3",
       "program": "(define try (lambda (x) x))\n(try 1)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "chain-001",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(define then (lambda (result next) (match result (:ok value) (next value) otherwise result)))\n(chain then ((a (list :ok 1))\n             (b (list :ok (+ a 1))))\n  (list :ok (+ a b)))",
+      "value": "(:ok 3)",
+      "output": ""
+    },
+    {
+      "id": "chain-002",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(import io)\n(define then (lambda (result next) (match result (:ok value) (next value) otherwise result)))\n(chain then ((a (list :error \"first\"))\n             (b (sequence (display! \"never\") (list :ok 2))))\n  (list :ok b))",
+      "value": "(:error \"first\")",
+      "output": ""
+    },
+    {
+      "id": "chain-003",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(define then (lambda (result next) (match result (:ok value) (next value) otherwise result)))\n(chain then (((x y) (list :ok (list 1 2)))\n             ({:k k} (list :ok {:k 3})))\n  (list x y k))",
+      "value": "(1 2 3)",
+      "output": ""
+    },
+    {
+      "id": "chain-004",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(define then (lambda (result next) (match result (:ok value) (next value) otherwise result)))\n(chain then ((_ (list :ok 1))\n             (b (list :ok 2)))\n  b)",
+      "value": "2",
+      "output": ""
+    },
+    {
+      "id": "chain-005",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(define then (lambda (result next) (match result (:ok value) (next value) otherwise result)))\n(chain then () 5)",
+      "value": "5",
+      "output": ""
+    },
+    {
+      "id": "chain-006",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(import io)\n(define then (lambda (result next) (match result (:ok value) (next value) otherwise result)))\n(chain (sequence (display! \"s\") then) ((a (list :ok 1)) (b (list :ok 2)))\n  (+ a b))",
+      "value": "3",
+      "output": "s"
+    },
+    {
+      "id": "chain-007",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(import io)\n(define then (lambda (result next) (match result (:ok value) (next value) otherwise result)))\n(chain (sequence (display! \"s\") then) () 7)",
+      "value": "7",
+      "output": "s"
+    },
+    {
+      "id": "chain-008",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(define then (lambda (result next) (match result (:ok value) (next value) otherwise result)))\n(chain then (((x y) (list :ok 1))) x)",
+      "error": ":no-match",
+      "output": ""
+    },
+    {
+      "id": "chain-009",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(import io)\n(define then (lambda (result next) (match result (:ok value) (next value) otherwise result)))\n(chain then ((a (list :ok 1)))\n  (display! \"x\")\n  (+ a 1))",
+      "value": "2",
+      "output": "x"
+    },
+    {
+      "id": "chain-010",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(define maybe (lambda (value next) (if (void? value) #void otherwise (next value))))\n(list (chain maybe ((a 1) (b (+ a 1))) (+ a b))\n      (chain maybe ((a 1) (b #void) (c (first ()))) c))",
+      "value": "(3 #void)",
+      "output": ""
+    },
+    {
+      "id": "chain-011",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(define then (lambda (result next) (match result (:ok value) (next value) otherwise result)))\n(define count-down\n  (lambda (n)\n    (if (= n 0) :done\n        otherwise (chain then ((m (list :ok (- n 1)))) (count-down m)))))\n(count-down 1000000)",
+      "value": ":done",
+      "output": ""
+    },
+    {
+      "id": "chain-012",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(define then (lambda (result next) (match result (:ok value) (next value) otherwise result)))\n(chain then ((then (list :ok 1))\n             (b (list :ok 2)))\n  (list then b))",
+      "value": "(1 2)",
+      "output": ""
+    },
+    {
+      "id": "chain-013",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(define then (lambda (result next) (match result (:ok value) (next value) otherwise result)))\n(chain then ((a (list :ok 1))\n             (b (list :error a))\n             (c (first ())))\n  c)",
+      "value": "(:error 1)",
+      "output": ""
+    },
+    {
+      "id": "chain-014",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(chain)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "chain-015",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(chain then)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "chain-016",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(chain then ((a 1)))",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "chain-017",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(chain then 5 1)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "chain-018",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(chain then (a 1) a)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "chain-019",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(chain then ((a)) a)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "chain-020",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(chain then ((a 1 2)) a)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "chain-021",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(chain then (((a a) 1)) a)",
+      "error": ":expansion-error",
+      "output": ""
+    },
+    {
+      "id": "chain-022",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(define x 1)\n(chain then\n  ((#{1} 1)) 1)",
+      "error": ":expansion-error",
+      "error_position": [
+        2,
+        1
+      ],
+      "output": ""
+    },
+    {
+      "id": "chain-023",
+      "kind": "eval",
+      "section": "8.3",
+      "program": "(define chain (lambda (x) x))\n(chain 1)",
       "error": ":expansion-error",
       "output": ""
     }

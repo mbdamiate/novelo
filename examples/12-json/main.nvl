@@ -55,20 +55,16 @@
           otherwise (list :error "an item needs a price and a whole quantity" (list (json/write item))))
       otherwise (list :error "an item needs a price and a quantity" (list (json/write item))))))
 
-; The sum of the items, or the first item that fails. `fold` goes through
-; every item, but once the sum has failed it only carries the failure on.
-;
-; Friction: a list of results becomes one result, the values or the first
-; failure, with a `match` on both the running sum and each item.
+; The sum of the items, or the first item that fails. Results here have
+; the shape of json.nvl's, so its `then` chains them too: `fold` goes
+; through every item, but once the sum has failed, `chain` carries the
+; failure on without checking another item.
 (define items-total
   (lambda (items)
     (fold (lambda (sum item)
-            (match sum
-              (:ok total)
-              (match (item-total item)
-                (:ok item-amount) (list :ok (+ total item-amount))
-                failure failure)
-              failure failure))
+            (chain json/then ((total sum)
+                              (amount (item-total item)))
+              (list :ok (+ total amount))))
           (list :ok 0.0)
           items)))
 
@@ -78,9 +74,8 @@
       {"customer" customer "items" items}
       (if (not (string? customer)) (list :error "the customer must be a string" ())
           (not (list? items)) (list :error "the items must be a list" ())
-          otherwise (match (items-total items)
-                      (:ok total) (list :ok (list customer (count items) total))
-                      failure failure))
+          otherwise (chain json/then ((total (items-total items)))
+                      (list :ok (list customer (count items) total))))
       otherwise (list :error "an order needs a customer and items" ()))))
 
 ; Money is shown with two decimals; the report keeps the total rounded to
