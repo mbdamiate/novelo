@@ -23,30 +23,24 @@
 (import list)      ; any?, filter, fold, map, reverse, sort, span, zip
 (import text t)    ; t/characters, t/digit?, t/join, t/letter?, t/pad-left, t/precedes?
 (import map)       ; from-entries, merge
+(import result)    ; ok, failure, then, map-results
 
 ; A line with a problem is an answer this program expects, not a mistake,
 ; so the steps below return it as a value, as example 12 does: each one
-; that can fail returns a result, (:ok value) when it worked, or
-; (:error message column) with the column where it found the problem.
-; Every step knows the column of what it works on: a token keeps the column
-; where it starts, and a node of the tree the column of its token.
-(define ok (lambda (value) (list :ok value)))
-
-(define fail (lambda (message column) (list :error message column)))
-
+; that can fail returns a result of the library `result`, (:ok value) when
+; it worked, or (:error message column) with the column where it found the
+; problem. Every step knows the column of what it works on: a token keeps
+; the column where it starts, and a node of the tree the column of its
+; token.
+;
 ; `then` passes the value of a result to the rest of the work and returns a
 ; failure as it is; `chain` (core 0.14.0) writes the steps that depend on
 ; each other one under the other. Anything that is not a result is a
 ; mistake in this program, and stops it.
 ;
-; Friction: these three definitions are the ones example 12 wrote, word
-; for word; a second program needed them.
-(define then
-  (lambda (result next)
-    (match result
-      (:ok value) (next value)
-      (:error &rest _) result
-      otherwise (error "not a result" result))))
+; Friction: `ok`, `failure` and `then` were defined here as example 12
+; defined them, word for word; they became the library `result` (stdlib
+; 0.10.0).
 
 ; ---- tokens ---------------------------------------------------------------------
 
@@ -89,17 +83,17 @@
                       (prepend {:kind :name :text (apply concatenate letters) :column column} tokens)))
           (contains? symbols character)
           (tokenize more (+ column 1) (prepend {:kind :symbol :text character :column column} tokens))
-          otherwise (fail (concatenate "unexpected character " character) column)))))
+          otherwise (failure (concatenate "unexpected character " character) column)))))
 
 ; `string-to-number` raises an error for a number too large, the one place
 ; where the tokenizer meets one; `try` turns it into a failure.
 (define number-value
   (lambda (text column)
     (try (let ((value (string-to-number text)))
-           (if (void? value) (fail (concatenate "invalid number " text) column)
+           (if (void? value) (failure (concatenate "invalid number " text) column)
                otherwise (ok value)))
-      {:kind :integer-overflow} (fail (concatenate "number too large " text) column)
-      {:kind :float-overflow} (fail (concatenate "number too large " text) column))))
+      {:kind :integer-overflow} (failure (concatenate "number too large " text) column)
+      {:kind :float-overflow} (failure (concatenate "number too large " text) column))))
 
 ; How a token is named in a message.
 (define describe
@@ -173,15 +167,15 @@
       (chain then (((tree after) (parse-expression more 1))
                    (after-parenthesis (expect ")" after)))
         (ok (list tree after-parenthesis)))
-      (token &rest more) (fail (concatenate "expected a value, found " (describe token)) (get token :column)))))
+      (token &rest more) (failure (concatenate "expected a value, found " (describe token)) (get token :column)))))
 
 (define expect
   (lambda (text tokens)
     (match tokens
       ({:kind :symbol :text found} &rest more)
       (if (equal? found text) (ok more)
-          otherwise (fail (concatenate "expected " text ", found " found) (get (first tokens) :column)))
-      (token &rest more) (fail (concatenate "expected " text ", found " (describe token)) (get token :column)))))
+          otherwise (failure (concatenate "expected " text ", found " found) (get (first tokens) :column)))
+      (token &rest more) (failure (concatenate "expected " text ", found " (describe token)) (get token :column)))))
 
 ; The arguments of a call, after its "(": none, or expressions separated by
 ; commas, up to the ")".
@@ -207,19 +201,19 @@
     (match tokens
       ({:kind :name :text name :column column} &rest more)
       (if (any? (lambda (parameter) (equal? parameter name)) parameters)
-          (fail (concatenate "parameter " name " given twice") column)
+          (failure (concatenate "parameter " name " given twice") column)
           otherwise
           (match more
             ({:kind :symbol :text ","} &rest after) (parse-parameters after (prepend name parameters))
             otherwise (chain then ((after-parenthesis (expect ")" more)))
                         (ok (list (reverse (prepend name parameters)) after-parenthesis)))))
-      (token &rest more) (fail (concatenate "expected a parameter, found " (describe token)) (get token :column)))))
+      (token &rest more) (failure (concatenate "expected a parameter, found " (describe token)) (get token :column)))))
 
 (define expect-end
   (lambda (tokens)
     (match tokens
       ({:kind :end}) (ok #true)
-      (token &rest more) (fail (concatenate "unexpected " (describe token)) (get token :column)))))
+      (token &rest more) (failure (concatenate "unexpected " (describe token)) (get token :column)))))
 
 ; A statement is one of three shapes, told apart by its first tokens.
 (define parse-statement
@@ -238,7 +232,7 @@
                    (_ (expect-end after)))
         (ok {:kind :define-function :name name :parameters parameters :tree tree}))
       ({:kind :name :text "let"} token &rest more)
-      (fail (concatenate "expected a name after let, found " (describe token)) (get token :column))
+      (failure (concatenate "expected a name after let, found " (describe token)) (get token :column))
       otherwise
       (chain then (((tree after) (parse-expression tokens 1))
                    (_ (expect-end after)))
@@ -299,7 +293,7 @@
   (lambda (operator left right column)
     (if (equal? operator "^")
         (if (and (integer? right) (>= right 0)) (ok (power left right (if (integer? left) 1 otherwise 1.0)))
-            otherwise (fail "the exponent must be a whole number, 0 or more" column))
+            otherwise (failure "the exponent must be a whole number, 0 or more" column))
         otherwise
         (let (((left right) (same-type left right)))
           (match operator
@@ -308,7 +302,7 @@
             "*" (ok (* left right))
             "/" (ok (if (integer? left) (quotient left right) otherwise (/ left right)))
             "%" (if (integer? left) (ok (remainder left right))
-                    otherwise (fail "% takes whole numbers" column)))))))
+                    otherwise (failure "% takes whole numbers" column)))))))
 
 ; Arithmetic can fail inside Novelo itself: a result too large for an
 ; Integer or a Float, or a division by zero. Those errors become failures
@@ -323,9 +317,9 @@
 (define arithmetic
   (lambda (compute column)
     (try (compute)
-      {:kind :integer-overflow} (fail "the result is too large" column)
-      {:kind :float-overflow} (fail "the result is too large" column)
-      {:kind :division-by-zero} (fail "division by zero" column))))
+      {:kind :integer-overflow} (failure "the result is too large" column)
+      {:kind :float-overflow} (failure "the result is too large" column)
+      {:kind :division-by-zero} (failure "division by zero" column))))
 
 ; A scope holds the :variables and the :functions a tree can see. A
 ; function is {:parameters (name …) :tree tree}; a call evaluates its
@@ -338,7 +332,7 @@
       {:kind :variable :name name :column column}
       (let ((variables (get scope :variables)))
         (if (contains? variables name) (ok (get variables name))
-            otherwise (fail (concatenate "unknown variable " name) column)))
+            otherwise (failure (concatenate "unknown variable " name) column)))
       {:kind :negate :operand operand :column column}
       (chain then ((value (evaluate operand scope)))
         (arithmetic (lambda () (ok (- value))) column))
@@ -348,23 +342,9 @@
         (arithmetic (lambda () (operate operator left-value right-value column)) column))
       {:kind :call :name name :arguments arguments :column column}
       (let ((functions (get scope :functions)))
-        (if (not (contains? functions name)) (fail (concatenate "unknown function " name) column)
-            otherwise (chain then ((values (evaluate-all arguments scope ())))
+        (if (not (contains? functions name)) (failure (concatenate "unknown function " name) column)
+            otherwise (chain then ((values (map-results (lambda (argument) (evaluate argument scope)) arguments)))
                         (call (get functions name) name values scope column)))))))
-
-; The values of the arguments, in order, or the first that fails; the
-; arguments after it are not evaluated.
-;
-; Friction: `map` over the arguments would give a list of results, not a
-; result with a list of values; going from one to the other is this loop,
-; and example 12 wrote its own with `fold`.
-(define evaluate-all
-  (lambda (trees scope values)
-    (match trees
-      () (ok (reverse values))
-      (tree &rest more)
-      (chain then ((value (evaluate tree scope)))
-        (evaluate-all more scope (prepend value values))))))
 
 ; Friction: binding each parameter to its argument needs the two lists
 ; side by side, and the library list had no function that walks two lists
@@ -374,7 +354,7 @@
   (lambda (function name values scope column)
     (let (({:parameters parameters :tree tree} function))
       (if (not (= (count parameters) (count values)))
-          (fail (t/format "{} takes {} arguments, given {}" name (count parameters) (count values)) column)
+          (failure (t/format "{} takes {} arguments, given {}" name (count parameters) (count values)) column)
           otherwise
           (evaluate tree (associate scope :variables
                                     (merge (get scope :variables) (from-entries (zip parameters values)))))))))

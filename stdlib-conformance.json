@@ -1,5 +1,5 @@
 {
-  "spec": "Standard Library — Novelo, version 0.9.1",
+  "spec": "Standard Library — Novelo, version 0.10.0",
   "format": {
     "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text, function, map, set and number available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
   },
@@ -949,6 +949,110 @@
       "section": "4.1",
       "program": "(import list)\n(let ((numbers (range 0 100000))\n      ((small large) (span (lambda (n) (< n 60000)) numbers))\n      (pairs (zip numbers (rest numbers))))\n  (list (count small) (first large) (count pairs) (first pairs) (fold (lambda (total pair) (+ total (- (first (rest pair)) (first pair)))) 0 pairs)))",
       "value": "(60000 60000 99999 (0 1) 99999)",
+      "output": ""
+    },
+    {
+      "id": "library-119",
+      "kind": "eval",
+      "section": "4.7",
+      "program": "(import result)\n(list (ok 1) (ok ()) (failure) (failure \"bad\") (failure \"bad\" 3 :column))",
+      "value": "((:ok 1) (:ok ()) (:error) (:error \"bad\") (:error \"bad\" 3 :column))",
+      "output": ""
+    },
+    {
+      "id": "library-120",
+      "kind": "eval",
+      "section": "4.7",
+      "program": "(import result)\n(map ok? (list (ok 1) (failure \"x\") (list :ok) (list :ok 1 2) (list :ok 1) (list :error) 5 \"ok\" #void ()))",
+      "value": "(#true #false #false #false #true #false #false #false #false #false)",
+      "output": ""
+    },
+    {
+      "id": "library-121",
+      "kind": "eval",
+      "section": "4.7",
+      "program": "(import result)\n(map failure? (list (failure) (failure \"x\" 1) (ok 1) (list :error) (list :fail \"x\") 5 :error #void ()))",
+      "value": "(#true #true #false #true #false #false #false #false #false)",
+      "output": ""
+    },
+    {
+      "id": "library-122",
+      "kind": "eval",
+      "section": "4.7",
+      "program": "(import result)\n(list (then (ok 2) (lambda (n) (ok (* n 10))))\n      (then (failure \"no\" 4) (lambda (n) (ok (* n 10)))))",
+      "value": "((:ok 20) (:error \"no\" 4))",
+      "output": ""
+    },
+    {
+      "id": "library-123",
+      "kind": "eval",
+      "section": "4.7",
+      "program": "(import result)\n(then 5 (lambda (n) (ok n)))",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-124",
+      "kind": "eval",
+      "section": "4.7",
+      "program": "(import result)\n(list (catch (lambda () (then (list :ok 1 2) ok)) (lambda (problem) (list (get problem :kind) (get problem :values))))\n      (catch (lambda () (then #void ok)) (lambda (problem) (get problem :values))))",
+      "value": "((:wrong-type ((:ok 1 2))) (#void))",
+      "output": ""
+    },
+    {
+      "id": "library-125",
+      "kind": "eval",
+      "section": "4.7",
+      "program": "(import result)\n(import io)\n(define parse-digit\n  (lambda (text)\n    (let ((number (string-to-number text)))\n      (if (integer? number) (ok number) otherwise (failure \"not a digit\" text)))))\n(list (chain then ((a (parse-digit \"4\"))\n                   (b (parse-digit \"5\")))\n        (ok (+ a b)))\n      (chain then ((a (parse-digit \"x\"))\n                   (b (sequence (display! \"never\") (parse-digit \"5\"))))\n        (ok (+ a b))))",
+      "value": "((:ok 9) (:error \"not a digit\" \"x\"))",
+      "output": ""
+    },
+    {
+      "id": "library-126",
+      "kind": "eval",
+      "section": "4.7",
+      "program": "(import result)\n(chain then (((left right) (ok (list 1 2)))\n             ({:total total} (ok {:total (+ left right)})))\n  (ok (* total 2)))",
+      "value": "(:ok 6)",
+      "output": ""
+    },
+    {
+      "id": "library-127",
+      "kind": "eval",
+      "section": "4.7",
+      "program": "(import result)\n(list (map-results ok ())\n      (map-results (lambda (n) (ok (* n n))) (list 1 2 3)))",
+      "value": "((:ok ()) (:ok (1 4 9)))",
+      "output": ""
+    },
+    {
+      "id": "library-128",
+      "kind": "eval",
+      "section": "4.7",
+      "program": "(import result)\n(import io)\n(map-results (lambda (n)\n               (sequence (display! (to-string n))\n                         (if (< n 3) (ok n) otherwise (failure \"too big\" n))))\n             (list 1 2 3 4 5))",
+      "value": "(:error \"too big\" 3)",
+      "output": "123"
+    },
+    {
+      "id": "library-129",
+      "kind": "eval",
+      "section": "4.7",
+      "program": "(import result)\n(map-results (lambda (n) n) (list 1 2))",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-130",
+      "kind": "eval",
+      "section": "4.7",
+      "program": "(import list)\n(import result)\n(let ((numbers (range 0 100000)))\n  (list (chain then ((squares (map-results (lambda (n) (ok (* n 2))) numbers)))\n          (ok (list (count squares) (first squares) (fold + 0 squares))))\n        (map-results (lambda (n) (if (= n 99999) (failure \"last\" n) otherwise (ok n))) numbers)))",
+      "value": "((:ok (100000 0 9999900000)) (:error \"last\" 99999))",
+      "output": ""
+    },
+    {
+      "id": "library-131",
+      "kind": "eval",
+      "section": "4.7",
+      "program": "(import result r)\n(list (r/ok 1) (r/reverse (list 1 2)) (r/then (r/ok 3) r/ok))",
+      "value": "((:ok 1) (2 1) (:ok 3))",
       "output": ""
     }
   ]

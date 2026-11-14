@@ -5,8 +5,8 @@
  * the library's definitions in the context of the import followed by the
  * prefix, and it happens at most once per library and resulting context.
  *
- * The libraries list, text, function, map, set and number are not copied into C:
- * their source is read from the `lisp` blocks of standard-library.md §4.1–4.6, so the
+ * The libraries list, text, function, map, set, number and result are not copied
+ * into C: their source is read from the `lisp` blocks of standard-library.md §4.1–4.7, so the
  * normative definitions are what runs.
  */
 #include "library.h"
@@ -29,6 +29,7 @@ static const LispLibrary library_function = {.name = "function", .section = "4.3
 static const LispLibrary library_map = {.name = "map", .section = "4.4"};
 static const LispLibrary library_set = {.name = "set", .section = "4.5"};
 static const LispLibrary library_number = {.name = "number", .section = "4.6"};
+static const LispLibrary library_result = {.name = "result", .section = "4.7"};
 
 static const LispLibrary *const libraries[] = {
     &lisp_library_io,
@@ -38,11 +39,12 @@ static const LispLibrary *const libraries[] = {
     &library_map,
     &library_set,
     &library_number,
+    &library_result,
 };
 
 constexpr size_t LIBRARY_COUNT = sizeof libraries / sizeof libraries[0];
 
-const char *const lisp_library_names[] = {"io", "list", "text", "function", "map", "set", "number", nullptr};
+const char *const lisp_library_names[] = {"io", "list", "text", "function", "map", "set", "number", "result", nullptr};
 
 const char *lisp_default_library_path(void) {
     const char *path = getenv("NOVELO_STDLIB");

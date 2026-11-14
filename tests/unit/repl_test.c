@@ -76,7 +76,8 @@ static void t_missing_library(void) {
     name " :cannot-open\n"
     check_session_with(__FILE__, __LINE__, "/no/such/standard-library.md", "(+ 1 2)\n", "3\n",
                        CANNOT_IMPORT("list") CANNOT_IMPORT("text") CANNOT_IMPORT("function")
-                           CANNOT_IMPORT("map") CANNOT_IMPORT("set") CANNOT_IMPORT("number"));
+                           CANNOT_IMPORT("map") CANNOT_IMPORT("set") CANNOT_IMPORT("number")
+                               CANNOT_IMPORT("result"));
 #undef CANNOT_IMPORT
 }
 

@@ -6,11 +6,13 @@ Nov 10, 2026 · @Matheus Damiate
 
 The standard library is a set of functions written in the language itself, on top of the core primitives. It is not part of the core: an implementation conformant to the core does not need to provide it, and the core tests do not depend on it.
 
-The standard library is made of six libraries, in the sense of core section 8.9: `list`, `text`, `function`, `map`, `set` and `number`. Nothing is loaded before the program: a file imports the libraries it uses, such as `(import list)`, and only then sees their names. Imported with no prefix, the names are ordinary globals, and a program may redefine them. Imported with a prefix, as in `(import list l)`, they are bound as `l/map` and so on.
+The standard library is made of seven libraries, in the sense of core section 8.9: `list`, `text`, `function`, `map`, `set`, `number` and `result`. Nothing is loaded before the program: a file imports the libraries it uses, such as `(import list)`, and only then sees their names. Imported with no prefix, the names are ordinary globals, and a program may redefine them. Imported with a prefix, as in `(import list l)`, they are bound as `l/map` and so on.
 
 The reference definitions in section 4 are normative. The implementation MAY replace any of them with a native version, as long as the observable behavior is identical, including errors and the names each library binds.
 
-**Version:** 0.9.1, draft, on top of core 0.11.0.
+**Version:** 0.10.0, draft, on top of core 0.14.0.
+
+**Changes since 0.9.1.** A new library, `result`, for failures that are values instead of errors: `ok` and `failure` build a result, `ok?` and `failure?` test one, `then` passes the value of a result on, as the step of a `chain` (core 0.14.0), and `map-results` turns a list into a result with a list of values, stopping at the first failure (sections 3 and 4.7). Examples 12-json and 13-expressions, which return the problems of their input as values, each wrote the same `then`, and each a loop that `map-results` replaces. The other libraries are unchanged.
 
 **Changes since 0.9.0.** No change in behavior. The definition of `any?` uses the `if` with several pairs (core 0.6.0) instead of an `if` nested in `otherwise` (section 4.1).
 
@@ -40,8 +42,8 @@ The reference definitions in section 4 are normative. The implementation MAY rep
 - **The function comes first and the collection last**, as in `(map f xs)` and `(map-values f m)`. This makes partial application with `partial` easier. `merge` takes two maps and `update` takes the key, the function and then the map.
 - **Evaluation is eager.** Every function traverses the whole list and returns the finished result.
 - **Constant memory.** Every function that traverses a list does so by tail recursion, so lists of any size are traversed in constant memory.
-- **Helpers.** Since the core has no local recursion, some functions use helpers defined at the top level of their library: `take-step`, `span-step`, `range-step`, `zip-step`, `merge-sorted`, `split-step`, `precedes-step`, `padding`, `repeat-step`, `format-step`, `check-base`, `digit-value`, `digits-step`, `letter-code-point?`, `uppercase-code-point` and `lowercase-code-point`. They are bound by `import` like the other names, but they are not part of the interface: a program should not rely on them, and a native implementation MAY omit them.
-- **Dependencies.** `text`, `function`, `map`, `set` and `number` import `list` (core 8.9). Importing any of them therefore also binds the names of `list` in the same context. The names of all the libraries are different, so they can be imported together without a prefix.
+- **Helpers.** Since the core has no local recursion, some functions use helpers defined at the top level of their library: `take-step`, `span-step`, `range-step`, `zip-step`, `merge-sorted`, `split-step`, `precedes-step`, `padding`, `repeat-step`, `format-step`, `check-base`, `digit-value`, `digits-step`, `map-results-step`, `letter-code-point?`, `uppercase-code-point` and `lowercase-code-point`. They are bound by `import` like the other names, but they are not part of the interface: a program should not rely on them, and a native implementation MAY omit them.
+- **Dependencies.** `text`, `function`, `map`, `set`, `number` and `result` import `list` (core 8.9). Importing any of them therefore also binds the names of `list` in the same context. The names of all the libraries are different, so they can be imported together without a prefix.
 - **Letters and case.** `text` knows two ranges of letters: ASCII, `A` to `Z` and `a` to `z`, and Latin-1, U+00C0 to U+00FF without U+00D7 `×` and U+00F7 `÷`, which covers the accented letters of Portuguese and the other languages of Western Europe, such as `á`, `ç`, `ê` and `õ`. `uppercase` and `lowercase` pair `A`–`Z` with `a`–`z` and U+00C0–U+00DE with U+00E0–U+00FE; `ß` (U+00DF) and `ÿ` (U+00FF) have no pair in these ranges and stay as they are. Every other character, in any script, is not a letter and keeps its case. `digit?` knows only `0` to `9`, the digits `string-to-number` reads.
 - **Order of text.** `precedes?` orders by code point, not as a dictionary does: every uppercase ASCII letter comes before every lowercase one, so `"Zebra"` precedes `"apple"`, and accented letters come after `z`. To ignore case, compare the `lowercase` of both.
 
@@ -87,6 +89,11 @@ The reference definitions in section 4 are normative. The implementation MAY rep
 | `number` | `floor`, `ceiling` | `(floor x)` | the largest Integer not greater than the Float `x`, or the smallest not less than it: `(floor -2.5)` is `-3`, `(ceiling 2.1)` is `3`; an Integer gives `:wrong-type`, a result outside the range of Integer `:integer-overflow` |
 | `number` | `digits-to-integer` | `(digits-to-integer text base)` | the Integer that `text` writes in `base`, from 2 to 36, with the digits `0`–`9` and then the letters `a`–`z`, in either case, and an optional `-` before them: `(digits-to-integer "ff" 16)` is `255`, `(digits-to-integer "-101" 2)` is `-5`; a text with no digit, or with any character that is not a digit of `base`, including a `+`, a space or a point, gives `#void`, as `string-to-number` does; a value outside the range of Integer is `:integer-overflow`; a `text` that is not a String or a `base` that is not an Integer is `:wrong-type`, and an Integer outside 2 to 36 is `:domain-error`, with `:values` `(base)` |
 | `number` | `integer-to-digits` | `(integer-to-digits number base)` | the String that writes the Integer `number` in `base`, from 2 to 36, with lowercase letters, no leading zero, and `-` before a negative number: `(integer-to-digits 255 16)` is `"ff"`, `(integer-to-digits 0 2)` is `"0"`; `digits-to-integer` reads it back as `number`, for every Integer; errors as `digits-to-integer` |
+| `result` | `ok` | `(ok value)` | the result `(:ok value)`, a step that worked |
+| `result` | `failure` | `(failure detail …)` | the result `(:error detail …)`, a step that failed; the details are the program's, such as a message and where it was found |
+| `result` | `ok?`, `failure?` | `(ok? x)` | `ok?` is `#true` for a List of `:ok` and one value, `failure?` for a List that starts with `:error`; any other value, of any type, is neither, and gives `#false` |
+| `result` | `then` | `(then result next)` | `(next value)` for `(:ok value)`; a failure, as it is; any other value is `:wrong-type`, with `:values` `(x)`, since it is a mistake in the program rather than a failure. It is the step of a `chain`: `(chain then ((p e) …) body …)` stops at the first failure |
+| `result` | `map-results` | `(map-results f xs)` | `(:ok ys)`, with `ys` the values of the results of `f` on each element of `xs`, in order, or the first failure; `f` is not called after it. A value of `f` that is not a result is `:wrong-type`, as in `then` |
 | `number` | `round` | `(round x)` | the Integer nearest to the Float `x`; exactly halfway, the one farther from zero: `(round 2.5)` is `3`, `(round -2.5)` is `-3`; errors as `floor` |
 
 There is no `find`. To get the first element that satisfies a predicate, take `first` of the `filter` result after checking that it is not empty; to only ask whether such an element exists, use `any?`. To combine from last to first, `fold` the `reverse` of the list.
@@ -515,8 +522,57 @@ The functions build on `elements`, `adjoin`, `disjoin` and `contains?`, which ar
       (if (= more 0) gathered otherwise (digits-step more base gathered)))))
 ```
 
+### 4.7 `result`
+
+A result says how a step went, as a value: `(:ok value)` when it worked, `(:error detail …)` when it failed. A failure that a program expects, such as a text that does not parse, can then be what a function returns, visible in its result, instead of an error it raises. The details of a failure are up to the program; the library only reads the first element of a result.
+
+```lisp
+(import list)
+
+(define ok (lambda (value) (list :ok value)))
+
+(define failure (lambda (&rest details) (prepend :error details)))
+
+(define ok?
+  (lambda (value)
+    (match value
+      (:ok _) #true
+      otherwise #false)))
+
+(define failure?
+  (lambda (value)
+    (match value
+      (:error &rest _) #true
+      otherwise #false)))
+```
+
+`then` is the step of a `chain`: each binding of `(chain then ((pattern step) …) body …)` goes on with the value of an `(:ok …)`, and the first failure is the value of the whole. A value that is neither is not passed on as a failure: it is a mistake, such as a step that forgot its `ok`, and stops where it is found.
+
+```lisp
+(define then
+  (lambda (result next)
+    (match result
+      (:ok value) (next value)
+      (:error &rest _) result
+      otherwise (raise {:kind :wrong-type :message "then: expected a result" :values (list result)}))))
+```
+
+`map-results` calls `f` on the elements in order and gathers the values newest first; `then` calls the rest of the walk in tail position, so it runs in constant memory, and stops at the first failure.
+
+```lisp
+(define map-results
+  (lambda (f xs)
+    (map-results-step f xs ())))
+
+(define map-results-step
+  (lambda (f xs values)
+    (if (empty? xs) (ok (reverse values))
+        otherwise (then (f (first xs))
+                        (lambda (value) (map-results-step f (rest xs) (prepend value values)))))))
+```
+
 ## 5. Conformance
 
-The file `stdlib-conformance.json` has 118 cases, in the same format as the core `eval` cases, with one difference: the libraries `list`, `text`, `function`, `map`, `set` and `number` are available to `import`. Each program imports what it uses. An implementation that provides the library MUST pass all of them, in addition to the core cases.
+The file `stdlib-conformance.json` has 131 cases, in the same format as the core `eval` cases, with one difference: the libraries `list`, `text`, `function`, `map`, `set`, `number` and `result` are available to `import`. Each program imports what it uses. An implementation that provides the library MUST pass all of them, in addition to the core cases.
 
-The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that imports a library, a traversal of one hundred thousand elements, which only passes if the functions run in constant memory, every function of `map` with its errors, a map of one hundred thousand keys built with `from-entries` and reduced with `filter-entries`, every function of `set`, sets of one hundred thousand elements, the order of `precedes?` and its stable use in `sort`, `uppercase`, `lowercase`, `letter?` and `digit?` at the edges of the ASCII and Latin-1 ranges, `pad-left` and `pad-right` with texts wider than the width, accented fills and fills of the wrong length, `format` with values of every type, braces outside `{}` and too few or too many values, `join` of a single part that is returned as it is, and `join` of two hundred thousand parts and `format` of ten thousand values, which only pass in reasonable time if they grow linearly, `max` and `min` with Integers, with Floats, with their errors and over one hundred thousand arguments, `abs`, `floor`, `ceiling` and `round` at negative numbers, `-0.0`, halfway values, Floats above 2^52 and the edges of the range of Integer, `characters` of accented letters, of characters outside the BMP and of the empty text, and its use with `match`, `digits-to-integer` and `integer-to-digits` in bases 2, 8, 10, 16 and 36, with uppercase digits, signs, texts that are not numbers, the smallest and largest Integer, overflow, every base error and a round trip in every base, `span` with a test that always or never holds and a test it stops calling, and with a `let` pattern, `zip` of lists of different lengths and as the input of `from-entries`, both over one hundred thousand elements, and `import` itself: names unbound without it, prefixes, the dependencies of `text`, `function`, `map`, `set` and `number` on `list`, and repeated imports.
+The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that imports a library, a traversal of one hundred thousand elements, which only passes if the functions run in constant memory, every function of `map` with its errors, a map of one hundred thousand keys built with `from-entries` and reduced with `filter-entries`, every function of `set`, sets of one hundred thousand elements, the order of `precedes?` and its stable use in `sort`, `uppercase`, `lowercase`, `letter?` and `digit?` at the edges of the ASCII and Latin-1 ranges, `pad-left` and `pad-right` with texts wider than the width, accented fills and fills of the wrong length, `format` with values of every type, braces outside `{}` and too few or too many values, `join` of a single part that is returned as it is, and `join` of two hundred thousand parts and `format` of ten thousand values, which only pass in reasonable time if they grow linearly, `max` and `min` with Integers, with Floats, with their errors and over one hundred thousand arguments, `abs`, `floor`, `ceiling` and `round` at negative numbers, `-0.0`, halfway values, Floats above 2^52 and the edges of the range of Integer, `characters` of accented letters, of characters outside the BMP and of the empty text, and its use with `match`, `digits-to-integer` and `integer-to-digits` in bases 2, 8, 10, 16 and 36, with uppercase digits, signs, texts that are not numbers, the smallest and largest Integer, overflow, every base error and a round trip in every base, `span` with a test that always or never holds and a test it stops calling, and with a `let` pattern, `zip` of lists of different lengths and as the input of `from-entries`, both over one hundred thousand elements, `ok`, `failure` with no detail and with several, `ok?` and `failure?` over values of every shape, `then` going on, stopping and rejecting what is not a result, as the step of a `chain` with patterns, `map-results` stopping at the first failure without calling `f` again, and over one hundred thousand elements, and `import` itself: names unbound without it, prefixes, the dependencies of `text`, `function`, `map`, `set`, `number` and `result` on `list`, and repeated imports.

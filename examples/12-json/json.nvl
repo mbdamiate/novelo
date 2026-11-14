@@ -19,6 +19,7 @@
 (import list)      ; any?, drop, map, reverse, take
 (import text t)    ; t/characters, t/digit?, t/join, t/lowercase, t/pad-left, t/split
 (import number)    ; digits-to-integer, integer-to-digits
+(import result)    ; ok, failure, then
 
 ; ---- characters -------------------------------------------------------------
 
@@ -43,8 +44,9 @@
 
 ; ---- parsing ------------------------------------------------------------------
 
-; Each function here that can fail returns a result, a value that says how
-; it went: (:ok value) when it worked, (:error message left) when it found a
+; Each function here that can fail returns a result of the library
+; `result`, a value that says how it went: (:ok value), made by `ok`, when
+; it worked, (:error message left), made by `failure`, when it found a
 ; problem with `left` characters still to read. A failure is an ordinary
 ; value, not an error: a text that is not JSON is an answer the parser
 ; expects, and the function says so in what it returns. `read`, at the end,
@@ -54,15 +56,16 @@
 ; two things: the value it read and the characters after it. A list of
 ; characters matches patterns well: ("{" &rest more) is a text that starts
 ; with a brace, and more is the rest of it.
-(define parsed (lambda (value more) (list :ok (list value more))))
+(define parsed (lambda (value more) (ok (list value more))))
 
-(define fail (lambda (message text) (list :error message (count text))))
+(define fail (lambda (message text) (failure message (count text))))
 
 ; Most steps need the value of the step before. `then` passes the value of
 ; a result to the rest of the work, a function of one argument; a failure
 ; skips the rest and is the result of the whole. Anything else is not a
-; result, but a mistake in the program, such as a step that forgot its :ok;
-; `then` stops there with an error, so it never passes on as a failure.
+; result, but a mistake in the program, such as a step that forgot its
+; `ok`; `then` stops there with :wrong-type, so it never passes on as a
+; failure.
 ;
 ; `chain` (core 0.14.0) writes such steps one under the other, as `let`
 ; does: (chain then ((pattern step) …) body …) calls `then` with each step
@@ -72,12 +75,8 @@
 ; Friction: without `chain`, every step that depends on another was a call
 ; to `then` and a lambda nested in the one before, three deep in
 ; parse-object, where a flat `let` had been when failures were errors.
-(define then
-  (lambda (result next)
-    (match result
-      (:ok value) (next value)
-      (:error &rest _) result
-      otherwise (error "not a result" result))))
+; `ok`, `failure` and `then` were defined here; example 13 needed the same
+; three, and they became the library `result` (stdlib 0.10.0).
 
 (define parse-value
   (lambda (text)
@@ -95,7 +94,7 @@
 (define expect
   (lambda (expected text)
     (let ((text (skip-space text)))
-      (if (and (not (empty? text)) (equal? (first text) expected)) (list :ok (rest text))
+      (if (and (not (empty? text)) (equal? (first text) expected)) (ok (rest text))
           otherwise (fail (concatenate "expected " expected) text)))))
 
 ; An object is a key, a colon and a value, then a comma and another, or the
@@ -152,7 +151,7 @@
     (let ((value (if (equal? (first digits) "-") #void
                      otherwise (digits-to-integer (apply concatenate digits) 16))))
       (if (void? value) (fail "invalid \\u escape" text)
-          otherwise (list :ok value)))))
+          otherwise (ok value)))))
 
 ; \uXXXX names a UTF-16 unit. A character above U+FFFF is written as two:
 ; a high surrogate, from D800 to DBFF, then a low one, from DC00 to DFFF,
@@ -204,27 +203,27 @@
 
 (define some-digits
   (lambda (text)
-    (if (and (not (empty? text)) (t/digit? (first text))) (list :ok (digits text))
+    (if (and (not (empty? text)) (t/digit? (first text))) (ok (digits text))
         otherwise (fail "expected a digit" text))))
 
 (define integer-part
   (lambda (text)
     (match text
-      ("0" &rest more) (list :ok more)
+      ("0" &rest more) (ok more)
       otherwise (some-digits text))))
 
 (define fraction-part
   (lambda (text)
     (match text
       ("." &rest more) (some-digits more)
-      otherwise (list :ok text))))
+      otherwise (ok text))))
 
 (define exponent-part
   (lambda (text)
     (match text
       ("e" &rest more) (exponent-digits more)
       ("E" &rest more) (exponent-digits more)
-      otherwise (list :ok text))))
+      otherwise (ok text))))
 
 (define exponent-digits
   (lambda (text)
@@ -286,10 +285,10 @@
     (let ((characters-of-text (t/characters text))
           (result (chain then (((value after) (parse-value characters-of-text)))
                     (let ((after (skip-space after)))
-                      (if (empty? after) (list :ok value)
+                      (if (empty? after) (ok value)
                           otherwise (fail "text after the value" after))))))
       (match result
-        (:error message left) (list :error message (+ 1 (- (count characters-of-text) left)))
+        (:error message left) (failure message (+ 1 (- (count characters-of-text) left)))
         otherwise result))))
 
 ; A text of spaces alone, which holds no value.
