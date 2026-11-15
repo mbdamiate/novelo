@@ -284,12 +284,41 @@ static Value *build_list(LispState *state, const LispNode *node, Value *environm
 
 /* ---- the loop ---------------------------------------------------------------------------- */
 
-/* Replaces *slot with a retained replacement and releases the old value. The
- * replacement is retained first, since it may be owned by the old value. */
-static void replace(Value **slot, Value *replacement) {
+/* A node, environment or context of the loop, borrowed from the caller until
+ * the loop replaces it, and owned from then on. */
+typedef struct Slot {
+    Value *value;
+    bool owned;
+} Slot;
+
+/* Replaces the slot's value with a retained replacement and releases the old
+ * one if it was owned. The replacement is retained first, since it may be
+ * owned by the old value. */
+static void replace(Slot *slot, Value *replacement) {
     lisp_retain(replacement);
-    lisp_release(*slot);
-    *slot = replacement;
+    if (slot->owned) lisp_release(slot->value);
+    *slot = (Slot){replacement, true};
+}
+
+/* Replaces the node with one of its children. A borrowed node keeps its
+ * children alive as long as the caller keeps it, so the child is borrowed
+ * too; an owned one is about to be released, so the child must be owned. */
+static void replace_with_child(Slot *slot, Value *child) {
+    if (slot->owned) {
+        replace(slot, child);
+    } else {
+        slot->value = child;
+    }
+}
+
+/* Replaces the slot's value with a reference the caller hands over. */
+static void replace_take(Slot *slot, Value *replacement) {
+    if (slot->owned) lisp_release(slot->value);
+    *slot = (Slot){replacement, true};
+}
+
+static void drop(Slot *slot) {
+    if (slot->owned) lisp_release(slot->value);
 }
 
 /* The value, or on failure nullptr with the error located at the position. */
@@ -315,46 +344,47 @@ Value *lisp_eval(LispState *state, Value *node, Value *environment, Value *conte
     }
 }
 
-/* Takes the frame. */
-static Value *evaluate(LispState *state, Value *node, Value *environment, Value *context, Frame frame) {
+/* Takes the frame. The node, the environment and the context are borrowed:
+ * the caller keeps them alive for the whole call, so the loop takes its own
+ * reference only to what replaces them. */
+static Value *evaluate(LispState *state, Value *node_value, Value *environment_value, Value *context_value,
+                       Frame frame) {
     if (!lisp_check_stack(state)) {
-        lisp_error_locate(state, lisp_as_node(node)->position);
+        lisp_error_locate(state, lisp_as_node(node_value)->position);
         leave_frame(state, &frame, true);
         return nullptr;
     }
-    lisp_retain(node);
-    lisp_retain(environment);
-    lisp_retain(context);
+    Slot node = {node_value, false}, environment = {environment_value, false}, context = {context_value, false};
     Value *result = nullptr;
 
     for (;;) {
-        const LispNode *current = lisp_as_node(node);
+        const LispNode *current = lisp_as_node(node.value);
         switch (current->kind) {
         case LISP_NODE_CONSTANT:
             result = lisp_retain(current->value);
             goto done;
         case LISP_NODE_LOCAL:
-            result = local_value(environment, current->depth, current->index);
+            result = local_value(environment.value, current->depth, current->index);
             goto done;
         case LISP_NODE_GLOBAL:
-            result = global_value(state, current->value, context);
+            result = global_value(state, current->value, context.value);
             goto done;
         case LISP_NODE_LAMBDA:
-            result = lisp_closure(node, environment, context);
+            result = lisp_closure(node.value, environment.value, context.value);
             goto done;
         case LISP_NODE_MAP:
         case LISP_NODE_MAP_BUILD:
-            result = build_map(state, current, environment, context);
+            result = build_map(state, current, environment.value, context.value);
             goto done;
         case LISP_NODE_SET:
-            result = build_set(state, current, environment, context);
+            result = build_set(state, current, environment.value, context.value);
             goto done;
         case LISP_NODE_LIST_BUILD:
-            result = build_list(state, current, environment, context);
+            result = build_list(state, current, environment.value, context.value);
             goto done;
 
         case LISP_NODE_IF: {
-            Value *test = lisp_eval(state, current->children[0], environment, context);
+            Value *test = lisp_eval(state, current->children[0], environment.value, context.value);
             if (!test) goto done;
             bool true_branch = test != LISP_FALSE; /* only #false is false (§8.4) */
             lisp_release(test);
@@ -363,30 +393,31 @@ static Value *evaluate(LispState *state, Value *node, Value *environment, Value 
                 result = LISP_VOID;
                 goto done;
             }
-            replace(&node, branch);
+            replace_with_child(&node, branch);
             continue;
         }
 
         case LISP_NODE_SEQUENCE: {
             for (size_t index = 0; index + 1 < current->child_count; index++) {
-                Value *value = lisp_eval(state, current->children[index], environment, context);
+                Value *value = lisp_eval(state, current->children[index], environment.value, context.value);
                 if (!value) goto done;
                 lisp_release(value);
             }
-            replace(&node, current->children[current->child_count - 1]);
+            replace_with_child(&node, current->children[current->child_count - 1]);
             continue;
         }
 
         case LISP_NODE_APPLY: {
             /* §8.1: the operator first, then the arguments, left to right. */
             size_t count = current->child_count - 1;
-            Value *function = lisp_eval(state, current->children[0], environment, context);
+            Value *function = lisp_eval(state, current->children[0], environment.value, context.value);
             if (!function) goto done;
             Value *inline_arguments[8];
             Value **arguments = count <= 8 ? inline_arguments : lisp_xmalloc(count * sizeof(Value *));
             size_t evaluated = 0;
             for (; evaluated < count; evaluated++) {
-                arguments[evaluated] = lisp_eval(state, current->children[evaluated + 1], environment, context);
+                arguments[evaluated] =
+                    lisp_eval(state, current->children[evaluated + 1], environment.value, context.value);
                 if (!arguments[evaluated]) break;
             }
 
@@ -413,8 +444,7 @@ static Value *evaluate(LispState *state, Value *node, Value *environment, Value 
             enter_frame(&frame, function, current->position);
             replace(&node, lisp_as_node(closure->lambda)->children[0]);
             replace(&context, closure->context);
-            lisp_release(environment);
-            environment = bound;
+            replace_take(&environment, bound);
             lisp_release(function);
             continue;
         }
@@ -423,10 +453,10 @@ static Value *evaluate(LispState *state, Value *node, Value *environment, Value 
 
 done:
     /* §8.5: the innermost node with a position names where the error left. */
-    if (!result) lisp_error_locate(state, lisp_as_node(node)->position);
+    if (!result) lisp_error_locate(state, lisp_as_node(node.value)->position);
     leave_frame(state, &frame, !result);
-    lisp_release(node);
-    lisp_release(environment);
-    lisp_release(context);
+    drop(&node);
+    drop(&environment);
+    drop(&context);
     return result;
 }
