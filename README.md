@@ -1,6 +1,6 @@
 # Novelo
 
-An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.16.0) and the standard library (`standard-library.md`, v0.10.0).
+An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.17.0) and the standard library (`standard-library.md`, v0.11.0).
 
 *Novelo* is Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as Novelo's lists are. Source files end in `.nvl`.
 
@@ -8,8 +8,8 @@ Every case of both conformance suites passes:
 
 | Suite | Cases |
 | --- | --- |
-| core | 645 |
-| stdlib | 131 |
+| core | 675 |
+| stdlib | 165 |
 
 Those runs report no leaks, and they also pass under AddressSanitizer and UndefinedBehaviorSanitizer.
 
@@ -77,19 +77,22 @@ An uncaught error names the innermost form, read from a file, that contains the 
 
 ```lisp
 (import io)            ; write!, display!, read-line!, read-lines!, write-to-error!, display-to-error!, program-arguments!, exit!,
-                       ; read-file!, write-file!, append-file!, list-directory!, file-kind!
+                       ; read-file!, write-file!, append-file!, list-directory!, file-kind!,
+                       ; environment-variable!, current-time!, monotonic-time!, random-seed!
 (import list)          ; map, filter, fold, sort, ...
 (import text t)        ; t/split, t/join, t/format, t/pad-left, t/lowercase, ... (and the names of list, as t/map)
 (import function)      ; partial
 (import map)           ; values, entries, merge, update, map-values, ...
 (import set)           ; from-list, union, intersection, difference, subset?
-(import number)        ; max, min, abs, floor, ceiling, round
+(import number)        ; max, min, abs, floor, ceiling, round, digits-to-integer, integer-to-digits
+(import result)        ; ok, failure, ok?, failure?, then, map-results
+(import random)        ; random-generator, random-integer, random-float, shuffle
 (include "lib/geometry.nvl" geo)   ; geo/area, ...
 ```
 
-**The REPL** starts with all seven libraries imported. An input may span several lines: while a list, map or string is still open, the REPL keeps reading. Each value except `#void` is printed with the `write!` rules. After an error the REPL reports it and reads the next input. The `> ` prompt appears only when standard input is a terminal, so piping a file through the REPL prints only the values.
+**The REPL** starts with all eight libraries imported. An input may span several lines: while a list, map or string is still open, the REPL keeps reading. Each value except `#void` is printed with the `write!` rules. After an error the REPL reports it and reads the next input. The `> ` prompt appears only when standard input is a terminal, so piping a file through the REPL prints only the values.
 
-**The standard library** is not compiled in. On each `import`, `list`, `text`, `function`, `map`, `set`, `number` and `result` are read from the `lisp` code blocks of `standard-library.md` §4.1–4.7, so the code that runs is the normative code. The build fixes the absolute path of that document. To use another copy, set `NOVELO_STDLIB`:
+**The standard library** is not compiled in. On each `import`, `list`, `text`, `function`, `map`, `set`, `number`, `result` and `random` are read from the `lisp` code blocks of `standard-library.md` §4.1–4.8, so the code that runs is the normative code. The build fixes the absolute path of that document. To use another copy, set `NOVELO_STDLIB`:
 
 ```bash
 NOVELO_STDLIB=/usr/local/share/novelo/standard-library.md build/novelo program.nvl
@@ -236,8 +239,8 @@ Most of the branches left are null checks and the other side of `assert`s.
 | `src/program.h/.c` | core §8.7 | interpreter state, top level, running a source, large-stack thread |
 | `src/include.h/.c` | core §8.8 | contexts and prefixes, path resolution, load once, cycles |
 | `src/library.h/.c` | core §8.9, stdlib §4 | library registry, `import`, reading the libraries from the document |
-| `src/library_io.c` | core §8.7, §8.9, §9 | the native library `io`: standard output and error, standard input, the program's arguments, `exit!`, the functions on files |
-| `src/io.h/.c` | core §8.8, §9 | interfaces for output, input and the file system: reading, writing, listing and the kind of a path, on the disk (POSIX) and in memory (`LispMemoryStore`, for the tests) |
+| `src/library_io.c` | core §8.7, §8.9, §9 | the native library `io`: standard output and error, standard input, the program's arguments, `exit!`, the functions on files and on the system |
+| `src/io.h/.c` | core §8.8, §9 | interfaces for output, input and the file system: reading, writing, listing and the kind of a path, on the disk (POSIX) and in memory (`LispMemoryStore`, for the tests); the system (environment, clocks, entropy), real or fixed (`LispFixedSystem`, for the tests) |
 | `src/repl.h/.c` | core §8.7 | the REPL |
 | `src/main.c` | core §8.7 | the command line |
 
@@ -297,6 +300,7 @@ Core 0.2.1 settled the points that versions up to 0.2.0 left open, such as `disp
 - **`:file` in error positions.** For the program, it is the path as given on the command line. For an included file, it is the absolute path. For a library written in the language, it is the path of the standard library document, and the line is its line in that document. In the REPL there is no `:file`, and lines count from the start of each input.
 
 - **Files.** The disk file system maps `errno` to the reasons of core §9: `ENOENT`, `ENOTDIR` and `ENAMETOOLONG` are `:not-found`, `EACCES`, `EPERM` and `EROFS` `:permission-denied`, `EISDIR` (or a directory opened for reading) `:not-a-file`; anything else, such as a full disk or a loop of symbolic links, is `:io-error` with `(:failed path)`. `file-kind!` follows symbolic links and calls anything that is not a directory `:file`. The working directory is read once, when the interpreter starts.
+- **The system.** `environment-variable!` reads `getenv`, `current-time!` the `CLOCK_REALTIME` of `clock_gettime`, `monotonic-time!` its `CLOCK_MONOTONIC`, and `random-seed!` 64 bits of `getentropy` shifted right by one.
 - **Standard error.** The command line flushes standard output before anything goes to standard error, so in a terminal the two appear in the order the program wrote them.
 - **`exit!`.** It unwinds like an error, returning `nullptr` through every C frame, so everything is released, but no descriptor is pending: `state->exiting` and `state->exit_code` say why evaluation stopped, `catch` checks the flag and lets it through, and `lisp_run_source` returns `LISP_RUN_EXIT`.
 

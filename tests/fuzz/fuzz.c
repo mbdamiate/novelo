@@ -381,6 +381,10 @@ static const char *const awkward_fragments[] = {
     "(exit! 3)", "(exit! 256)", "(program-arguments!)", "(display-to-error! 1)", "(write-to-error! \"e\")",
     "(read-file! \"main.nvl\")", "(write-file! \"out.txt\" \"x\")", "(append-file! \"out.txt\" \"y\")",
     "(list-directory! \".\")", "(file-kind! \"main.nvl\")",
+    "(environment-variable! \"HOME\")", "(environment-variable! \"BROKEN\")", "(environment-variable! \"\")",
+    "(current-time!)", "(monotonic-time!)", "(random-seed!)", "(import random)",
+    "(random-generator (random-seed!))", "(random-integer (random-generator 2) 0 10)",
+    "(random-float (random-generator 0))", "(shuffle (random-generator 3) '(1 2 3))",
     "\"\xe2\x82\xac\"", "\xc2\xa0", "\xe3\x81\x82", "(import io)", "(import list)", "(import text)",
     "(include \"main.nvl\")", "(include \"missing.nvl\")",
 };
@@ -628,6 +632,18 @@ static void run_eval_on_thread(void *argument) {
     LispBuffer error_output;
     lisp_buffer_init(&error_output);
     static const char *const arguments[] = {"-x", "a\xc3\xa7\xc3\xa3o", "\xff"};
+    static const LispVariable variables[] = {{"HOME", "/home/novelo"}, {"BROKEN", "a\xff"}};
+    static const int64_t times[] = {5, 9, 9, 40};
+    static const int64_t seeds[] = {0, 1, INT64_MAX};
+    LispFixedSystem system = {
+        .variables = variables,
+        .variable_count = 2,
+        .current_time = 1794700000000,
+        .monotonic_times = times,
+        .monotonic_count = 4,
+        .seeds = seeds,
+        .seed_count = 3,
+    };
     LispStateOptions options = {
         .output = lisp_output_to_buffer(&output),
         .error_output = lisp_output_to_buffer(&error_output),
@@ -635,6 +651,7 @@ static void run_eval_on_thread(void *argument) {
         .arguments = arguments,
         .argument_count = 1 + seed->input_length % 3, /* sometimes an argument that is not UTF-8 */
         .files = lisp_file_system_from_memory(&file_system),
+        .system = lisp_system_fixed(&system),
         .working_directory = "/",
         .stack_limit = STACK_LIMIT,
     };

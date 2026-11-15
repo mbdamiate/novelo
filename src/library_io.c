@@ -1,7 +1,8 @@
 /* core §8.7, §8.9, §9, §10 — the native library io: write!, display!,
    read-line!, read-lines!, write-to-error!, display-to-error!,
    program-arguments!, exit!, read-file!, write-file!, append-file!,
-   list-directory!, file-kind!. */
+   list-directory!, file-kind!, environment-variable!, current-time!,
+   monotonic-time!, random-seed!. */
 #include "library.h"
 
 #include "error.h"
@@ -284,6 +285,50 @@ static Value *file_kind(LispState *state, size_t, Value *const *arguments) {
                                                                                                      : "none");
 }
 
+/* ---- the environment, the clocks and entropy (§9) ------------------------------------------ */
+
+/* The variable's value, or #void when it is not set; a name that cannot
+   name a variable (empty, or holding '=' or U+0000) is never set. */
+static Value *environment_variable(LispState *state, size_t, Value *const *arguments) {
+    Value *name = arguments[0];
+    if (!lisp_expect_kind(state, "environment-variable!", name, LISP_KIND_STRING, "String")) return nullptr;
+    const LispString *text = lisp_as_string(name);
+    if (text->bytes == 0 || memchr(text->data, '=', text->bytes) || memchr(text->data, '\0', text->bytes)) {
+        return LISP_VOID;
+    }
+    const char *value = state->system.environment_variable(state->system.context, text->data);
+    if (!value) return LISP_VOID;
+    size_t length = strlen(value);
+    size_t invalid_offset;
+    if (!lisp_utf8_valid((const unsigned char *)value, length, &invalid_offset)) {
+        return lisp_error(state, "io-error", LISP_LIST(lisp_keyword_cstr("invalid-utf8"), name),
+                          "environment-variable!: the value of %s is not valid UTF-8 at byte %zu", text->data,
+                          invalid_offset);
+    }
+    return lisp_string(value, length);
+}
+
+/* An Integer the system gave, or :io-error (:failed) when it could not. */
+static Value *system_integer(LispState *state, const char *name, bool (*read)(void *, int64_t *)) {
+    int64_t value;
+    if (!read(state->system.context, &value)) {
+        return lisp_error(state, "io-error", LISP_LIST(lisp_keyword_cstr("failed")), "%s: the system failed", name);
+    }
+    return lisp_integer(value);
+}
+
+static Value *current_time(LispState *state, size_t, Value *const *) {
+    return system_integer(state, "current-time!", state->system.current_time);
+}
+
+static Value *monotonic_time(LispState *state, size_t, Value *const *) {
+    return system_integer(state, "monotonic-time!", state->system.monotonic_time);
+}
+
+static Value *random_seed(LispState *state, size_t, Value *const *) {
+    return system_integer(state, "random-seed!", state->system.random_seed);
+}
+
 static const LispNativeFunction io_functions[] = {
     {"write!", 1, 1, write_value},
     {"display!", 1, 1, display_value},
@@ -298,6 +343,10 @@ static const LispNativeFunction io_functions[] = {
     {"append-file!", 2, 2, append_file},
     {"list-directory!", 1, 1, list_directory},
     {"file-kind!", 1, 1, file_kind},
+    {"environment-variable!", 1, 1, environment_variable},
+    {"current-time!", 0, 0, current_time},
+    {"monotonic-time!", 0, 0, monotonic_time},
+    {"random-seed!", 0, 0, random_seed},
 };
 
 const LispLibrary lisp_library_io = {

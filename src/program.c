@@ -27,6 +27,7 @@ LispState *lisp_state_new(const LispStateOptions *options) {
     state->input = options->input.read_line ? options->input : lisp_input_empty();
     state->stack_limit = options->stack_limit ? options->stack_limit : DEFAULT_STACK_LIMIT;
     state->files = options->files.read_file ? options->files : lisp_file_system_disk();
+    state->system = options->system.current_time ? options->system : lisp_system_real();
     char current_directory[4096];
     const char *directory = options->working_directory;
     if (!directory) directory = getcwd(current_directory, sizeof current_directory) ? current_directory : "/";

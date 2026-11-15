@@ -6,11 +6,13 @@ Nov 10, 2026 · @Matheus Damiate
 
 The standard library is a set of functions written in the language itself, on top of the core primitives. It is not part of the core: an implementation conformant to the core does not need to provide it, and the core tests do not depend on it.
 
-The standard library is made of seven libraries, in the sense of core section 8.9: `list`, `text`, `function`, `map`, `set`, `number` and `result`. Nothing is loaded before the program: a file imports the libraries it uses, such as `(import list)`, and only then sees their names. Imported with no prefix, the names are ordinary globals, and a program may redefine them. Imported with a prefix, as in `(import list l)`, they are bound as `l/map` and so on.
+The standard library is made of eight libraries, in the sense of core section 8.9: `list`, `text`, `function`, `map`, `set`, `number`, `result` and `random`. Nothing is loaded before the program: a file imports the libraries it uses, such as `(import list)`, and only then sees their names. Imported with no prefix, the names are ordinary globals, and a program may redefine them. Imported with a prefix, as in `(import list l)`, they are bound as `l/map` and so on.
 
 The reference definitions in section 4 are normative. The implementation MAY replace any of them with a native version, as long as the observable behavior is identical, including errors and the names each library binds.
 
-**Version:** 0.10.0, draft, on top of core 0.14.0.
+**Version:** 0.11.0, draft, on top of core 0.17.0.
+
+**Changes since 0.10.0.** A new library, `random`, draws pseudo-random numbers without effects: a generator is a value, made from a seed by `random-generator`, and `random-integer`, `random-float` and `shuffle` each return what they drew together with the generator for the next draw (sections 3 and 4.8). The same seed always gives the same draws, on every implementation, because the algorithm, MRG32k3a, and the way a seed becomes a generator are part of the definition. A seed that changes at every run comes from `random-seed!` of core 0.17.0. The other libraries are unchanged.
 
 **Changes since 0.9.1.** A new library, `result`, for failures that are values instead of errors: `ok` and `failure` build a result, `ok?` and `failure?` test one, `then` passes the value of a result on, as the step of a `chain` (core 0.14.0), and `map-results` turns a list into a result with a list of values, stopping at the first failure (sections 3 and 4.7). Examples 12-json and 13-expressions, which return the problems of their input as values, each wrote the same `then`, and each a loop that `map-results` replaces. The other libraries are unchanged.
 
@@ -42,8 +44,8 @@ The reference definitions in section 4 are normative. The implementation MAY rep
 - **The function comes first and the collection last**, as in `(map f xs)` and `(map-values f m)`. This makes partial application with `partial` easier. `merge` takes two maps and `update` takes the key, the function and then the map.
 - **Evaluation is eager.** Every function traverses the whole list and returns the finished result.
 - **Constant memory.** Every function that traverses a list does so by tail recursion, so lists of any size are traversed in constant memory.
-- **Helpers.** Since the core has no local recursion, some functions use helpers defined at the top level of their library: `take-step`, `span-step`, `range-step`, `zip-step`, `merge-sorted`, `split-step`, `precedes-step`, `padding`, `repeat-step`, `format-step`, `check-base`, `digit-value`, `digits-step`, `map-results-step`, `letter-code-point?`, `uppercase-code-point` and `lowercase-code-point`. They are bound by `import` like the other names, but they are not part of the interface: a program should not rely on them, and a native implementation MAY omit them.
-- **Dependencies.** `text`, `function`, `map`, `set`, `number` and `result` import `list` (core 8.9). Importing any of them therefore also binds the names of `list` in the same context. The names of all the libraries are different, so they can be imported together without a prefix.
+- **Helpers.** Since the core has no local recursion, some functions use helpers defined at the top level of their library: `take-step`, `span-step`, `range-step`, `zip-step`, `merge-sorted`, `split-step`, `precedes-step`, `padding`, `repeat-step`, `format-step`, `check-base`, `digit-value`, `digits-step`, `map-results-step`, `letter-code-point?`, `uppercase-code-point`, `lowercase-code-point`, and the names of `random` that start with `random-` and are not in section 3: `random-jump`, `random-matrix-apply`, `random-matrix-product`, `random-dot`, `random-multiply`, `random-next`, `random-modulo`, `random-below`, `random-below-narrow`, `random-below-wide`, `random-positions`, `random-shuffle-step` and `random-gather`. They are bound by `import` like the other names, but they are not part of the interface: a program should not rely on them, and a native implementation MAY omit them.
+- **Dependencies.** `text`, `function`, `map`, `set`, `number` and `result` import `list` (core 8.9); `random` imports nothing. Importing any of them therefore also binds the names of `list` in the same context. The names of all the libraries are different, so they can be imported together without a prefix.
 - **Letters and case.** `text` knows two ranges of letters: ASCII, `A` to `Z` and `a` to `z`, and Latin-1, U+00C0 to U+00FF without U+00D7 `×` and U+00F7 `÷`, which covers the accented letters of Portuguese and the other languages of Western Europe, such as `á`, `ç`, `ê` and `õ`. `uppercase` and `lowercase` pair `A`–`Z` with `a`–`z` and U+00C0–U+00DE with U+00E0–U+00FE; `ß` (U+00DF) and `ÿ` (U+00FF) have no pair in these ranges and stay as they are. Every other character, in any script, is not a letter and keeps its case. `digit?` knows only `0` to `9`, the digits `string-to-number` reads.
 - **Order of text.** `precedes?` orders by code point, not as a dictionary does: every uppercase ASCII letter comes before every lowercase one, so `"Zebra"` precedes `"apple"`, and accented letters come after `z`. To ignore case, compare the `lowercase` of both.
 
@@ -94,13 +96,17 @@ The reference definitions in section 4 are normative. The implementation MAY rep
 | `result` | `ok?`, `failure?` | `(ok? x)` | `ok?` is `#true` for a List of `:ok` and one value, `failure?` for a List that starts with `:error`; any other value, of any type, is neither, and gives `#false` |
 | `result` | `then` | `(then result next)` | `(next value)` for `(:ok value)`; a failure, as it is; any other value is `:wrong-type`, with `:values` `(x)`, since it is a mistake in the program rather than a failure. It is the step of a `chain`: `(chain then ((p e) …) body …)` stops at the first failure |
 | `result` | `map-results` | `(map-results f xs)` | `(:ok ys)`, with `ys` the values of the results of `f` on each element of `xs`, in order, or the first failure; `f` is not called after it. A value of `f` that is not a result is `:wrong-type`, as in `then` |
+| `random` | `random-generator` | `(random-generator seed)` | the generator of the seed, an Integer from 0 to 2^63 − 1, such as the one `random-seed!` returns (core section 9): the List `(:random-generator a b c d e f)` of section 4.8. A seed that is not an Integer is `:wrong-type`, and a negative one `:domain-error` |
+| `random` | `random-integer` | `(random-integer generator low high)` | List of an Integer from `low` up to before `high`, as `range` counts, each equally likely, and the next generator: `(random-integer g 1 7)` throws a die. `low` not less than `high` is `:domain-error`, with `:values` `(low high)`; a `low` or `high` that is not an Integer is `:wrong-type`, and a range whose size `high` − `low` is outside the range of Integer is `:integer-overflow` |
+| `random` | `random-float` | `(random-float generator)` | List of a Float greater than 0 and less than 1, and the next generator |
+| `random` | `shuffle` | `(shuffle generator xs)` | List of the elements of `xs` in an order drawn so that every order is equally likely, and the next generator |
 | `number` | `round` | `(round x)` | the Integer nearest to the Float `x`; exactly halfway, the one farther from zero: `(round 2.5)` is `3`, `(round -2.5)` is `-3`; errors as `floor` |
 
 There is no `find`. To get the first element that satisfies a predicate, take `first` of the `filter` result after checking that it is not empty; to only ask whether such an element exists, use `any?`. To combine from last to first, `fold` the `reverse` of the list.
 
 ## 4. Reference definitions
 
-The source of each library is the concatenation, in order, of the `lisp` code blocks in its section (4.1 for `list`, 4.2 for `text`, 4.3 for `function`, 4.4 for `map`, 4.5 for `set`, 4.6 for `number`). The definitions use only the core and the libraries they import. Parameter names avoid those of the primitives, such as `rest` and `count`, because a parameter with the same name would shadow the primitive inside the function. The order of the definitions does not matter: global names are resolved at call time.
+The source of each library is the concatenation, in order, of the `lisp` code blocks in its section (4.1 for `list`, 4.2 for `text`, 4.3 for `function`, 4.4 for `map`, 4.5 for `set`, 4.6 for `number`, 4.7 for `result`, 4.8 for `random`). The definitions use only the core and the libraries they import. Parameter names avoid those of the primitives, such as `rest` and `count`, because a parameter with the same name would shadow the primitive inside the function. The order of the definitions does not matter: global names are resolved at call time.
 
 ### 4.1 `list`
 
@@ -571,8 +577,164 @@ A result says how a step went, as a value: `(:ok value)` when it worked, `(:erro
                         (lambda (value) (map-results-step f (rest xs) (prepend value values)))))))
 ```
 
+### 4.8 `random`
+
+A generator of pseudo-random numbers that is a value: each draw takes a generator and returns a List of the number drawn and the generator for the next draw, which a `let` pattern takes apart, as in `(let (((die next) (random-integer generator 1 7))) …)`. Nothing changes in place, so the same generator always draws the same number, and a program that keeps its seed can run again exactly as it ran. The seed itself comes from wherever the program wants: a fixed number, an argument, or `random-seed!` of the library `io` (core section 9).
+
+The algorithm is MRG32k3a, by Pierre L'Ecuyer: two linear recurrences of order 3, modulo m1 = 4294967087 and m2 = 4294944443, whose state is six Integers. Its period is about 2^191, and its products stay below 2^53, so it runs on the Integers of the core, which raise `:integer-overflow` instead of wrapping and have no operations on bits. A generator is the List `(:random-generator a b c d e f)`, where `(a b c)` are the last three values of the first recurrence, oldest first, and `(d e f)` those of the second.
+
+Seeds are the streams of L'Ecuyer's RngStreams: the generator of seed `k` is the one reached after `k` × 2^127 draws from the state whose six values are 12345, so different seeds give sequences that do not overlap for 2^127 draws. `random-jump` moves that state by `k` times the jump of 2^127 draws, a matrix for each recurrence, given below with its entries computed beforehand: it squares the matrix once for each binary digit of `k`, and applies it to the state where the digit is 1. The products of numbers below 2^32 would overflow, so `random-multiply` splits the second factor in two halves of 16 bits.
+
+```lisp
+(define random-generator
+  (lambda (seed)
+    (if (not (integer? seed))
+        (raise {:kind :wrong-type :message "random-generator: expected an Integer" :values (list seed)})
+        (< seed 0)
+        (raise {:kind :domain-error :message "random-generator: the seed must not be negative" :values (list seed)})
+        otherwise
+        (let (((a b c) (random-jump '(2427906178 3580155704 949770784
+                                      226153695 1230515664 3580155704
+                                      1988835001 986791581 1230515664)
+                                    seed 4294967087 '(12345 12345 12345)))
+              ((d e f) (random-jump '(1464411153 277697599 1610723613
+                                      32183930 1464411153 1022607788
+                                      2824425944 32183930 2093834863)
+                                    seed 4294944443 '(12345 12345 12345))))
+          (list :random-generator a b c d e f)))))
+
+(define random-jump
+  (lambda (matrix times modulus state)
+    (if (= times 0) state
+        otherwise (random-jump (random-matrix-product matrix matrix modulus)
+                               (quotient times 2)
+                               modulus
+                               (if (= (remainder times 2) 1) (random-matrix-apply matrix state modulus)
+                                   otherwise state)))))
+
+(define random-matrix-apply
+  (lambda (matrix state modulus)
+    (let (((a b c d e f g h i) matrix)
+          ((x y z) state))
+      (list (random-dot a b c x y z modulus)
+            (random-dot d e f x y z modulus)
+            (random-dot g h i x y z modulus)))))
+
+(define random-matrix-product
+  (lambda (left right modulus)
+    (let (((a b c d e f g h i) left)
+          ((j k l m n o p q r) right))
+      (list (random-dot a b c j m p modulus) (random-dot a b c k n q modulus) (random-dot a b c l o r modulus)
+            (random-dot d e f j m p modulus) (random-dot d e f k n q modulus) (random-dot d e f l o r modulus)
+            (random-dot g h i j m p modulus) (random-dot g h i k n q modulus) (random-dot g h i l o r modulus)))))
+
+(define random-dot
+  (lambda (a b c x y z modulus)
+    (remainder (+ (random-multiply a x modulus) (random-multiply b y modulus) (random-multiply c z modulus))
+               modulus)))
+
+(define random-multiply
+  (lambda (a b modulus)
+    (remainder (+ (* (remainder (* a (quotient b 65536)) modulus) 65536)
+                  (* a (remainder b 65536)))
+               modulus)))
+```
+
+`random-next` is one step of MRG32k3a: it returns a List of an Integer from 1 to m1 and the next generator, as L'Ecuyer's code computes them. Every draw goes through it, so it is also where a value that is not a generator is found, and produces `:wrong-type`; `shuffle` of a list of fewer than two elements draws nothing, and returns the generator it was given.
+
+```lisp
+(define random-next
+  (lambda (generator)
+    (match generator
+      (:random-generator a b c d e f)
+      (let ((first-value (random-modulo (- (* 1403580 b) (* 810728 a)) 4294967087))
+            (second-value (random-modulo (- (* 527612 f) (* 1370589 d)) 4294944443)))
+        (list (if (> first-value second-value) (- first-value second-value)
+                  otherwise (+ (- first-value second-value) 4294967087))
+              (list :random-generator b c first-value e f second-value)))
+      otherwise (raise {:kind :wrong-type :message "random: expected a generator" :values (list generator)}))))
+
+(define random-modulo
+  (lambda (number modulus)
+    (let ((leftover (remainder number modulus)))
+      (if (< leftover 0) (+ leftover modulus) otherwise leftover))))
+```
+
+`random-float` divides the step by m1 + 1, as L'Ecuyer's code does, so the Float is greater than 0 and less than 1.
+
+```lisp
+(define random-float
+  (lambda (generator)
+    (let (((value next) (random-next generator)))
+      (list (/ (integer-to-float value) 4294967088.0) next))))
+```
+
+`random-integer` draws from `low` up to before `high`, as `range` counts, with no bias: every Integer of the range is equally likely. `random-below` draws from 0 up to before `size`. A step less one is a digit from 0 to m1 − 1; for a size up to m1, it is used when it falls below the largest multiple of the size, and its remainder by the size is the number, and otherwise it is thrown away and drawn again. A larger size takes two digits, a high one drawn from 0 to the quotient of the size by m1 and a low one; the pair is kept when it writes a number below the size, which happens at least half of the time.
+
+```lisp
+(define random-integer
+  (lambda (generator low high)
+    (if (not (and (integer? low) (integer? high)))
+        (raise {:kind :wrong-type :message "random-integer: expected Integers" :values (list low high)})
+        (>= low high)
+        (raise {:kind :domain-error :message "random-integer: the range is empty" :values (list low high)})
+        otherwise
+        (let (((offset next) (random-below generator (- high low))))
+          (list (+ low offset) next)))))
+
+(define random-below
+  (lambda (generator size)
+    (if (> size 4294967087)
+        (random-below-wide generator (quotient size 4294967087) (remainder size 4294967087))
+        otherwise (random-below-narrow generator size (- 4294967087 (remainder 4294967087 size))))))
+
+(define random-below-narrow
+  (lambda (generator size limit)
+    (let (((value next) (random-next generator)))
+      (if (<= value limit) (list (remainder (- value 1) size) next)
+          otherwise (random-below-narrow next size limit)))))
+
+(define random-below-wide
+  (lambda (generator high-limit low-limit)
+    (let (((high middle) (random-below generator (+ high-limit 1)))
+          ((value next) (random-next middle)))
+      (if (or (< high high-limit) (< (- value 1) low-limit))
+          (list (+ (* high 4294967087) (- value 1)) next)
+          otherwise (random-below-wide next high-limit low-limit)))))
+```
+
+`shuffle` is the algorithm of Fisher and Yates, from the last position down: at each position `i`, it draws a position from 0 to `i` and exchanges the two elements, so each of the orders of the list is equally likely. The list becomes a Map from positions to elements, where an exchange takes two `associate`s, and back into a List at the end.
+
+```lisp
+(define shuffle
+  (lambda (generator xs)
+    (let ((size (count xs)))
+      (random-shuffle-step generator (random-positions xs 0 {}) (- size 1) size))))
+
+(define random-positions
+  (lambda (xs index positions)
+    (if (empty? xs) positions
+        otherwise (random-positions (rest xs) (+ index 1) (associate positions index (first xs))))))
+
+(define random-shuffle-step
+  (lambda (generator positions index size)
+    (if (< index 1) (list (random-gather positions (- size 1) ()) generator)
+        otherwise
+        (let (((other next) (random-below generator (+ index 1))))
+          (random-shuffle-step next
+                               (associate (associate positions index (get positions other))
+                                          other (get positions index))
+                               (- index 1)
+                               size)))))
+
+(define random-gather
+  (lambda (positions index gathered)
+    (if (< index 0) gathered
+        otherwise (random-gather positions (- index 1) (prepend (get positions index) gathered)))))
+```
+
 ## 5. Conformance
 
-The file `stdlib-conformance.json` has 131 cases, in the same format as the core `eval` cases, with one difference: the libraries `list`, `text`, `function`, `map`, `set`, `number` and `result` are available to `import`. Each program imports what it uses. An implementation that provides the library MUST pass all of them, in addition to the core cases.
+The file `stdlib-conformance.json` has 165 cases, in the same format as the core `eval` cases, with one difference: the libraries `list`, `text`, `function`, `map`, `set`, `number`, `result` and `random` are available to `import`. Each program imports what it uses. An implementation that provides the library MUST pass all of them, in addition to the core cases.
 
-The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that imports a library, a traversal of one hundred thousand elements, which only passes if the functions run in constant memory, every function of `map` with its errors, a map of one hundred thousand keys built with `from-entries` and reduced with `filter-entries`, every function of `set`, sets of one hundred thousand elements, the order of `precedes?` and its stable use in `sort`, `uppercase`, `lowercase`, `letter?` and `digit?` at the edges of the ASCII and Latin-1 ranges, `pad-left` and `pad-right` with texts wider than the width, accented fills and fills of the wrong length, `format` with values of every type, braces outside `{}` and too few or too many values, `join` of a single part that is returned as it is, and `join` of two hundred thousand parts and `format` of ten thousand values, which only pass in reasonable time if they grow linearly, `max` and `min` with Integers, with Floats, with their errors and over one hundred thousand arguments, `abs`, `floor`, `ceiling` and `round` at negative numbers, `-0.0`, halfway values, Floats above 2^52 and the edges of the range of Integer, `characters` of accented letters, of characters outside the BMP and of the empty text, and its use with `match`, `digits-to-integer` and `integer-to-digits` in bases 2, 8, 10, 16 and 36, with uppercase digits, signs, texts that are not numbers, the smallest and largest Integer, overflow, every base error and a round trip in every base, `span` with a test that always or never holds and a test it stops calling, and with a `let` pattern, `zip` of lists of different lengths and as the input of `from-entries`, both over one hundred thousand elements, `ok`, `failure` with no detail and with several, `ok?` and `failure?` over values of every shape, `then` going on, stopping and rejecting what is not a result, as the step of a `chain` with patterns, `map-results` stopping at the first failure without calling `f` again, and over one hundred thousand elements, and `import` itself: names unbound without it, prefixes, the dependencies of `text`, `function`, `map`, `set`, `number` and `result` on `list`, and repeated imports.
+The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that imports a library, a traversal of one hundred thousand elements, which only passes if the functions run in constant memory, every function of `map` with its errors, a map of one hundred thousand keys built with `from-entries` and reduced with `filter-entries`, every function of `set`, sets of one hundred thousand elements, the order of `precedes?` and its stable use in `sort`, `uppercase`, `lowercase`, `letter?` and `digit?` at the edges of the ASCII and Latin-1 ranges, `pad-left` and `pad-right` with texts wider than the width, accented fills and fills of the wrong length, `format` with values of every type, braces outside `{}` and too few or too many values, `join` of a single part that is returned as it is, and `join` of two hundred thousand parts and `format` of ten thousand values, which only pass in reasonable time if they grow linearly, `max` and `min` with Integers, with Floats, with their errors and over one hundred thousand arguments, `abs`, `floor`, `ceiling` and `round` at negative numbers, `-0.0`, halfway values, Floats above 2^52 and the edges of the range of Integer, `characters` of accented letters, of characters outside the BMP and of the empty text, and its use with `match`, `digits-to-integer` and `integer-to-digits` in bases 2, 8, 10, 16 and 36, with uppercase digits, signs, texts that are not numbers, the smallest and largest Integer, overflow, every base error and a round trip in every base, `span` with a test that always or never holds and a test it stops calling, and with a `let` pattern, `zip` of lists of different lengths and as the input of `from-entries`, both over one hundred thousand elements, `ok`, `failure` with no detail and with several, `ok?` and `failure?` over values of every shape, `then` going on, stopping and rejecting what is not a result, as the step of a `chain` with patterns, `map-results` stopping at the first failure without calling `f` again, and over one hundred thousand elements, `random-generator` for the first seeds, the largest one and one from `random-seed!`, the exact draws of `random-float` and of `random-integer` over small, negative, one-element, wide and edge ranges, sixty thousand throws of a die, `shuffle` of short lists, of lists too short to draw from and of twenty thousand elements, and every error of `random`, and `import` itself: names unbound without it, prefixes, the dependencies of `text`, `function`, `map`, `set`, `number` and `result` on `list`, and repeated imports.

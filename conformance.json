@@ -1,10 +1,10 @@
 {
-  "spec": "Core Specification — Novelo, version 0.16.0",
+  "spec": "Core Specification — Novelo, version 0.17.0",
   "format": {
     "read": "Read 'input' (UTF-8). With 'equivalent': also read that text and compare the two datum sequences with equal?. With 'types': the sequence read has exactly these types, in order.",
     "read-error": "Read 'input' (or the bytes of 'input_hex'). Reading MUST fail with the code 'error' at position [line, column].",
     "read-positions": "Read 'input'. For each entry, 'path' indexes the sequence read and then list elements (0-based); the node found MUST be in the position table with 'position'.",
-    "eval": "Evaluate 'program' as a file (section 8.7), with only the library io available to import (section 8.9), with 'input' (or the bytes of 'input_hex') as standard input (empty if absent). Standard output MUST be exactly 'output'. With 'value': the program terminates normally, and the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'. With 'error_position': the descriptor of that error has a :position whose :line and :column are the pair [line, column]; when it is null, the descriptor has no :position. With 'arguments': a list of strings, the program's arguments (section 8.7); without it, there are none. Standard error MUST be exactly 'error_output', or empty when absent; it holds only what the program wrote there, not the message of an uncaught error. With 'exit_code': the program terminates by calling exit! with that code, instead of ending with 'value' or 'error'. With 'files_after': an object from relative paths to texts; once the program has ended, the files other than main.nvl are exactly these, holding exactly these texts."
+    "eval": "Evaluate 'program' as a file (section 8.7), with only the library io available to import (section 8.9), with 'input' (or the bytes of 'input_hex') as standard input (empty if absent). Standard output MUST be exactly 'output'. With 'value': the program terminates normally, and the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'. With 'error_position': the descriptor of that error has a :position whose :line and :column are the pair [line, column]; when it is null, the descriptor has no :position. With 'arguments': a list of strings, the program's arguments (section 8.7); without it, there are none. Standard error MUST be exactly 'error_output', or empty when absent; it holds only what the program wrote there, not the message of an uncaught error. With 'exit_code': the program terminates by calling exit! with that code, instead of ending with 'value' or 'error'. With 'files_after': an object from relative paths to texts; once the program has ended, the files other than main.nvl are exactly these, holding exactly these texts. With 'environment': an object from names to values, the variables set (section 9); without it, none. With 'current_time': the Integer every call to current-time! returns; 0 without it. With 'monotonic_times' and 'entropy': lists of Integers that the calls to monotonic-time! and to random-seed! return in turn, repeating the last once they run out; 0 without them."
   },
   "cases": [
     {
@@ -5295,6 +5295,306 @@
       "program": "(import io)\n(write-file! \"main.nvl\" \"changed\")\n(read-file! \"main.nvl\")",
       "value": "(:ok \"changed\")",
       "files_after": {},
+      "output": ""
+    },
+    {
+      "id": "system-001",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(environment-variable! \"GREETING\")",
+      "environment": {
+        "GREETING": "olá"
+      },
+      "value": "\"olá\"",
+      "output": ""
+    },
+    {
+      "id": "system-002",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(environment-variable! \"MISSING\")",
+      "environment": {
+        "GREETING": "olá"
+      },
+      "value": "#void",
+      "output": ""
+    },
+    {
+      "id": "system-003",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(environment-variable! \"EMPTY\")",
+      "environment": {
+        "EMPTY": ""
+      },
+      "value": "\"\"",
+      "output": ""
+    },
+    {
+      "id": "system-004",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(list (environment-variable! \"PATH\") (environment-variable! \"Path\"))",
+      "environment": {
+        "Path": "/bin"
+      },
+      "value": "(#void \"/bin\")",
+      "output": ""
+    },
+    {
+      "id": "system-005",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(environment-variable! \"\")",
+      "environment": {
+        "": "x"
+      },
+      "value": "#void",
+      "output": ""
+    },
+    {
+      "id": "system-006",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(environment-variable! \"A=B\")",
+      "environment": {
+        "A=B": "x",
+        "A": "y"
+      },
+      "value": "#void",
+      "output": ""
+    },
+    {
+      "id": "system-007",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(environment-variable! \"A\\u{0}B\")",
+      "environment": {
+        "A": "y"
+      },
+      "value": "#void",
+      "output": ""
+    },
+    {
+      "id": "system-008",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(environment-variable! 'HOME)",
+      "environment": {
+        "HOME": "/home"
+      },
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "system-009",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(environment-variable!)",
+      "error": ":wrong-arguments",
+      "output": ""
+    },
+    {
+      "id": "system-010",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(environment-variable! \"A\" \"B\")",
+      "error": ":wrong-arguments",
+      "output": ""
+    },
+    {
+      "id": "system-011",
+      "kind": "eval",
+      "section": "9",
+      "program": "(environment-variable! \"HOME\")",
+      "environment": {
+        "HOME": "/home"
+      },
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "system-012",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(display! (concatenate \"Hello, \" (environment-variable! \"NAME\") \"!\"))",
+      "environment": {
+        "NAME": "Ana"
+      },
+      "value": "#void",
+      "output": "Hello, Ana!"
+    },
+    {
+      "id": "system-013",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(current-time!)",
+      "current_time": 1794700000000,
+      "value": "1794700000000",
+      "output": ""
+    },
+    {
+      "id": "system-014",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(current-time!)",
+      "value": "0",
+      "output": ""
+    },
+    {
+      "id": "system-015",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(list (current-time!) (current-time!))",
+      "current_time": -5,
+      "value": "(-5 -5)",
+      "output": ""
+    },
+    {
+      "id": "system-016",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(current-time! 1)",
+      "error": ":wrong-arguments",
+      "output": ""
+    },
+    {
+      "id": "system-017",
+      "kind": "eval",
+      "section": "9",
+      "program": "(current-time!)",
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "system-018",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(list (monotonic-time!) (monotonic-time!) (monotonic-time!))",
+      "monotonic_times": [
+        100,
+        250,
+        900
+      ],
+      "value": "(100 250 900)",
+      "output": ""
+    },
+    {
+      "id": "system-019",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(list (monotonic-time!) (monotonic-time!) (monotonic-time!))",
+      "monotonic_times": [
+        7
+      ],
+      "value": "(7 7 7)",
+      "output": ""
+    },
+    {
+      "id": "system-020",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(let ((start (monotonic-time!))\n      (finish (monotonic-time!)))\n  (- finish start))",
+      "monotonic_times": [
+        1000,
+        4500
+      ],
+      "value": "3500",
+      "output": ""
+    },
+    {
+      "id": "system-021",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(monotonic-time!)",
+      "value": "0",
+      "output": ""
+    },
+    {
+      "id": "system-022",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(monotonic-time! :now)",
+      "error": ":wrong-arguments",
+      "output": ""
+    },
+    {
+      "id": "system-023",
+      "kind": "eval",
+      "section": "9",
+      "program": "(monotonic-time!)",
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "system-024",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(list (random-seed!) (random-seed!) (random-seed!))",
+      "entropy": [
+        42,
+        9223372036854775807
+      ],
+      "value": "(42 9223372036854775807 9223372036854775807)",
+      "output": ""
+    },
+    {
+      "id": "system-025",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(random-seed!)",
+      "value": "0",
+      "output": ""
+    },
+    {
+      "id": "system-026",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(random-seed! 1)",
+      "error": ":wrong-arguments",
+      "output": ""
+    },
+    {
+      "id": "system-027",
+      "kind": "eval",
+      "section": "9",
+      "program": "(random-seed!)",
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "system-028",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io system)\n(list (system/current-time!) (system/monotonic-time!) (system/random-seed!) (system/environment-variable! \"X\"))",
+      "environment": {
+        "X": "4"
+      },
+      "current_time": 1,
+      "monotonic_times": [
+        2
+      ],
+      "entropy": [
+        3
+      ],
+      "value": "(1 2 3 \"4\")",
+      "output": ""
+    },
+    {
+      "id": "system-029",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(try (environment-variable! 1)\n  {:kind :wrong-type :values (value)} value)",
+      "value": "1",
+      "output": ""
+    },
+    {
+      "id": "system-030",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(define f (lambda () (current-time!)))\n(list (f) (current-time!) (f))",
+      "current_time": 60000,
+      "value": "(60000 60000 60000)",
       "output": ""
     },
     {

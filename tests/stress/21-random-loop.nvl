@@ -1,0 +1,24 @@
+; random-integer, random-float and the functions on the system at every step
+; of a loop that threads the generator through: each step leaves only the
+; next generator behind, so nothing may pile up.
+; scale: 30000
+; memory: constant
+(import io)
+(import random)
+(define size (string-to-number (read-line!)))
+
+(define loop
+  (lambda (generator n total previous)
+    (if (= n 0) total
+        otherwise
+        (let (((die next) (random-integer generator 1 7))
+              ((fraction after) (random-float next))
+              (now (monotonic-time!)))
+          (if (or (< die 1) (> die 6) (<= fraction 0.0) (>= fraction 1.0) (< now previous) (< (random-seed!) 0)
+                  (void? (environment-variable! "PATH")) (< (current-time!) 0))
+              (error "out of range" die fraction now)
+              otherwise (loop after (- n 1) (+ total die) now))))))
+
+(define total (loop (random-generator 7) size 0 (monotonic-time!)))
+(if (and (>= total size) (<= total (* 6 size))) (display! "ok\n")
+    otherwise (error "wrong total" total))

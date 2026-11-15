@@ -1,7 +1,7 @@
 {
-  "spec": "Standard Library — Novelo, version 0.10.0",
+  "spec": "Standard Library — Novelo, version 0.11.0",
   "format": {
-    "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text, function, map, set and number available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
+    "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text, function, map, set, number, result and random available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
   },
   "cases": [
     {
@@ -1053,6 +1053,282 @@
       "section": "4.7",
       "program": "(import result r)\n(list (r/ok 1) (r/reverse (list 1 2)) (r/then (r/ok 3) r/ok))",
       "value": "((:ok 1) (2 1) (:ok 3))",
+      "output": ""
+    },
+    {
+      "id": "library-132",
+      "kind": "eval",
+      "section": "4.8",
+      "program": "(import random)\n(random-generator 0)",
+      "value": "(:random-generator 12345 12345 12345 12345 12345 12345)",
+      "output": ""
+    },
+    {
+      "id": "library-133",
+      "kind": "eval",
+      "section": "4.8",
+      "program": "(import random)\n(list (random-generator 1) (random-generator 2))",
+      "value": "((:random-generator 3692455944 1366884236 2968912127 335948734 4161675175 475798818) (:random-generator 1015873554 1310354410 2249465273 994084013 2912484720 3876682925))",
+      "output": ""
+    },
+    {
+      "id": "library-134",
+      "kind": "eval",
+      "section": "4.8",
+      "program": "(import random)\n(random-generator 9223372036854775807)",
+      "value": "(:random-generator 621359115 2582221557 4290142916 4044550559 3783558044 3817393288)",
+      "output": ""
+    },
+    {
+      "id": "library-135",
+      "kind": "eval",
+      "section": "4.8",
+      "program": "(import random)\n(random-float (random-generator 0))",
+      "value": "(0.12701112204657714 (:random-generator 12345 12345 3023790853 12345 12345 2478282264))",
+      "output": ""
+    },
+    {
+      "id": "library-136",
+      "kind": "eval",
+      "section": "4.8",
+      "program": "(import random)\n(define draws\n  (lambda (generator n drawn)\n    (if (= n 0) drawn\n        otherwise (let (((x next) (random-float generator)))\n                    (draws next (- n 1) (prepend x drawn))))))\n(draws (random-generator 0) 8 ())",
+      "value": "(0.3555598794381262 0.48077420331561804 0.5333953879182788 0.22162991578202287 0.8258468629271135 0.3091860155832701 0.3185275653967945 0.12701112204657714)",
+      "output": ""
+    },
+    {
+      "id": "library-137",
+      "kind": "eval",
+      "section": "4.8",
+      "program": "(import random)\n(define draws\n  (lambda (generator low high n drawn)\n    (if (= n 0) drawn\n        otherwise (let (((x next) (random-integer generator low high)))\n                    (draws next low high (- n 1) (prepend x drawn))))))\n(draws (random-generator 42) 1 7 20 ())",
+      "value": "(1 3 3 5 4 6 6 5 1 1 5 6 1 5 6 1 5 1 2 4)",
+      "output": ""
+    },
+    {
+      "id": "library-138",
+      "kind": "eval",
+      "section": "4.8",
+      "program": "(import random)\n(define draws\n  (lambda (generator low high n drawn)\n    (if (= n 0) drawn\n        otherwise (let (((x next) (random-integer generator low high)))\n                    (draws next low high (- n 1) (prepend x drawn))))))\n(draws (random-generator 7) -3 3 12 ())",
+      "value": "(-3 -3 -2 -1 0 -3 0 -1 -2 -2 0 -2)",
+      "output": ""
+    },
+    {
+      "id": "library-139",
+      "kind": "eval",
+      "section": "4.8",
+      "program": "(import random)\n(define draws\n  (lambda (generator low high n drawn)\n    (if (= n 0) drawn\n        otherwise (let (((x next) (random-integer generator low high)))\n                    (draws next low high (- n 1) (prepend x drawn))))))\n(draws (random-generator 7) 5 6 3 ())",
+      "value": "(5 5 5)",
+      "output": ""
+    },
+    {
+      "id": "library-140",
+      "kind": "eval",
+      "section": "4.8",
+      "program": "(import random)\n(define draws\n  (lambda (generator low high n drawn)\n    (if (= n 0) drawn\n        otherwise (let (((x next) (random-integer generator low high)))\n                    (draws next low high (- n 1) (prepend x drawn))))))\n(draws (random-generator 1) 0 3000000000 10 ())",
+      "value": "(1138808755 1774179211 2002574753 889416970 1075125030 806649903 2606446935 427046611 1199453741 2942635746)",
+      "output": ""
+    },
+    {
+      "id": "library-141",
+      "kind": "eval",
+      "section": "4.8",
+      "program": "(import random)\n(define draws\n  (lambda (generator low high n drawn)\n    (if (= n 0) drawn\n        otherwise (let (((x next) (random-integer generator low high)))\n                    (draws next low high (- n 1) (prepend x drawn))))))\n(list (draws (random-generator 11) 0 4294967087 3 ()) (draws (random-generator 11) 0 4294967088 3 ()))",
+      "value": "((2703436358 25707064 1737516771) (2626142184 2670213021 2089337546))",
+      "output": ""
+    },
+    {
+      "id": "library-142",
+      "kind": "eval",
+      "section": "4.8",
+      "program": "(import random)\n(define draws\n  (lambda (generator low high n drawn)\n    (if (= n 0) drawn\n        otherwise (let (((x next) (random-integer generator low high)))\n                    (draws next low high (- n 1) (prepend x drawn))))))\n(draws (random-generator 3) 0 9223372036854775807 4 ())",
+      "value": "(297576792205235563 1406522814413830944 4361333579123060197 1765401582070455209)",
+      "output": ""
+    },
+    {
+      "id": "library-143",
+      "kind": "eval",
+      "section": "4.8",
+      "program": "(import random)\n(define draws\n  (lambda (generator low high n drawn)\n    (if (= n 0) drawn\n        otherwise (let (((x next) (random-integer generator low high)))\n                    (draws next low high (- n 1) (prepend x drawn))))))\n(draws (random-generator 3) -9223372036854775808 -1 4 ())",
+      "value": "(-8925795244649540245 -7816849222440944864 -4862038457731715611 -7457970454784320599)",
+      "output": ""
+    },
+    {
+      "id": "library-144",
+      "kind": "eval",
+      "section": "4.8",
+      "program": "(import random)\n(shuffle (random-generator 5) '(1 2 3 4 5 6 7 8 9 10))",
+      "value": "((7 5 4 1 8 2 6 9 10 3) (:random-generator 1570981982 2733253318 4285920563 3776037596 695291088 4264279698))",
+      "output": ""
+    },
+    {
+      "id": "library-145",
+      "kind": "eval",
+      "section": "4.8",
+      "program": "(import random)\n(list (shuffle (random-generator 5) ()) (shuffle 5 '(:a)))",
+      "value": "((() (:random-generator 97147054 3131372450 829345164 3691032523 3006063034 4259826321)) ((:a) 5))",
+      "output": ""
+    },
+    {
+      "id": "library-146",
+      "kind": "eval",
+      "section": "4.8",
+      "program": "(import random)\n(first (shuffle (random-generator 8) (list \"a\" \"b\" \"c\")))",
+      "value": "(\"b\" \"a\" \"c\")",
+      "output": ""
+    },
+    {
+      "id": "library-147",
+      "kind": "eval",
+      "section": "4.8",
+      "program": "(import list)\n(import random)\n(let (((shuffled _) (shuffle (random-generator 99) (range 0 20000))))\n  (list (equal? (sort < shuffled) (range 0 20000)) (equal? shuffled (range 0 20000))))",
+      "value": "(#true #false)",
+      "output": ""
+    },
+    {
+      "id": "library-148",
+      "kind": "eval",
+      "section": "4.8",
+      "program": "(import random)\n(define roll\n  (lambda (generator n counts)\n    (if (= n 0) counts\n        otherwise (let (((face next) (random-integer generator 0 6)))\n                    (roll next (- n 1) (associate counts face (+ 1 (get counts face))))))))\n(let ((counts (roll (random-generator 2024) 60000 {0 0 1 0 2 0 3 0 4 0 5 0})))\n  (list (get counts 0) (get counts 1) (get counts 2) (get counts 3) (get counts 4) (get counts 5)))",
+      "value": "(10130 9934 9971 9987 9900 10078)",
+      "output": ""
+    },
+    {
+      "id": "library-149",
+      "kind": "eval",
+      "section": "4.8",
+      "program": "(import random)\n(equal? (random-float (random-generator 9)) (random-float (random-generator 9)))",
+      "value": "#true",
+      "output": ""
+    },
+    {
+      "id": "library-150",
+      "kind": "eval",
+      "section": "4.8",
+      "program": "(import io)\n(import random)\n(list (random-generator (random-seed!)) (random-generator (random-seed!)))",
+      "entropy": [
+        1,
+        2
+      ],
+      "value": "((:random-generator 3692455944 1366884236 2968912127 335948734 4161675175 475798818) (:random-generator 1015873554 1310354410 2249465273 994084013 2912484720 3876682925))",
+      "output": ""
+    },
+    {
+      "id": "library-151",
+      "kind": "eval",
+      "section": "4.8",
+      "program": "(import random r)\n(first (r/random-integer (r/random-generator 0) 0 10))",
+      "value": "8",
+      "output": ""
+    },
+    {
+      "id": "library-152",
+      "kind": "eval",
+      "section": "4.8",
+      "program": "(import random)\n(let (((die _) (random-integer (random-generator 42) 1 7)))\n  (+ die 0))",
+      "value": "4",
+      "output": ""
+    },
+    {
+      "id": "library-153",
+      "kind": "eval",
+      "section": "3",
+      "program": "(import random)\n(random-integer (random-generator 0) 5 5)",
+      "error": ":domain-error",
+      "output": ""
+    },
+    {
+      "id": "library-154",
+      "kind": "eval",
+      "section": "3",
+      "program": "(import random)\n(random-integer (random-generator 0) 6 5)",
+      "error": ":domain-error",
+      "output": ""
+    },
+    {
+      "id": "library-155",
+      "kind": "eval",
+      "section": "3",
+      "program": "(import random)\n(random-integer (random-generator 0) \"1\" 5)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-156",
+      "kind": "eval",
+      "section": "3",
+      "program": "(import random)\n(random-integer (random-generator 0) 1 5.0)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-157",
+      "kind": "eval",
+      "section": "3",
+      "program": "(import random)\n(random-integer (random-generator 0) -2 9223372036854775807)",
+      "error": ":integer-overflow",
+      "output": ""
+    },
+    {
+      "id": "library-158",
+      "kind": "eval",
+      "section": "3",
+      "program": "(import random)\n(random-float '(1 2))",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-159",
+      "kind": "eval",
+      "section": "3",
+      "program": "(import random)\n(random-integer 5 0 10)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-160",
+      "kind": "eval",
+      "section": "3",
+      "program": "(import random)\n(shuffle :generator '(1 2 3))",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-161",
+      "kind": "eval",
+      "section": "3",
+      "program": "(import random)\n(random-generator \"1\")",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-162",
+      "kind": "eval",
+      "section": "3",
+      "program": "(import random)\n(random-generator 1.5)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-163",
+      "kind": "eval",
+      "section": "3",
+      "program": "(import random)\n(random-generator -1)",
+      "error": ":domain-error",
+      "output": ""
+    },
+    {
+      "id": "library-164",
+      "kind": "eval",
+      "section": "3",
+      "program": "(import random)\n(try (random-generator -1)\n  {:kind :domain-error :values (seed)} seed)",
+      "value": "-1",
+      "output": ""
+    },
+    {
+      "id": "library-165",
+      "kind": "eval",
+      "section": "4.8",
+      "program": "(random-generator 0)",
+      "error": ":unbound-symbol",
       "output": ""
     }
   ]

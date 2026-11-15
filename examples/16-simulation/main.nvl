@@ -1,0 +1,114 @@
+; Rolling two dice, many times.
+;
+; Throws two dice as many times as asked and prints how often each sum came
+; up, next to how often it should come up: 7 in one throw of six, 2 and 12
+; in one of thirty-six. The options on the command line choose the throws
+; and the seed:
+;
+;   -n THROWS   how many throws, 3600 when not given
+;   -s SEED     the seed of the generator, from 0 up
+;
+; Without -s the seed comes from the system, and every run differs. The
+; report starts with the seed it used, so any run, even a surprising one,
+; can be run again exactly with -s. How long the throws took goes to
+; standard error, which is not part of the report.
+;
+;   build/novelo examples/16-simulation/main.nvl -s 2026 -n 3600
+;
+; New here: the generator of the library `random` (stdlib 0.11.0), a value
+; that each draw returns renewed, so the throws are pure work: the same
+; seed always gives the same report. The effects stay at the edge: the
+; seed of the system, `random-seed!`, and the clock that measures the run,
+; `monotonic-time!` (core 0.17.0).
+;
+; Friction: a draw returns a List of the number and the next generator,
+; so every loop takes the List apart and passes the generator on by hand;
+; the shape repeats in `throws` and would in any simulation.
+
+(import io)
+(import list)      ; fold, map, range
+(import text t)    ; t/format, t/join, t/pad-left
+(import number)    ; abs, max, digits-to-integer
+(import result)    ; ok, failure, then
+(import random)    ; random-generator, random-integer
+
+(define usage "usage: main.nvl [-n THROWS] [-s SEED]\n")
+
+; ---- options ------------------------------------------------------------------
+
+(define option-names {"-n" :throws "-s" :seed})
+
+; A number from 0 up, or a failure that names the option.
+(define read-count
+  (lambda (option text)
+    (let ((number (digits-to-integer text 10)))
+      (if (and (integer? number) (>= number 0)) (ok number)
+          otherwise (failure (t/format "{} expects a number from 0 up, not \"{}\"" option text))))))
+
+; The options, as a map from :throws and :seed to their numbers; each
+; option takes the word after it.
+(define read-options
+  (lambda (arguments options)
+    (match arguments
+      () (ok options)
+      (option &rest more)
+      (if (not (contains? option-names option)) (failure (t/format "unknown option {}" option))
+          (empty? more) (failure (t/format "{} needs a value" option))
+          otherwise (chain then ((number (read-count option (first more))))
+                      (read-options (rest more) (associate options (get option-names option) number)))))))
+
+; ---- the throws -----------------------------------------------------------------
+
+; Throws two dice `left` times, counting each sum in `tally`; returns the
+; tally. The generator goes from draw to draw.
+(define throws
+  (lambda (generator left tally)
+    (if (= left 0) tally
+        otherwise
+        (let (((first-die after-first) (random-integer generator 1 7))
+              ((second-die next) (random-integer after-first 1 7))
+              (sum (+ first-die second-die)))
+          (throws next (- left 1) (associate tally sum (+ 1 (get tally sum 0))))))))
+
+; The ways two dice make each sum: 1 for 2, up to 6 for 7, down to 1 for 12.
+(define ways (lambda (sum) (- 6 (abs (- sum 7)))))
+
+(define percent
+  (lambda (part whole)
+    (concatenate (float-to-fixed (/ (* 100.0 (integer-to-float part)) (integer-to-float whole)) 1) "%")))
+
+; Two spaces and `width` marks, or nothing when there are none.
+(define bar
+  (lambda (width)
+    (if (= width 0) "" otherwise (concatenate "  " (t/pad-left width "#" "")))))
+
+(define report
+  (lambda (seed count tally)
+    (let ((most (fold (lambda (largest sum) (max largest (get tally sum 0))) 0 (range 2 13))))
+      (concatenate
+        (t/format "seed {}, {} throws of two dice\n\nsum  throws   share  expected\n" seed count)
+        (t/join "" (map (lambda (sum)
+                          (let ((seen (get tally sum 0)))
+                            (t/format "{}  {}  {}  {}{}\n"
+                                      (t/pad-left 3 " " (to-string sum))
+                                      (t/pad-left 6 " " (to-string seen))
+                                      (t/pad-left 6 " " (if (= count 0) "-" otherwise (percent seen count)))
+                                      (t/pad-left 8 " " (percent (ways sum) 36))
+                                      (bar (if (= most 0) 0 otherwise (quotient (* 40 seen) most))))))
+                        (range 2 13)))))))
+
+; ---- the edge -------------------------------------------------------------------
+
+; The options are pure. The seed of the system is read only when -s is not
+; given, and the clock only around the throws.
+(match (read-options (program-arguments!) {:throws 3600})
+  (:ok options)
+  (let ((seed (if (contains? options :seed) (get options :seed) otherwise (random-seed!)))
+        (count (get options :throws))
+        (start (monotonic-time!))
+        (tally (throws (random-generator seed) count {}))
+        (elapsed (- (monotonic-time!) start)))
+    (display! (report seed count tally))
+    (display-to-error! (t/format "{} throws in {} ms\n" count (quotient elapsed 1000000))))
+  (:error message) (sequence (display-to-error! (t/format "main.nvl: {}\n{}" message usage))
+                             (exit! 2)))

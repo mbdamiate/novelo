@@ -275,6 +275,33 @@ static void run_eval_on_thread(void *argument) {
     const char **arguments = calloc(argument_count + 1, sizeof(char *));
     for (size_t index = 0; index < argument_count; index++) arguments[index] = argument_list->items[index].string;
 
+    /* §9 — the system: `environment`, `current_time`, `monotonic_times` and
+     * `entropy`, each fixed, with nothing set and 0 when absent. */
+    const Json *environment = json_member(test_case, "environment");
+    size_t variable_count = environment ? environment->count : 0;
+    LispVariable *variables = calloc(variable_count + 1, sizeof(LispVariable));
+    for (size_t index = 0; index < variable_count; index++) {
+        variables[index] = (LispVariable){environment->keys[index], environment->items[index].string};
+    }
+    const Json *current_time = json_member(test_case, "current_time");
+    const Json *monotonic_list = json_member(test_case, "monotonic_times");
+    const Json *entropy_list = json_member(test_case, "entropy");
+    size_t monotonic_count = monotonic_list ? monotonic_list->count : 0;
+    size_t seed_count = entropy_list ? entropy_list->count : 0;
+    int64_t *monotonic_times = calloc(monotonic_count + 1, sizeof(int64_t));
+    int64_t *seeds = calloc(seed_count + 1, sizeof(int64_t));
+    for (size_t index = 0; index < monotonic_count; index++) monotonic_times[index] = monotonic_list->items[index].integer;
+    for (size_t index = 0; index < seed_count; index++) seeds[index] = entropy_list->items[index].integer;
+    LispFixedSystem system = {
+        .variables = variables,
+        .variable_count = variable_count,
+        .current_time = current_time ? current_time->integer : 0,
+        .monotonic_times = monotonic_times,
+        .monotonic_count = monotonic_count,
+        .seeds = seeds,
+        .seed_count = seed_count,
+    };
+
     LispBuffer output;
     lisp_buffer_init(&output);
     LispBuffer error_output;
@@ -287,6 +314,7 @@ static void run_eval_on_thread(void *argument) {
         .arguments = arguments,
         .argument_count = argument_count,
         .files = lisp_file_system_from_memory(&file_system),
+        .system = lisp_system_fixed(&system),
         .working_directory = "/",
         .stack_limit = lisp_large_stack_limit(),
     };
@@ -384,6 +412,9 @@ static void run_eval_on_thread(void *argument) {
     lisp_buffer_free(&output);
     lisp_buffer_free(&error_output);
     free(arguments);
+    free(variables);
+    free(monotonic_times);
+    free(seeds);
     lisp_buffer_free(&input);
     lisp_memory_store_free(&file_system);
 }

@@ -6,6 +6,7 @@
 #include "buffer.h"
 
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 
 typedef struct LispOutput {
@@ -103,3 +104,49 @@ void lisp_memory_store_free(LispMemoryStore *store);
 
 /* A file system over the store, which must outlive it. */
 LispFileSystem lisp_file_system_from_memory(LispMemoryStore *store);
+
+/* core §9 — the rest of the operating system a program sees: its environment,
+ * its clocks and its entropy. Each function but environment_variable returns
+ * false on a failure of the system, which the library io turns into
+ * :io-error. */
+typedef struct LispSystem {
+    /* The value of the variable `name`, valid until the next call, or
+     * nullptr when it is not set. The library only asks for names that are
+     * not empty and hold no '='. */
+    const char *(*environment_variable)(void *context, const char *name);
+    /* Milliseconds since 1970-01-01T00:00:00 UTC. */
+    bool (*current_time)(void *context, int64_t *milliseconds);
+    /* Nanoseconds since a point fixed while the program runs, never
+     * decreasing. */
+    bool (*monotonic_time)(void *context, int64_t *nanoseconds);
+    /* A number from 0 to 2^63 - 1 drawn from the entropy of the system. */
+    bool (*random_seed)(void *context, int64_t *seed);
+    void *context;
+} LispSystem;
+
+/* The operating system: getenv, clock_gettime and getentropy. */
+LispSystem lisp_system_real(void);
+
+/* A variable given to a fixed system. */
+typedef struct LispVariable {
+    const char *name;
+    const char *value;
+} LispVariable;
+
+/* A system that answers with fixed values, for tests: the variables given,
+ * the same current time at every call, and the monotonic times and seeds in
+ * turn, the last one repeated once they run out (0 when there are none).
+ * The arrays must outlive it. */
+typedef struct LispFixedSystem {
+    const LispVariable *variables;
+    size_t variable_count;
+    int64_t current_time;
+    const int64_t *monotonic_times;
+    size_t monotonic_count;
+    size_t monotonic_next;
+    const int64_t *seeds;
+    size_t seed_count;
+    size_t seed_next;
+} LispFixedSystem;
+
+LispSystem lisp_system_fixed(LispFixedSystem *system);

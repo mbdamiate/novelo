@@ -30,6 +30,7 @@ struct LispState {
     LispOutput error_output; /* standard error, for write-to-error! and display-to-error! */
     LispInput input;
     LispFileSystem files;
+    LispSystem system;     /* environment, clocks and entropy (§9) */
     /* §8.7 — the program's arguments, as given; checked as UTF-8 when
      * program-arguments! reads them */
     const char *const *arguments;
@@ -59,6 +60,7 @@ typedef struct LispStateOptions {
     const char *const *arguments;
     size_t argument_count;
     LispFileSystem files;          /* default: the disk */
+    LispSystem system;             /* default: lisp_system_real() */
     const char *working_directory; /* absolute; default: the process's current directory */
     const char *library_path;      /* the standard library document; default: lisp_default_library_path() */
     /* Bytes of C stack the interpreter may use, counted from the frame that

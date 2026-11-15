@@ -1,11 +1,13 @@
-/* Output, input and file system implementations (core §8.8, §9). */
+/* Output, input, file system and system implementations (core §8.8, §9). */
 #include "io.h"
 
 #include <dirent.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/random.h>
 #include <sys/stat.h>
+#include <time.h>
 
 static void write_to_buffer(void *context, const char *bytes, size_t length) {
     lisp_buffer_append((LispBuffer *)context, bytes, length);
@@ -282,5 +284,83 @@ LispFileSystem lisp_file_system_from_memory(LispMemoryStore *store) {
         .list_directory = list_memory_directory,
         .kind = memory_kind,
         .context = store,
+    };
+}
+
+/* ---- the system (core §9) ------------------------------------------------------------------ */
+
+static const char *real_environment_variable(void *, const char *name) { return getenv(name); }
+
+static bool real_current_time(void *, int64_t *milliseconds) {
+    struct timespec now;
+    if (clock_gettime(CLOCK_REALTIME, &now) != 0) return false;
+    *milliseconds = (int64_t)now.tv_sec * 1000 + now.tv_nsec / 1000000;
+    return true;
+}
+
+static bool real_monotonic_time(void *, int64_t *nanoseconds) {
+    struct timespec now;
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) return false;
+    *nanoseconds = (int64_t)now.tv_sec * 1000000000 + now.tv_nsec;
+    return true;
+}
+
+static bool real_random_seed(void *, int64_t *seed) {
+    uint64_t bits;
+    if (getentropy(&bits, sizeof bits) != 0) return false;
+    *seed = (int64_t)(bits >> 1);
+    return true;
+}
+
+LispSystem lisp_system_real(void) {
+    return (LispSystem){
+        .environment_variable = real_environment_variable,
+        .current_time = real_current_time,
+        .monotonic_time = real_monotonic_time,
+        .random_seed = real_random_seed,
+        .context = nullptr,
+    };
+}
+
+static const char *fixed_environment_variable(void *context, const char *name) {
+    LispFixedSystem *system = context;
+    for (size_t index = 0; index < system->variable_count; index++) {
+        if (strcmp(system->variables[index].name, name) == 0) return system->variables[index].value;
+    }
+    return nullptr;
+}
+
+static bool fixed_current_time(void *context, int64_t *milliseconds) {
+    *milliseconds = ((LispFixedSystem *)context)->current_time;
+    return true;
+}
+
+/* The next of `count` values, the last one again once they run out. */
+static int64_t next_fixed(const int64_t *values, size_t count, size_t *next) {
+    if (count == 0) return 0;
+    int64_t value = values[*next];
+    if (*next + 1 < count) (*next)++;
+    return value;
+}
+
+static bool fixed_monotonic_time(void *context, int64_t *nanoseconds) {
+    LispFixedSystem *system = context;
+    *nanoseconds = next_fixed(system->monotonic_times, system->monotonic_count, &system->monotonic_next);
+    return true;
+}
+
+static bool fixed_random_seed(void *context, int64_t *seed) {
+    LispFixedSystem *system = context;
+    *seed = next_fixed(system->seeds, system->seed_count, &system->seed_next);
+    return true;
+}
+
+LispSystem lisp_system_fixed(LispFixedSystem *system) {
+    return (LispSystem){
+        .environment_variable = fixed_environment_variable,
+        .current_time = fixed_current_time,
+        .monotonic_time = fixed_monotonic_time,
+        .random_seed = fixed_random_seed,
+        .context = system,
     };
 }

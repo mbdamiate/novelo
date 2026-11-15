@@ -192,6 +192,45 @@ printf '(import list)\n' > import.nvl
 check "NOVELO_STDLIB names the document" 1 "" "import.nvl:1:1: error :import-error: cannot open the standard library /no/such.md (set NOVELO_STDLIB) list :cannot-open
 " "" env NOVELO_STDLIB=/no/such.md "$interpreter" import.nvl
 
+# ---- the system: the environment, the clocks and entropy --------------------------------
+
+printf '(import io)\n(display! (list (environment-variable! "GREETING") (environment-variable! "NOVELO_SURELY_NOT_SET")))\n' > environment.nvl
+check "a variable of the environment" 0 '("olá" #void)' "" "" env GREETING=olá "$interpreter" environment.nvl
+check "a variable that is not UTF-8" 1 "" "environment.nvl:2:17: error :io-error: environment-variable!: the value of GREETING is not valid UTF-8 at byte 1 :invalid-utf8 \"GREETING\"
+" "" env "GREETING=a$(printf '\377')" "$interpreter" environment.nvl
+
+printf '(import io)\n(display! (quotient (current-time!) 1000))\n' > time.nvl
+before=$(date +%s)
+seconds=$("$interpreter" time.nvl)
+after=$(date +%s)
+if [ "$before" -le "$seconds" ] && [ "$seconds" -le "$after" ]; then
+    passed=$((passed + 1))
+else
+    failed=$((failed + 1))
+    echo "FAIL current-time! is the time of the wall clock: $seconds, expected from $before to $after" >&2
+fi
+
+printf '(import io)\n(let ((start (monotonic-time!))\n      (seed (random-seed!)))\n  (display! (list (<= start (monotonic-time!)) (<= 0 seed) (= seed (random-seed!)))))\n' > system.nvl
+check "the monotonic clock and two seeds" 0 "(#true #true #false)" "" "" "$interpreter" system.nvl
+
+simulation=$repository/examples/16-simulation/main.nvl
+simulation_usage='usage: main.nvl [-n THROWS] [-s SEED]
+'
+check "example 16 with an unknown option" 2 "" "main.nvl: unknown option -x
+$simulation_usage" "" "$interpreter" "$simulation" -x
+check "example 16 with an option missing its value" 2 "" "main.nvl: -s needs a value
+$simulation_usage" "" "$interpreter" "$simulation" -n 10 -s
+"$interpreter" "$simulation" -n 100 > first.txt 2> timing.txt
+code=$?
+seed=$(sed -n '1s/^seed \([0-9]*\), 100 throws of two dice$/\1/p' first.txt)
+if [ "$code" = 0 ] && [ -n "$seed" ] && grep -q '^100 throws in [0-9]* ms$' timing.txt &&
+    "$interpreter" "$simulation" -n 100 -s "$seed" 2> /dev/null | cmp -s - first.txt; then
+    passed=$((passed + 1))
+else
+    failed=$((failed + 1))
+    echo "FAIL example 16 without -s prints a seed that runs again the same" >&2
+fi
+
 # ---- the REPL, with standard input not a terminal ----------------------------------
 
 check "the REPL prints values, without prompts" 0 "3
