@@ -5,9 +5,9 @@
  * the library's definitions in the context of the import followed by the
  * prefix, and it happens at most once per library and resulting context.
  *
- * The libraries list, text, function, map, set, number and result are not copied
- * into C: their source is read from the `lisp` blocks of standard-library.md §4.1–4.7, so the
- * normative definitions are what runs.
+ * The libraries other than io are not copied into C: their source is read
+ * from the `lisp` blocks of standard-library.md §4.1–4.12, so the normative
+ * definitions are what runs.
  */
 #include "library.h"
 
@@ -34,6 +34,7 @@ static const LispLibrary library_random = {.name = "random", .section = "4.8"};
 static const LispLibrary library_json = {.name = "json", .section = "4.9"};
 static const LispLibrary library_csv = {.name = "csv", .section = "4.10"};
 static const LispLibrary library_time = {.name = "time", .section = "4.11"};
+static const LispLibrary library_pattern = {.name = "pattern", .section = "4.12"};
 
 static const LispLibrary *const libraries[] = {
     &lisp_library_io,
@@ -48,12 +49,13 @@ static const LispLibrary *const libraries[] = {
     &library_json,
     &library_csv,
     &library_time,
+    &library_pattern,
 };
 
 constexpr size_t LIBRARY_COUNT = sizeof libraries / sizeof libraries[0];
 
 const char *const lisp_library_names[] = {"io",     "list",   "text",   "function", "map", "set",
-                                          "number", "result", "random", "json",     "csv", "time", nullptr};
+                                          "number", "result", "random", "json",     "csv", "time", "pattern", nullptr};
 
 const char *lisp_default_library_path(void) {
     const char *path = getenv("NOVELO_STDLIB");

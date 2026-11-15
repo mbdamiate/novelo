@@ -1,0 +1,96 @@
+; Orders in free text.
+;
+; Reads customer messages from standard input, one per line: a sender, a
+; colon, and whatever the customer wrote. Picks out of each message the
+; order codes, the dates and the amounts in reais, then prints them with
+; the dates in ISO 8601, the sender's address masked, and the total.
+;
+;   build/novelo examples/19-pattern/main.nvl < examples/19-pattern/input.txt
+;
+; New here: the library `pattern` (stdlib 0.15.0). A pattern is compiled
+; once and used for every line; a match is a Map with its positions, its
+; text and its groups, which a `match` takes apart. `replace-all` builds
+; the replacement of each match with a function, so masking an address
+; and rewriting a date are ordinary code.
+;
+; Friction: there are no groups that only group, so the thousands of an
+; amount, `(\.\d{3})*`, take a group the program never reads; there is no
+; lookaround, so `mask` keeps the first character with `substring`; and the
+; backslashes of a pattern are doubled inside a String.
+
+(import io)
+(import list)      ; filter, fold, map
+(import text t)    ; t/format, t/join, t/pad-left, t/split
+(import pattern)   ; compile-pattern, find-all, find-match, replace-all
+
+; ---- the patterns ---------------------------------------------------------------
+
+(define message-pattern (compile-pattern "^([\\w.]+)@([\\w.]+):\\s*(.*)$"))
+(define order-pattern (compile-pattern "PED-\\d{5}"))
+(define date-pattern (compile-pattern "(\\d{2})/(\\d{2})/(\\d{4})"))
+(define amount-pattern (compile-pattern "R\\$\\s*(\\d{1,3}(\\.\\d{3})*),(\\d{2})"))
+
+; ---- what a message holds ---------------------------------------------------------
+
+(define texts (lambda (matches) (map (lambda (found) (get found :text)) matches)))
+
+; "03/11/2026" becomes "2026-11-03".
+(define iso-date
+  (lambda (found)
+    (match (get found :groups)
+      (day month year) (t/format "{}-{}-{}" year month day))))
+
+; "R$ 1.249,00" is 124900 cents: the thousands lose their points.
+(define cents
+  (lambda (found)
+    (match (get found :groups)
+      (reais _ centavos)
+      (+ (* 100 (string-to-number (t/join "" (t/split "." reais)))) (string-to-number centavos)))))
+
+(define money
+  (lambda (amount)
+    (t/format "R$ {},{}" (quotient amount 100) (t/pad-left 2 "0" (to-string (remainder amount 100))))))
+
+; "ana.souza" becomes "a********": the first character stays.
+(define mask
+  (lambda (name)
+    (concatenate (substring name 0 1) (replace-all "." (lambda (found) "*") (substring name 1 (count name))))))
+
+; A message is read into a Map, or #void for a line with no sender.
+(define read-message
+  (lambda (line)
+    (match (find-match message-pattern line)
+      {:groups (name domain body)}
+      (let ((amounts (map cents (find-all amount-pattern body))))
+        {:sender (concatenate (mask name) "@" domain)
+         :orders (texts (find-all order-pattern body))
+         :dates (map iso-date (find-all date-pattern body))
+         :amounts amounts
+         :total (fold + 0 amounts)})
+      otherwise #void)))
+
+; ---- the report -----------------------------------------------------------------
+
+(define listed
+  (lambda (items)
+    (if (empty? items) "-" otherwise (t/join "; " items))))
+
+(define describe
+  (lambda (message)
+    (match message
+      {:sender sender :orders orders :dates dates :amounts amounts}
+      (t/format "{}\n  orders:  {}\n  dates:   {}\n  amounts: {}\n"
+                sender (listed orders) (listed dates) (listed (map money amounts))))))
+
+(define report
+  (lambda (lines)
+    (let ((messages (map read-message lines))
+          (read (filter map? messages))
+          (unread (filter void? messages)))
+      (t/format "{}\n{} messages, {} without a sender; {} orders, total {}\n"
+                (t/join "\n" (map describe read))
+                (count read) (count unread)
+                (fold + 0 (map (lambda (message) (count (get message :orders))) read))
+                (money (fold + 0 (map (lambda (message) (get message :total)) read)))))))
+
+(display! (report (read-lines!)))

@@ -6,11 +6,18 @@ Nov 10, 2026 · @Matheus Damiate
 
 The standard library is a set of functions written in the language itself, on top of the core primitives. It is not part of the core: an implementation conformant to the core does not need to provide it, and the core tests do not depend on it.
 
-The standard library is made of eleven libraries, in the sense of core section 8.9: `list`, `text`, `function`, `map`, `set`, `number`, `result`, `random`, `json`, `csv` and `time`. Nothing is loaded before the program: a file imports the libraries it uses, such as `(import list)`, and only then sees their names. Imported with no prefix, the names are ordinary globals, and a program may redefine them. Imported with a prefix, as in `(import list l)`, they are bound as `l/map` and so on.
+The standard library is made of twelve libraries, in the sense of core section 8.9: `list`, `text`, `function`, `map`, `set`, `number`, `result`, `random`, `json`, `csv`, `time` and `pattern`. Nothing is loaded before the program: a file imports the libraries it uses, such as `(import list)`, and only then sees their names. Imported with no prefix, the names are ordinary globals, and a program may redefine them. Imported with a prefix, as in `(import list l)`, they are bound as `l/map` and so on.
 
 The reference definitions in section 4 are normative. The implementation MAY replace any of them with a native version, as long as the observable behavior is identical, including errors and the names each library binds.
 
-**Version:** 0.14.0, draft, on top of core 0.18.0.
+**Version:** 0.15.0, draft, on top of core 0.18.0.
+
+**Changes since 0.14.0.** A new library, `pattern`, matches text against regular expressions in a common subset of the syntax of Perl and JavaScript (sections 3 and 4.12).
+- `compile-pattern` turns the source of a pattern into a value, and an invalid one into a `:domain-error` with its column.
+- `find-match`, `find-all` and `matches?` search a text, and a match gives its positions, its text and the text of its groups.
+- `replace-all` replaces each match with what a function makes of it, and `split-pattern` splits a text at the matches.
+
+The search is a Pike machine, written in the language. Its time grows with the length of the text times the size of the pattern, for every pattern. The other libraries are unchanged.
 
 **Changes since 0.13.0.** A new library, `time`, for dates and times of the calendar in UTC, without effects (sections 3 and 4.11). An instant is the Integer of milliseconds that `current-time!` returns.
 - `time-to-date` and `date-to-time` convert an instant to a Map of its fields and back.
@@ -71,8 +78,8 @@ The other libraries are unchanged.
 - **The function comes first and the collection last**, as in `(map f xs)` and `(map-values f m)`. This makes partial application with `partial` easier. `merge` takes two maps and `update` takes the key, the function and then the map.
 - **Evaluation is eager.** Every function traverses the whole list and returns the finished result.
 - **Constant memory.** Every function that traverses a list does so by tail recursion, so lists of any size are traversed in constant memory.
-- **Helpers.** Since the core has no local recursion, some functions use helpers defined at the top level of their library: `take-step`, `span-step`, `range-step`, `zip-step`, `merge-sorted`, `split-step`, `precedes-step`, `padding`, `repeat-step`, `format-step`, `check-base`, `digit-value`, `digits-step`, `map-results-step`, `letter-code-point?`, `uppercase-code-point`, `lowercase-code-point`, and the names of `random` that start with `random-` and are not in section 3: `random-jump`, `random-matrix-apply`, `random-matrix-product`, `random-dot`, `random-multiply`, `random-next`, `random-modulo`, `random-below`, `random-below-narrow`, `random-below-wide`, `random-positions`, `random-shuffle-step` and `random-gather`, and the names of `json`, `csv` and `time` that start with `json-`, `csv-` and `time-`, except the functions of `time` in section 3. They are bound by `import` like the other names, but they are not part of the interface: a program should not rely on them, and a native implementation MAY omit them.
-- **Dependencies.** `text`, `function`, `map`, `set`, `number` and `result` import `list` (core 8.9); `random` imports nothing; `json` imports `list`, `text`, `number` and `result`; `csv` and `time` import `list`, `text` and `result`. Importing a library therefore also binds the names of the libraries it imports in the same context. The names of all the libraries are different, so they can be imported together without a prefix.
+- **Helpers.** Since the core has no local recursion, some functions use helpers defined at the top level of their library: `take-step`, `span-step`, `range-step`, `zip-step`, `merge-sorted`, `split-step`, `precedes-step`, `padding`, `repeat-step`, `format-step`, `check-base`, `digit-value`, `digits-step`, `map-results-step`, `letter-code-point?`, `uppercase-code-point`, `lowercase-code-point`, and the names of `random` that start with `random-` and are not in section 3: `random-jump`, `random-matrix-apply`, `random-matrix-product`, `random-dot`, `random-multiply`, `random-next`, `random-modulo`, `random-below`, `random-below-narrow`, `random-below-wide`, `random-positions`, `random-shuffle-step` and `random-gather`, and the names of `json`, `csv`, `time` and `pattern` that start with `json-`, `csv-`, `time-` and `pattern-`, except the functions of `time` in section 3. They are bound by `import` like the other names, but they are not part of the interface: a program should not rely on them, and a native implementation MAY omit them.
+- **Dependencies.** `text`, `function`, `map`, `set`, `number` and `result` import `list` (core 8.9); `random` imports nothing; `json` imports `list`, `text`, `number` and `result`; `csv` and `time` import `list`, `text` and `result`; `pattern` imports `list` and `text`. Importing a library therefore also binds the names of the libraries it imports in the same context. The names of all the libraries are different, so they can be imported together without a prefix.
 - **Letters and case.** `text` knows two ranges of letters: ASCII, `A` to `Z` and `a` to `z`, and Latin-1, U+00C0 to U+00FF without U+00D7 `×` and U+00F7 `÷`, which covers the accented letters of Portuguese and the other languages of Western Europe, such as `á`, `ç`, `ê` and `õ`. `uppercase` and `lowercase` pair `A`–`Z` with `a`–`z` and U+00C0–U+00DE with U+00E0–U+00FE; `ß` (U+00DF) and `ÿ` (U+00FF) have no pair in these ranges and stay as they are. Every other character, in any script, is not a letter and keeps its case. `digit?` knows only `0` to `9`, the digits `string-to-number` reads.
 - **Order of text.** `precedes?` orders by code point, not as a dictionary does: every uppercase ASCII letter comes before every lowercase one, so `"Zebra"` precedes `"apple"`, and accented letters come after `z`. To ignore case, compare the `lowercase` of both.
 
@@ -136,13 +143,19 @@ The other libraries are unchanged.
 | `time` | `format-time` | `(format-time instant)` | the instant in ISO 8601, `"2026-11-15T14:30:05.120Z"`; a year outside 0 to 9999 is `:domain-error` |
 | `time` | `read-time` | `(read-time text)` | `(:ok instant)` for a date, `2026-11-15`, or a date and time of RFC 3339, `2026-11-15T14:30:05.120-03:00`, with the seconds, the fraction and the zone optional, and UTC without a zone; or `(:error message column)` with a message of section 4.11 |
 | `time` | `leap-year?`, `days-in-month` | `(leap-year? year)`, `(days-in-month year month)` | whether the year has a February 29, and the days of the month, 28 to 31; a month outside 1 to 12 is `:domain-error` |
+| `pattern` | `compile-pattern` | `(compile-pattern source)` | the compiled pattern of the String `source`, in the syntax of section 4.12: a value the other functions of `pattern` run; a source that is not a pattern is `:domain-error`, with `:values` `(source column)` |
+| `pattern` | `find-match` | `(find-match pattern text)` | the first match of `pattern` in `text`, the leftmost, as the Map `{:start :end :text :groups}`, or `#void` when there is none: `(find-match "(\\d+)-" "ab 12-3")` is `{:start 3 :end 6 :text "12-" :groups ("12")}`. `pattern` is a compiled pattern or a source |
+| `pattern` | `find-all` | `(find-all pattern text)` | List of the matches from left to right, each searched for after the one before; after an empty match the search starts one character later |
+| `pattern` | `matches?` | `(matches? pattern text)` | `#true` if `pattern` matches the whole of `text` |
+| `pattern` | `replace-all` | `(replace-all pattern replace text)` | `text` with each match of `find-all` replaced by `(replace match)`, a String |
+| `pattern` | `split-pattern` | `(split-pattern pattern text)` | List of the parts of `text` around the matches of `find-all`, as `split` gives them around a separator |
 | `number` | `round` | `(round x)` | the Integer nearest to the Float `x`; exactly halfway, the one farther from zero: `(round 2.5)` is `3`, `(round -2.5)` is `-3`; errors as `floor` |
 
 There is no `find`. To get the first element that satisfies a predicate, take `first` of the `filter` result after checking that it is not empty; to only ask whether such an element exists, use `any?`. To combine from last to first, `fold` the `reverse` of the list.
 
 ## 4. Reference definitions
 
-The source of each library is the concatenation, in order, of the `lisp` code blocks in its section (4.1 for `list`, 4.2 for `text`, 4.3 for `function`, 4.4 for `map`, 4.5 for `set`, 4.6 for `number`, 4.7 for `result`, 4.8 for `random`). The definitions use only the core and the libraries they import. Parameter names avoid those of the primitives, such as `rest` and `count`, because a parameter with the same name would shadow the primitive inside the function. The order of the definitions does not matter: global names are resolved at call time.
+The source of each library is the concatenation, in order, of the `lisp` code blocks in its section (4.1 for `list`, 4.2 for `text`, 4.3 for `function`, 4.4 for `map`, 4.5 for `set`, 4.6 for `number`, 4.7 for `result`, 4.8 for `random`, 4.9 for `json`, 4.10 for `csv`, 4.11 for `time`, 4.12 for `pattern`). The definitions use only the core and the libraries they import. Parameter names avoid those of the primitives, such as `rest` and `count`, because a parameter with the same name would shadow the primitive inside the function. The order of the definitions does not matter: global names are resolved at call time.
 
 ### 4.1 `list`
 
@@ -1485,8 +1498,489 @@ The conversions are those of Howard Hinnant's `days_from_civil` and `civil_from_
       (ok (list (* sign (+ (* hours 3600000) (* minutes 60000))) after-minutes)))))
 ```
 
+### 4.12 `pattern`
+
+Text matching with regular expressions. A pattern is written as a String, in a common subset of the syntax of Perl and JavaScript, and `compile-pattern` turns it into a value that the other functions run. The search always takes time proportional to the length of the text times the size of the pattern, whatever the pattern: there is no backtracking, so a pattern such as `(a*)*b` cannot hang a program.
+
+**Syntax.**
+
+| Form | Matches |
+| --- | --- |
+| a character | itself, unless it is one of `\ . ^ $ \| ? * + ( ) [ ] { }` |
+| `.` | any character, also a line break |
+| `[abc]`, `[a-z]`, `[^…]` | one character of the class, or with `^` first, one character outside it |
+| `\d`, `\w`, `\s` | a digit, `0` to `9`; a word character, a letter of section 2, a digit or `_`; a space, a tab, a line feed, a vertical tab, a form feed or a carriage return |
+| `\D`, `\W`, `\S` | a character that `\d`, `\w` or `\s` does not match |
+| `\n`, `\t`, `\r` | a line feed, a tab, a carriage return |
+| `\` and one of `\ . ^ $ \| ? * + ( ) [ ] { } - /` | that character |
+| `^`, `$` | nothing, at the start or at the end of the text |
+| `x*`, `x+`, `x?` | `x` any number of times, at least once, or at most once |
+| `x{m}`, `x{m,}`, `x{m,n}` | `x` exactly `m` times, at least `m` times, or from `m` to `n` times; `m` and `n` are at most 1000 |
+| `(x)` | `x`, as a group whose text the match keeps |
+| `x\|y` | `x` or `y`; either may be empty |
+
+Inside a class:
+- every character stands for itself except `]`, which closes it, and `\`, which starts the escapes of the table;
+- `-` between two characters is a range of code points;
+- a `-` that is first or last is itself;
+- `\d`, `\w`, `\s` and their negations add what they match.
+
+There are no backreferences, no lookaround, no lazy quantifiers and no flags. To match without regard to case, match the `lowercase` of the text against a pattern in lowercase.
+
+**Which match.** The search finds the matches that start leftmost, and of those, the first in this order of preference:
+- `*`, `+`, `?` and `{…}` prefer one more repetition to stopping, so `a+` finds all of `aaa`;
+- `|` prefers its left side, so `a|ab` finds `a` in `ab`;
+- an earlier part of the pattern has its preference before a later one.
+
+The backtracking matchers of Python and JavaScript find the same match, and Python the same groups. They can differ from it, and from one another, only when a repeated part can match nothing; here, a repetition with no upper limit, `*`, `+` or `{m,}`, never takes a turn that reads no character. A repeated group keeps the text of its last repetition, and a group that took no part in the match has no text.
+
+**Values.**
+- A compiled pattern is the List `(:pattern source groups program)`. `groups` counts the groups, numbered by their `(` from left to right, and `program` is the Map of the instructions described below.
+- Every function that takes a pattern also takes its source, a String, and compiles it at each call; a pattern used many times is better compiled once.
+- A match is the Map `{:start :end :text :groups}`:
+  - `:start` and `:end` are the positions of its first character and of the character after it, counted in characters from 0, as `substring` counts;
+  - `:text` is the text it matched;
+  - `:groups` is a List with the text of each group, in order, or `#void` for a group that took no part in it.
+
+**Errors.** A pattern is part of the program, not data it reads, so a pattern that cannot be compiled is an error, not a failure: `:domain-error`, with `:values` `(source column)`, the column counted from 1 in characters. Its message is `compile-pattern: ` followed by one of:
+
+| Message | The problem | The column |
+| --- | --- | --- |
+| `nothing to repeat` | `*`, `+`, `?` or `{` with nothing before it, after `(`, `\|`, `^`, `$` or another repetition | the quantifier |
+| `invalid repetition` | a `{` not followed by `m}`, `m,}` or `m,n}`, with `m` not above `n` and neither above 1000 | the `{` |
+| `missing )`, `missing ]` | a group or a class still open at the end of the pattern | the `(` or the `[` |
+| `unexpected )`, `unexpected ]`, `unexpected }` | a `)` outside a group, or a `]` or `}` outside a class | the character |
+| `empty class` | `[]` or `[^]` | the `[` |
+| `invalid range` | a range whose start is after its end, or with a class such as `\d` at either end | the start of the range |
+| `invalid escape` | a `\` before any other character, or at the end of the pattern | the `\` |
+
+A source that is not a String, or a pattern that is neither a String nor a compiled pattern, is `:wrong-type`. So is a text that is not a String, an error from `string-to-code-points`.
+
+The library compiles a pattern in two steps. First a parser reads the source into a tree, then the tree becomes a program for a Pike machine, a list of instructions numbered from 0, kept in a Map:
+
+| Instruction | What it does |
+| --- | --- |
+| `(:char code-point)`, `(:any)`, `(:class negated items)` | reads one character that it matches, or stops the thread |
+| `(:start)`, `(:end)` | goes on only at the start, or at the end, of the text |
+| `(:split preferred other)` | goes on at both, `preferred` with priority |
+| `(:jump target)` | goes on at `target` |
+| `(:save slot)` | records the position in a slot: slot 0 and 1 are the match, slots 2k and 2k + 1 group k |
+| `(:match)` | a match |
+
+The parser raises an internal error, which `compile-pattern` gives the source and raises again. Each parsing function takes the characters left and the column of the first of them, and returns what it read with the characters after it and their column.
+
+```lisp
+(import list)
+(import text)
+
+(define compile-pattern
+  (lambda (source)
+    (if (not (string? source))
+        (raise {:kind :wrong-type :message "compile-pattern: the source must be a String" :values (list source)})
+        otherwise
+        (try (match (pattern-parse source)
+               (tree groups)
+               (match (pattern-emit tree {0 (list :save 0)} 1)
+                 (program end)
+                 (list :pattern source groups
+                       (associate (associate program end (list :save 1)) (+ end 1) (list :match)))))
+          {:kind :pattern-syntax :message message :values (column)}
+          (raise {:kind :domain-error :message (concatenate "compile-pattern: " message)
+                  :values (list source column)})))))
+
+(define pattern-fail
+  (lambda (message column)
+    (raise {:kind :pattern-syntax :message message :values (list column)})))
+
+; The whole source, as (tree groups).
+(define pattern-parse
+  (lambda (source)
+    (match (pattern-alternatives (characters source) 1 0 ())
+      (tree () _ groups) (list tree groups)
+      (_ (")" &rest _) column _) (pattern-fail "unexpected )" column))))
+
+; Sequences separated by |, up to a ) or the end, as (tree text column groups).
+(define pattern-alternatives
+  (lambda (text column groups choices)
+    (match (pattern-sequence text column groups ())
+      (tree ("|" &rest more) after groups-after)
+      (pattern-alternatives more (+ after 1) groups-after (prepend tree choices))
+      (tree more after groups-after)
+      (list (if (empty? choices) tree otherwise (list :alternation (reverse (prepend tree choices))))
+            more after groups-after))))
+
+(define pattern-sequence
+  (lambda (text column groups items)
+    (if (or (empty? text) (equal? (first text) "|") (equal? (first text) ")"))
+        (list (list :sequence (reverse items)) text column groups)
+        otherwise
+        (match (pattern-atom text column groups)
+          (atom more after groups-after)
+          (match (pattern-quantifier atom more after)
+            (item rest-text rest-column) (pattern-sequence rest-text rest-column groups-after (prepend item items)))))))
+
+(define pattern-atom
+  (lambda (text column groups)
+    (match text
+      ("(" &rest more)
+      (match (pattern-alternatives more (+ column 1) (+ groups 1) ())
+        (tree (")" &rest after) close groups-after) (list (list :group (+ groups 1) tree) after (+ close 1) groups-after)
+        otherwise (pattern-fail "missing )" column))
+      ("[" &rest more)
+      (match more
+        ("^" &rest items) (pattern-class items (+ column 2) column groups #true ())
+        otherwise (pattern-class more (+ column 1) column groups #false ()))
+      ("." &rest more) (list (list :any) more (+ column 1) groups)
+      ("^" &rest more) (list (list :start) more (+ column 1) groups)
+      ("$" &rest more) (list (list :end) more (+ column 1) groups)
+      ("\\" &rest more)
+      (let ((item (pattern-escape more column)))
+        (list (if (integer? item) (list :char item) otherwise (list :class #false (list item)))
+              (rest more) (+ column 2) groups))
+      (character &rest more)
+      (if (or (equal? character "*") (equal? character "+") (equal? character "?") (equal? character "{"))
+          (pattern-fail "nothing to repeat" column)
+          (or (equal? character "]") (equal? character "}"))
+          (pattern-fail (concatenate "unexpected " character) column)
+          otherwise (list (list :char (first (string-to-code-points character))) more (+ column 1) groups)))))
+
+; The character after a \: a code point, or a named class.
+(define pattern-escape
+  (lambda (text column)
+    (match text
+      ("d" &rest _) :digit
+      ("D" &rest _) :not-digit
+      ("w" &rest _) :word
+      ("W" &rest _) :not-word
+      ("s" &rest _) :space
+      ("S" &rest _) :not-space
+      ("n" &rest _) 10
+      ("t" &rest _) 9
+      ("r" &rest _) 13
+      (character &rest _)
+      (if (contains? #{"\\" "." "^" "$" "|" "?" "*" "+" "(" ")" "[" "]" "{" "}" "-" "/"} character)
+          (first (string-to-code-points character))
+          otherwise (pattern-fail "invalid escape" column))
+      otherwise (pattern-fail "invalid escape" column))))
+```
+
+A quantifier wraps the atom before it in `(:repeat atom low high)`, with `high` `#void` when there is no limit. An anchor cannot be repeated.
+
+```lisp
+(define pattern-quantifier
+  (lambda (atom text column)
+    (match text
+      ("*" &rest more) (pattern-repeat atom 0 #void more (+ column 1) column)
+      ("+" &rest more) (pattern-repeat atom 1 #void more (+ column 1) column)
+      ("?" &rest more) (pattern-repeat atom 0 1 more (+ column 1) column)
+      ("{" &rest more) (pattern-braces atom more (+ column 1) column)
+      otherwise (list atom text column))))
+
+(define pattern-repeat
+  (lambda (atom low high text after column)
+    (if (or (equal? atom (list :start)) (equal? atom (list :end))) (pattern-fail "nothing to repeat" column)
+        otherwise (list (list :repeat atom low high) text after))))
+
+(define pattern-braces
+  (lambda (atom text column open)
+    (match (pattern-number text 0 0)
+      (low 0 _) (pattern-fail "invalid repetition" open)
+      (low read ("}" &rest more)) (pattern-bounded atom low low more (+ column read 1) open)
+      (low read ("," "}" &rest more)) (pattern-bounded atom low #void more (+ column read 2) open)
+      (low read ("," &rest more))
+      (match (pattern-number more 0 0)
+        (high read-high ("}" &rest after))
+        (if (= read-high 0) (pattern-fail "invalid repetition" open)
+            otherwise (pattern-bounded atom low high after (+ column read read-high 2) open))
+        otherwise (pattern-fail "invalid repetition" open))
+      otherwise (pattern-fail "invalid repetition" open))))
+
+(define pattern-bounded
+  (lambda (atom low high text after open)
+    (if (or (> low 1000) (and (not (void? high)) (or (> high 1000) (> low high))))
+        (pattern-fail "invalid repetition" open)
+        otherwise (pattern-repeat atom low high text after open))))
+
+; The digits at the front of the text, as (value read after); a value above
+; 1000 stays at 1001, which is enough to refuse it.
+(define pattern-number
+  (lambda (text value read)
+    (if (and (not (empty? text)) (digit? (first text)))
+        (pattern-number (rest text) (if (> value 1000) 1001 otherwise (- (+ (* value 10) (first (string-to-code-points (first text)))) 48))
+                        (+ read 1))
+        otherwise (list value read text))))
+```
+
+A class gathers its items: a range `(low high)` of code points, or a named class such as `:digit`.
+
+```lisp
+(define pattern-class
+  (lambda (text column open groups negated items)
+    (match text
+      () (pattern-fail "missing ]" open)
+      ("]" &rest more)
+      (if (empty? items) (pattern-fail "empty class" open)
+          otherwise (list (list :class negated (reverse items)) more (+ column 1) groups))
+      otherwise
+      (match (pattern-class-element text column)
+        (element after after-column)
+        (match after
+          ("-" "]" &rest _) (pattern-class after after-column open groups negated (prepend (pattern-item element) items))
+          ("-" _ &rest _)
+          (match (pattern-class-element (rest after) (+ after-column 1))
+            (high more more-column)
+            (if (and (integer? element) (integer? high) (<= element high))
+                (pattern-class more more-column open groups negated (prepend (list element high) items))
+                otherwise (pattern-fail "invalid range" column)))
+          otherwise (pattern-class after after-column open groups negated (prepend (pattern-item element) items)))))))
+
+; One character of a class, or an escape, as (element after column).
+(define pattern-class-element
+  (lambda (text column)
+    (match text
+      ("\\" &rest more) (list (pattern-escape more column) (rest more) (+ column 2))
+      (character &rest more) (list (first (string-to-code-points character)) more (+ column 1)))))
+
+(define pattern-item
+  (lambda (element)
+    (if (integer? element) (list element element) otherwise element)))
+```
+
+The tree becomes instructions, from the first free number on. Each function returns the program and the next free number. A jump forward is written after the instructions it jumps over, once their number is known. `x{m,n}` is `x` written `m` times and then `n − m` optional copies, each inside the one before, so skipping one skips the rest.
+
+```lisp
+(define pattern-emit
+  (lambda (tree program next)
+    (match tree
+      (:sequence items) (fold (lambda (state item) (apply pattern-emit item state)) (list program next) items)
+      (:group index inner)
+      (match (pattern-emit inner (associate program next (list :save (* 2 index))) (+ next 1))
+        (after end) (list (associate after end (list :save (+ (* 2 index) 1))) (+ end 1)))
+      (:alternation choices) (pattern-emit-choices choices program next)
+      (:repeat inner low high) (pattern-emit-repeat inner low high program next)
+      otherwise (list (associate program next tree) (+ next 1)))))
+
+(define pattern-emit-choices
+  (lambda (choices program next)
+    (if (empty? (rest choices)) (pattern-emit (first choices) program next)
+        otherwise
+        (match (pattern-emit (first choices) program (+ next 1))
+          (after-first jump)
+          (match (pattern-emit-choices (rest choices) after-first (+ jump 1))
+            (after-rest end)
+            (list (associate (associate after-rest next (list :split (+ next 1) (+ jump 1))) jump (list :jump end))
+                  end))))))
+
+(define pattern-emit-repeat
+  (lambda (inner low high program next)
+    (if (> low 0)
+        (match (pattern-emit inner program next)
+          (after end) (pattern-emit-repeat inner (- low 1) (if (void? high) high otherwise (- high 1)) after end))
+        (void? high)
+        (match (pattern-emit inner program (+ next 1))
+          (after jump)
+          (list (associate (associate after next (list :split (+ next 1) (+ jump 1))) jump (list :jump next))
+                (+ jump 1)))
+        (= high 0) (list program next)
+        otherwise
+        (match (pattern-emit inner program (+ next 1))
+          (after more)
+          (match (pattern-emit-repeat inner 0 (- high 1) after more)
+            (after-rest end) (list (associate after-rest next (list :split (+ next 1) end)) end))))))
+```
+
+The machine reads the text once, one character at a time. Before reading, it holds a list of threads, each a pair of an instruction that reads a character and the slots recorded so far. The list is in order of priority, and no two threads are at the same instruction.
+
+`pattern-follow` adds a thread at an instruction. It follows the instructions that read nothing, depth first, the preferred side of a split before the other, and adds the threads they lead to. The set `visited` keeps it from adding a thread twice, or looping in a repetition of something empty. The threads are gathered in reverse order.
+
+`pattern-search` runs the steps. While no thread is alive and no match has been found, a new thread that starts with an instruction reading a character dies at once on any character that instruction does not accept. So the search skips those characters without starting a thread, which makes looking for a pattern that starts with a literal or a class in a long text several times faster.
+
+`pattern-step` reads one character with each thread, in order. A thread at `(:match)` is a match: the threads after it have lower priority and are dropped, while those before it go on, since they may still find a match they prefer. Until a match is found, a new thread starts at each position with the lowest priority, which finds the leftmost match. With `whole`, only the thread at position 0 starts, and a match counts only at the end of the text, as `matches?` needs.
+
+```lisp
+(define pattern-follow
+  (lambda (program pc slots position size visited threads)
+    (if (contains? visited pc) (list visited threads)
+        otherwise
+        (let ((seen (adjoin visited pc)))
+          (match (get program pc)
+            (:jump target) (pattern-follow program target slots position size seen threads)
+            (:split preferred other)
+            (match (pattern-follow program preferred slots position size seen threads)
+              (after-seen after-threads) (pattern-follow program other slots position size after-seen after-threads))
+            (:save slot) (pattern-follow program (+ pc 1) (associate slots slot position) position size seen threads)
+            (:start) (if (= position 0) (pattern-follow program (+ pc 1) slots position size seen threads)
+                         otherwise (list seen threads))
+            (:end) (if (= position size) (pattern-follow program (+ pc 1) slots position size seen threads)
+                       otherwise (list seen threads))
+            otherwise (list seen (prepend (list pc slots) threads)))))))
+
+(define pattern-accepts?
+  (lambda (instruction code-point)
+    (match instruction
+      (:char expected) (= code-point expected)
+      (:any) #true
+      (:class negated items) (not (equal? negated (any? (lambda (item) (pattern-in-item? item code-point)) items)))
+      otherwise #false)))
+
+(define pattern-in-item?
+  (lambda (item code-point)
+    (if (list? item) (<= (first item) code-point (first (rest item)))
+        (equal? item :digit) (<= 48 code-point 57)
+        (equal? item :word) (pattern-word? code-point)
+        (equal? item :space) (pattern-space? code-point)
+        (equal? item :not-digit) (not (<= 48 code-point 57))
+        (equal? item :not-word) (not (pattern-word? code-point))
+        otherwise (not (pattern-space? code-point)))))
+
+(define pattern-word?
+  (lambda (code-point)
+    (or (letter-code-point? code-point) (<= 48 code-point 57) (= code-point 95))))
+
+(define pattern-space?
+  (lambda (code-point)
+    (or (= code-point 32) (<= 9 code-point 13))))
+
+; One character, or #void at the end, read by each thread: (visited threads matched).
+(define pattern-step
+  (lambda (program threads code-point position size whole visited next matched)
+    (if (empty? threads) (list visited next matched)
+        otherwise
+        (match (first threads)
+          (pc slots)
+          (let ((instruction (get program pc)))
+            (if (equal? instruction (list :match))
+                (if (or (not whole) (= position size)) (list visited next slots)
+                    otherwise (pattern-step program (rest threads) code-point position size whole visited next matched))
+                (and (not (void? code-point)) (pattern-accepts? instruction code-point))
+                (match (pattern-follow program (+ pc 1) slots (+ position 1) size visited next)
+                  (seen more)
+                  (pattern-step program (rest threads) code-point position size whole seen more matched))
+                otherwise (pattern-step program (rest threads) code-point position size whole visited next matched)))))))
+
+; The slots of the match the threads lead to, from position on, or #void.
+(define pattern-search
+  (lambda (program leading text position size whole visited reversed matched)
+    (if (and (empty? reversed) (void? matched) (not whole) (not (void? leading))
+             (not (empty? text)) (not (pattern-accepts? leading (first text))))
+        (pattern-search program leading (rest text) (+ position 1) size whole visited reversed matched)
+        otherwise
+        (match (if (and (void? matched) (or (not whole) (= position 0)))
+                   (pattern-follow program 0 {} position size visited reversed)
+                   otherwise (list visited reversed))
+          (_ all)
+          (let ((threads (reverse all)))
+            (if (and (empty? threads) (or whole (not (void? matched)))) matched
+                (empty? text) (first (rest (rest (pattern-step program threads #void position size whole #{} () matched))))
+                otherwise
+                (match (pattern-step program threads (first text) position size whole #{} () matched)
+                  (seen next found) (pattern-search program leading (rest text) (+ position 1) size whole seen next found))))))))
+```
+
+The public functions convert the text to code points once. A match takes its text, and its groups' texts, from the code points where the search started, so a search costs the characters it reads and the match it returns. `find-all` searches again after each match; after an empty match it starts one character later, so it never finds the same empty match twice.
+
+```lisp
+(define pattern-of
+  (lambda (name pattern)
+    (if (string? pattern) (compile-pattern pattern)
+        (and (list? pattern) (not (empty? pattern)) (equal? (first pattern) :pattern)) pattern
+        otherwise (raise {:kind :wrong-type :message (concatenate name ": not a pattern") :values (list pattern)}))))
+
+(define pattern-slice
+  (lambda (code-points from length)
+    (code-points-to-string (take length (drop from code-points)))))
+
+; The first match from position on, with code-points the text from there.
+(define pattern-find
+  (lambda (compiled code-points position size whole)
+    (match compiled
+      (:pattern _ groups program)
+      (let ((leading (match (get program 1)
+                       (:char _) (get program 1)
+                       (:class _ _) (get program 1)
+                       otherwise #void))
+            (slots (pattern-search program leading code-points position size whole #{} () #void)))
+        (if (void? slots) #void
+            otherwise
+            (let ((start (get slots 0))
+                  (end (get slots 1)))
+              {:start start :end end :text (pattern-slice code-points (- start position) (- end start))
+               :groups (map (lambda (index)
+                              (let ((from (get slots (* 2 index) #void))
+                                    (to (get slots (+ (* 2 index) 1) #void)))
+                                (if (or (void? from) (void? to)) #void
+                                    otherwise (pattern-slice code-points (- from position) (- to from)))))
+                            (range 1 (+ groups 1)))}))))))
+
+(define find-match
+  (lambda (pattern text)
+    (let ((compiled (pattern-of "find-match" pattern))
+          (code-points (string-to-code-points text)))
+      (pattern-find compiled code-points 0 (count code-points) #false))))
+
+(define matches?
+  (lambda (pattern text)
+    (let ((compiled (pattern-of "matches?" pattern))
+          (code-points (string-to-code-points text)))
+      (not (void? (pattern-find compiled code-points 0 (count code-points) #true))))))
+
+(define find-all
+  (lambda (pattern text)
+    (let ((compiled (pattern-of "find-all" pattern))
+          (code-points (string-to-code-points text)))
+      (reverse (pattern-all compiled code-points 0 (count code-points) ())))))
+
+(define pattern-all
+  (lambda (compiled code-points position size found)
+    (let ((match-value (if (> position size) #void
+                           otherwise (pattern-find compiled code-points position size #false))))
+      (if (void? match-value) found
+          otherwise
+          (let ((end (get match-value :end))
+                (next (if (= end (get match-value :start)) (+ end 1) otherwise end)))
+            (pattern-all compiled (drop (- next position) code-points) next size (prepend match-value found)))))))
+```
+
+`replace-all` and `split-pattern` take the text between the matches that `find-all` finds, and gather the pieces for one `concatenate`, as `join` does. A replacement that is not a String is the error of `concatenate`.
+
+```lisp
+(define replace-all
+  (lambda (pattern replace text)
+    (let ((compiled (pattern-of "replace-all" pattern))
+          (code-points (string-to-code-points text))
+          (pieces (pattern-between (reverse (pattern-all compiled code-points 0 (count code-points) ()))
+                                   code-points 0 ())))
+      (apply concatenate (reverse (pattern-replace-step pieces replace ()))))))
+
+(define pattern-replace-step
+  (lambda (pieces replace gathered)
+    (match pieces
+      (last) (prepend last gathered)
+      (before match-value &rest more) (pattern-replace-step more replace (prepend (replace match-value) (prepend before gathered))))))
+
+(define split-pattern
+  (lambda (pattern text)
+    (let ((compiled (pattern-of "split-pattern" pattern))
+          (code-points (string-to-code-points text)))
+      (filter string? (pattern-between (reverse (pattern-all compiled code-points 0 (count code-points) ()))
+                                       code-points 0 ())))))
+
+; The text before each match, the match, and so on, ending with the text
+; after the last match.
+(define pattern-between
+  (lambda (matches code-points position pieces)
+    (if (empty? matches) (reverse (prepend (code-points-to-string code-points) pieces))
+        otherwise
+        (let ((match-value (first matches))
+              (start (get match-value :start))
+              (end (get match-value :end)))
+          (pattern-between (rest matches) (drop (- end position) code-points) end
+                           (prepend match-value
+                                    (prepend (pattern-slice code-points 0 (- start position)) pieces)))))))
+```
+
 ## 5. Conformance
 
-The file `stdlib-conformance.json` has 247 cases, in the same format as the core `eval` cases, with one difference: the libraries `list`, `text`, `function`, `map`, `set`, `number`, `result`, `random`, `json`, `csv` and `time` are available to `import`. Each program imports what it uses. An implementation that provides the library MUST pass all of them, in addition to the core cases.
+The file `stdlib-conformance.json` has 284 cases, in the same format as the core `eval` cases, with one difference: the libraries `list`, `text`, `function`, `map`, `set`, `number`, `result`, `random`, `json`, `csv`, `time` and `pattern` are available to `import`. Each program imports what it uses. An implementation that provides the library MUST pass all of them, in addition to the core cases.
 
-The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that imports a library, a traversal of one hundred thousand elements, which only passes if the functions run in constant memory, every function of `map` with its errors, a map of one hundred thousand keys built with `from-entries` and reduced with `filter-entries`, every function of `set`, sets of one hundred thousand elements, the order of `precedes?` and its stable use in `sort`, `uppercase`, `lowercase`, `letter?` and `digit?` at the edges of the ASCII and Latin-1 ranges, `pad-left` and `pad-right` with texts wider than the width, accented fills and fills of the wrong length, `format` with values of every type, braces outside `{}` and too few or too many values, `join` of a single part that is returned as it is, and `join` of two hundred thousand parts and `format` of ten thousand values, which only pass in reasonable time if they grow linearly, `max` and `min` with Integers, with Floats, with their errors and over one hundred thousand arguments, `abs`, `floor`, `ceiling` and `round` at negative numbers, `-0.0`, halfway values, Floats above 2^52 and the edges of the range of Integer, `characters` of accented letters, of characters outside the BMP and of the empty text, and its use with `match`, `digits-to-integer` and `integer-to-digits` in bases 2, 8, 10, 16 and 36, with uppercase digits, signs, texts that are not numbers, the smallest and largest Integer, overflow, every base error and a round trip in every base, `span` with a test that always or never holds and a test it stops calling, and with a `let` pattern, `zip` of lists of different lengths and as the input of `from-entries`, both over one hundred thousand elements, `ok`, `failure` with no detail and with several, `ok?` and `failure?` over values of every shape, `then` going on, stopping and rejecting what is not a result, as the step of a `chain` with patterns, `map-results` stopping at the first failure without calling `f` again, and over one hundred thousand elements, `random-generator` for the first seeds, the largest one and one from `random-seed!`, the exact draws of `random-float` and of `random-integer` over small, negative, one-element, wide and edge ranges, sixty thousand throws of a die, `shuffle` of short lists, of lists too short to draw from and of twenty thousand elements, and every error of `random`, `read-json` over every kind of value, numbers at the edges of Integer and Float and beyond them, every escape and surrogate case, keys that repeat, whitespace, every failure message with its line and column, also across lines, `write-json` of every type, of escapes and of values without a JSON form, a round trip, and an array of twenty thousand numbers, which only passes in reasonable time if reading grows linearly, `read-csv` with every kind of line break, empty lines and fields, quoted fields holding separators, line breaks and quotes, a lone carriage return, records of different lengths, every failure with its position, other separators and every separator error, `write-csv` quoting only what needs it, its errors, a round trip with two separators, the idiom that turns a header into Maps, and twenty thousand records read in linear time, `time-to-date` at the epoch, before it, at leap days, at the edges of years 0 and 9999 and over a week of weekdays, `date-to-time` with defaults, ignored keys, every range error and overflow, round trips through both, `format-time` and its range, `leap-year?` and `days-in-month` over centuries and negative years, `read-time` of dates, times, fractions, zones and offsets, every failure with its column, the idioms of a fixed offset and of adding days, and every day of four hundred years, the trace of an error in the function given to `map`, and `import` itself: names unbound without it, prefixes, the dependencies of `text`, `function`, `map`, `set`, `number` and `result` on `list` of `json` on four libraries and of `csv` and `time` on three, and repeated imports.
+The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that imports a library, a traversal of one hundred thousand elements, which only passes if the functions run in constant memory, every function of `map` with its errors, a map of one hundred thousand keys built with `from-entries` and reduced with `filter-entries`, every function of `set`, sets of one hundred thousand elements, the order of `precedes?` and its stable use in `sort`, `uppercase`, `lowercase`, `letter?` and `digit?` at the edges of the ASCII and Latin-1 ranges, `pad-left` and `pad-right` with texts wider than the width, accented fills and fills of the wrong length, `format` with values of every type, braces outside `{}` and too few or too many values, `join` of a single part that is returned as it is, and `join` of two hundred thousand parts and `format` of ten thousand values, which only pass in reasonable time if they grow linearly, `max` and `min` with Integers, with Floats, with their errors and over one hundred thousand arguments, `abs`, `floor`, `ceiling` and `round` at negative numbers, `-0.0`, halfway values, Floats above 2^52 and the edges of the range of Integer, `characters` of accented letters, of characters outside the BMP and of the empty text, and its use with `match`, `digits-to-integer` and `integer-to-digits` in bases 2, 8, 10, 16 and 36, with uppercase digits, signs, texts that are not numbers, the smallest and largest Integer, overflow, every base error and a round trip in every base, `span` with a test that always or never holds and a test it stops calling, and with a `let` pattern, `zip` of lists of different lengths and as the input of `from-entries`, both over one hundred thousand elements, `ok`, `failure` with no detail and with several, `ok?` and `failure?` over values of every shape, `then` going on, stopping and rejecting what is not a result, as the step of a `chain` with patterns, `map-results` stopping at the first failure without calling `f` again, and over one hundred thousand elements, `random-generator` for the first seeds, the largest one and one from `random-seed!`, the exact draws of `random-float` and of `random-integer` over small, negative, one-element, wide and edge ranges, sixty thousand throws of a die, `shuffle` of short lists, of lists too short to draw from and of twenty thousand elements, and every error of `random`, `read-json` over every kind of value, numbers at the edges of Integer and Float and beyond them, every escape and surrogate case, keys that repeat, whitespace, every failure message with its line and column, also across lines, `write-json` of every type, of escapes and of values without a JSON form, a round trip, and an array of twenty thousand numbers, which only passes in reasonable time if reading grows linearly, `read-csv` with every kind of line break, empty lines and fields, quoted fields holding separators, line breaks and quotes, a lone carriage return, records of different lengths, every failure with its position, other separators and every separator error, `write-csv` quoting only what needs it, its errors, a round trip with two separators, the idiom that turns a header into Maps, and twenty thousand records read in linear time, `time-to-date` at the epoch, before it, at leap days, at the edges of years 0 and 9999 and over a week of weekdays, `date-to-time` with defaults, ignored keys, every range error and overflow, round trips through both, `format-time` and its range, `leap-year?` and `days-in-month` over centuries and negative years, `read-time` of dates, times, fractions, zones and offsets, every failure with its column, the idioms of a fixed offset and of adding days, and every day of four hundred years, `compile-pattern` and the program it gives, every form of the syntax of section 4.12, the classes at the edges of ASCII and Latin-1, the preference of repetitions and alternatives, groups that repeat or take no part, repetitions of something empty, empty matches in `find-all`, `replace-all` and `split-pattern`, positions in characters outside ASCII, a pattern compiled once and used again, every error of a pattern with its column, patterns that would make a backtracking matcher take exponential time, and five thousand matches in a text outside ASCII, which only pass in reasonable time if the search and the slicing grow linearly, the trace of an error in the function given to `map`, and `import` itself: names unbound without it, prefixes, the dependencies of `text`, `function`, `map`, `set`, `number` and `result` on `list` of `json` on four libraries, of `csv` and `time` on three and of `pattern` on two, and repeated imports.

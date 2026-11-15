@@ -1,0 +1,32 @@
+; The library pattern over a log the program builds: dates, addresses
+; and amounts found, a line checked whole, and a field masked.
+; scale: 300
+(import io)
+(import list)
+(import text)
+(import pattern)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define line
+  (lambda (index)
+    (format "{} pedido PED-{} de 15/11/2026 por R$ {},90; contato cliente{}@exemplo.com.br\n"
+            (if (= (remainder index 2) 0) "ok" otherwise "erro") (+ 10000 index) index index)))
+
+(define lines (map line (range 0 size)))
+(define text (apply concatenate lines))
+
+(define date (compile-pattern "(\\d{2})/(\\d{2})/(\\d{4})"))
+(define address (compile-pattern "[\\w.]+@[\\w.]+"))
+(define order-line (compile-pattern "^(ok|erro) pedido PED-\\d{5} de .*\\n$"))
+
+(check "dates" (count (find-all date text)) size)
+(check "addresses" (get (first (reverse (find-all address text))) :text)
+       (format "cliente{}@exemplo.com.br" (- size 1)))
+(check "amounts" (count (split-pattern "R\\$ \\d+,\\d{2}" text)) (+ size 1))
+(check "whole lines" (count (filter (lambda (each) (matches? order-line each)) lines)) size)
+(check "masked" (count (replace-all "\\d" (lambda (found) "#") text)) (count text))
+(display! "ok\n")

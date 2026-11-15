@@ -1,0 +1,38 @@
+; The library pattern in a tail loop over many lines: each line is built,
+; searched, checked whole, rewritten and split, in constant memory, by
+; patterns compiled once.
+; scale: 800
+; memory: constant
+(import io)
+(import list)
+(import text)
+(import pattern)
+(define size (string-to-number (read-line!)))
+
+(define date (compile-pattern "(\\d{2})/(\\d{2})/(\\d{4})"))
+(define whole-line (compile-pattern "^item (\\d+): (\\w+(, \\w+)*)$"))
+(define words (compile-pattern ",\\s*"))
+
+(define loop
+  (lambda (index)
+    (if (= index size) #true
+        otherwise
+        (let ((line (format "item {}: alfa, beta, gama{}" index index))
+              (dated (format "de {}/11/2026 a {}/12/2026" (pad-left 2 "0" (to-string (+ (remainder index 28) 1))) "01")))
+          (if (not (match (find-match whole-line line)
+                     {:groups (number names _)}
+                     (and (matches? whole-line line)
+                          (equal? number (to-string index))
+                          (equal? (split-pattern words names) (list "alfa" "beta" (format "gama{}" index)))
+                          (equal? (map (lambda (found) (get found :groups)) (find-all date dated))
+                                  (list (list (pad-left 2 "0" (to-string (+ (remainder index 28) 1))) "11" "2026")
+                                        (list "01" "12" "2026")))
+                          (equal? (replace-all "\\d" (lambda (found) "#") line)
+                                  (concatenate "item " (pad-left (count number) "#" "") ": alfa, beta, gama"
+                                               (pad-left (count number) "#" ""))))
+                     otherwise #false))
+              (error "the line disagrees" index line)
+              otherwise (loop (+ index 1)))))))
+
+(loop 0)
+(display! "ok\n")

@@ -1,6 +1,6 @@
 # Novelo
 
-An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.18.0) and the standard library (`standard-library.md`, v0.14.0).
+An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.18.0) and the standard library (`standard-library.md`, v0.15.0).
 
 *Novelo* is Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as Novelo's lists are. Source files end in `.nvl`.
 
@@ -9,7 +9,7 @@ Every case of both conformance suites passes:
 | Suite | Cases |
 | --- | --- |
 | core | 696 |
-| stdlib | 247 |
+| stdlib | 284 |
 
 Those runs report no leaks, and they also pass under AddressSanitizer and UndefinedBehaviorSanitizer.
 
@@ -99,9 +99,9 @@ An uncaught error names the innermost form, read from a file, that contains the 
 (include "lib/geometry.nvl" geo)   ; geo/area, ...
 ```
 
-**The REPL** starts with all eight libraries imported. An input may span several lines: while a list, map or string is still open, the REPL keeps reading. Each value except `#void` is printed with the `write!` rules. After an error the REPL reports it and reads the next input. The `> ` prompt appears only when standard input is a terminal, so piping a file through the REPL prints only the values.
+**The REPL** starts with every library imported. An input may span several lines: while a list, map or string is still open, the REPL keeps reading. Each value except `#void` is printed with the `write!` rules. After an error the REPL reports it and reads the next input. The `> ` prompt appears only when standard input is a terminal, so piping a file through the REPL prints only the values.
 
-**The standard library** is not compiled in. On each `import`, `list`, `text`, `function`, `map`, `set`, `number`, `result`, `random`, `json`, `csv` and `time` are read from the `lisp` code blocks of `standard-library.md` §4.1–4.11, so the code that runs is the normative code. The build fixes the absolute path of that document. To use another copy, set `NOVELO_STDLIB`:
+**The standard library** is not compiled in. On each `import`, `list`, `text`, `function`, `map`, `set`, `number`, `result`, `random`, `json`, `csv`, `time` and `pattern` are read from the `lisp` code blocks of `standard-library.md` §4.1–4.12, so the code that runs is the normative code. The build fixes the absolute path of that document. To use another copy, set `NOVELO_STDLIB`:
 
 ```bash
 NOVELO_STDLIB=/usr/local/share/novelo/standard-library.md build/novelo program.nvl
@@ -170,6 +170,7 @@ The programs cover:
   - errors re-raised through ten catches;
   - text formatting;
   - the library `time` over every day from 1970, four hundred years at ten times the scale;
+  - the library `pattern` over lines it searches, checks whole, rewrites and splits with patterns compiled once;
 - **volume:**
   - lists of a million elements;
   - maps and sets of half a million, emptied again;
@@ -231,6 +232,7 @@ The times are only reported. A slower program never fails the build, because a t
 | `maps` | `associate`, `get`, `dissociate`, `contains?`, and the libraries `map` and `set` |
 | `text` | `format`, `split`, `join`, `characters`, `lowercase`, `precedes?` |
 | `time` | `time-to-date`, `date-to-time`, `format-time` and `read-time` over instants spread across four centuries |
+| `pattern` | `find-all`, `split-pattern`, `matches?` and `replace-all` of the library `pattern` over a log it builds |
 | `match` | a stack machine whose steps are `match` and patterns in `let` |
 | `json` | `read-json` and `write-json` of the library `json` over a document it builds |
 | `random` | draws from the library `random`, and `shuffle` |

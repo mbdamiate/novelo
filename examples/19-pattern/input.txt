@@ -1,0 +1,5 @@
+ana.souza@exemplo.com.br: Oi! O pedido PED-10422 de 03/11/2026 veio com a cor errada. Paguei R$ 189,90.
+bruno@mail.com: Quero trocar os pedidos PED-10431 e PED-10433, de 05/11/2026, total de R$ 1.249,00.
+carla_m@empresa.com.br: O boleto de R$ 75,50 venceu em 31/10/2026 e o de R$ 75,50 vence em 30/11/2026.
+mensagem sem remetente sobre o PED-10500
+davi@mail.com: Alguém pode me ligar? Meu telefone é 11 98765-4321.

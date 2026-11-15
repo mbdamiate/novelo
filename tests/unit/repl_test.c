@@ -77,7 +77,7 @@ static void t_missing_library(void) {
     check_session_with(__FILE__, __LINE__, "/no/such/standard-library.md", "(+ 1 2)\n", "3\n",
                        CANNOT_IMPORT("list") CANNOT_IMPORT("text") CANNOT_IMPORT("function")
                            CANNOT_IMPORT("map") CANNOT_IMPORT("set") CANNOT_IMPORT("number")
-                               CANNOT_IMPORT("result") CANNOT_IMPORT("random") CANNOT_IMPORT("json") CANNOT_IMPORT("csv") CANNOT_IMPORT("time"));
+                               CANNOT_IMPORT("result") CANNOT_IMPORT("random") CANNOT_IMPORT("json") CANNOT_IMPORT("csv") CANNOT_IMPORT("time") CANNOT_IMPORT("pattern"));
 #undef CANNOT_IMPORT
 }
 

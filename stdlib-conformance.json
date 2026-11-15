@@ -1,7 +1,7 @@
 {
-  "spec": "Standard Library — Novelo, version 0.14.0",
+  "spec": "Standard Library — Novelo, version 0.15.0",
   "format": {
-    "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text, function, map, set, number, result, random, json, csv and time available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
+    "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text, function, map, set, number, result, random, json, csv, time and pattern available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
   },
   "cases": [
     {
@@ -1991,6 +1991,302 @@
       "section": "4.11",
       "program": "(import time)\n(list (characters \"ab\") (ok 1) (pad-left 3 \"0\" \"7\") (map - '(1)))",
       "value": "((\"a\" \"b\") (:ok 1) \"007\" (-1))",
+      "output": ""
+    },
+    {
+      "id": "library-248",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(compile-pattern \"ab\")",
+      "value": "(:pattern \"ab\" 0 {0 (:save 0) 1 (:char 97) 2 (:char 98) 3 (:save 1) 4 (:match)})",
+      "output": ""
+    },
+    {
+      "id": "library-249",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(list (compile-pattern \"a|b\") (compile-pattern \"(a)*\"))",
+      "value": "((:pattern \"a|b\" 0 {0 (:save 0) 1 (:split 2 4) 2 (:char 97) 3 (:jump 5) 4 (:char 98) 5 (:save 1) 6 (:match)}) (:pattern \"(a)*\" 1 {0 (:save 0) 1 (:split 2 6) 2 (:save 2) 3 (:char 97) 4 (:save 3) 5 (:jump 1) 6 (:save 1) 7 (:match)}))",
+      "output": ""
+    },
+    {
+      "id": "library-250",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(list (find-match \"lo\" \"hello world\") (find-match \"xyz\" \"hello world\") (find-match \"\" \"abc\"))",
+      "value": "({:start 3 :end 5 :text \"lo\" :groups ()} #void {:start 0 :end 0 :text \"\" :groups ()})",
+      "output": ""
+    },
+    {
+      "id": "library-251",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(map (lambda (text) (matches? \"a.c\" text)) '(\"abc\" \"a\\nc\" \"ac\" \"a\\u{1F600}c\" \"abbc\"))",
+      "value": "(#true #true #false #true #false)",
+      "output": ""
+    },
+    {
+      "id": "library-252",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(list (find-all \"[a-c]+\" \"xabcd cab\") (map (lambda (m) (get m :text)) (find-all \"[^a-c ]\" \"xabcd cab\")) (map (lambda (m) (get m :text)) (find-all \"[-a]+|[b-]+\" \"a-b--c\")))",
+      "value": "(({:start 1 :end 4 :text \"abc\" :groups ()} {:start 6 :end 9 :text \"cab\" :groups ()}) (\"x\" \"d\") (\"a-\" \"b--\"))",
+      "output": ""
+    },
+    {
+      "id": "library-253",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(map (lambda (m) (get m :text)) (find-all \"[\\\\]\\\\\\\\^.]\" \"a]b\\\\c^d.e\"))",
+      "value": "(\"]\" \"\\\\\" \"^\" \".\")",
+      "output": ""
+    },
+    {
+      "id": "library-254",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(map (lambda (m) (get m :text)) (find-all \"\\\\w+\" \"Ação_2026, x×y÷z ß-ÿ!\"))",
+      "value": "(\"Ação_2026\" \"x\" \"y\" \"z\" \"ß\" \"ÿ\")",
+      "output": ""
+    },
+    {
+      "id": "library-255",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(list (map (lambda (m) (get m :text)) (find-all \"\\\\d+\" \"a1b22c333\")) (map (lambda (m) (get m :text)) (find-all \"\\\\D+\" \"a1b22c333\")) (map (lambda (m) (get m :text)) (find-all \"\\\\W+\" \"a, b-c\")))",
+      "value": "((\"1\" \"22\" \"333\") (\"a\" \"b\" \"c\") (\", \" \"-\"))",
+      "output": ""
+    },
+    {
+      "id": "library-256",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(list (count (find-all \"\\\\s\" \" \\t\\n\\u{B}\\u{C}\\r\\u{A0}x\")) (count (find-all \"\\\\S\" \" \\t\\n\\u{B}\\u{C}\\r\\u{A0}x\")) (count (find-all \"[\\\\s\\\\d]\" \"a 1\\tb\")) (count (find-all \"[\\\\S]\" \"a 1\\tb\")))",
+      "value": "(6 2 3 3)",
+      "output": ""
+    },
+    {
+      "id": "library-257",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(list (matches? \"\\\\.\\\\^\\\\$\\\\|\\\\?\\\\*\\\\+\\\\(\\\\)\\\\[\\\\]\\\\{\\\\}\\\\\\\\\\\\-\\\\/\" \".^$|?*+()[]{}\\\\-/\") (matches? \"\\\\n\\\\t\\\\r\" \"\\n\\t\\r\") (matches? \"[\\\\n\\\\t]+\" \"\\t\\n\"))",
+      "value": "(#true #true #true)",
+      "output": ""
+    },
+    {
+      "id": "library-258",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(list (find-match \"^a\" \"ba\") (get (find-match \"a$\" \"aba\") :start) (matches? \"^$\" \"\") (map (lambda (m) (get m :start)) (find-all \"$\" \"ab\")) (find-match \"a^b\" \"ab\") (find-match \"a$b\" \"ab\"))",
+      "value": "(#void 2 #true (2) #void #void)",
+      "output": ""
+    },
+    {
+      "id": "library-259",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(list (get (find-match \"a*\" \"aaab\") :text) (find-match \"a+\" \"bbb\") (get (find-match \"ba?\" \"baa\") :text) (get (find-match \"b+\" \"abbcbbb\") :start) (get (find-match \"ab{0}c\" \"ac\") :text))",
+      "value": "(\"aaa\" #void \"ba\" 1 \"ac\")",
+      "output": ""
+    },
+    {
+      "id": "library-260",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(list (map (lambda (text) (matches? \"a{2,3}\" text)) '(\"a\" \"aa\" \"aaa\" \"aaaa\")) (map (lambda (text) (matches? \"a{2}\" text)) '(\"a\" \"aa\" \"aaa\")) (map (lambda (text) (matches? \"a{2,}\" text)) '(\"a\" \"aa\" \"aaaaaaa\")) (map (lambda (m) (get m :text)) (find-all \"a{2,3}\" \"aaaaaaa\")))",
+      "value": "((#false #true #true #false) (#false #true #false) (#false #true #true) (\"aaa\" \"aaa\"))",
+      "output": ""
+    },
+    {
+      "id": "library-261",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(import text)\n(list (matches? \"a{1000}\" (pad-left 1000 \"a\" \"\")) (matches? \"a{1000}\" (pad-left 999 \"a\" \"\")) (matches? \"(ab){0,1000}\" (apply concatenate (map (lambda (_) \"ab\") (range 0 1000)))))",
+      "value": "(#true #false #true)",
+      "output": ""
+    },
+    {
+      "id": "library-262",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(list (get (find-match \"a|ab\" \"ab\") :text) (get (find-match \"ab|a\" \"ab\") :text) (matches? \"a|ab\" \"ab\") (get (find-match \"(a|)b\" \"b\") :groups) (get (find-match \"x|\" \"abc\") :end))",
+      "value": "(\"a\" \"ab\" #true (\"\") 0)",
+      "output": ""
+    },
+    {
+      "id": "library-263",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(list (get (find-match \"((a)(b))c\" \"zabc\") :groups) (get (find-match \"(a)|(b)\" \"b\") :groups) (get (find-match \"(\\\\w)+\" \"abc\") :groups) (get (find-match \"(x)?y\" \"y\") :groups) (get (find-match \"(a(b)?)+\" \"aba\") :groups))",
+      "value": "((\"ab\" \"a\" \"b\") (#void \"b\") (\"c\") (#void) (\"a\" \"b\"))",
+      "output": ""
+    },
+    {
+      "id": "library-264",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(list (find-match \"(a*)*\" \"b\") (find-match \"(a*)+\" \"b\") (find-match \"(a|)*b\" \"ab\"))",
+      "value": "({:start 0 :end 0 :text \"\" :groups (#void)} {:start 0 :end 0 :text \"\" :groups (\"\")} {:start 0 :end 2 :text \"ab\" :groups (\"a\")})",
+      "output": ""
+    },
+    {
+      "id": "library-265",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(list (map (lambda (m) (list (get m :start) (get m :text))) (find-all \"a*\" \"baaa\")) (map (lambda (m) (get m :start)) (find-all \"\" \"abc\")) (map (lambda (m) (get m :start)) (find-all \"aa\" \"aaaaa\")) (find-all \"z\" \"abc\") (find-all \"\" \"\"))",
+      "value": "(((0 \"\") (1 \"aaa\") (4 \"\")) (0 1 2 3) (0 2) () ({:start 0 :end 0 :text \"\" :groups ()}))",
+      "output": ""
+    },
+    {
+      "id": "library-266",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(list (matches? \"\\\\d+\" \"123\") (matches? \"\\\\d+\" \"123a\") (matches? \"\\\\d+\" \"a123\") (matches? \"\" \"\") (matches? \"\" \"a\") (matches? \"(a|ab)(c|bcd)\" \"abcd\"))",
+      "value": "(#true #false #false #true #false #true)",
+      "output": ""
+    },
+    {
+      "id": "library-267",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(import text)\n(list (replace-all \"(\\\\d+)/(\\\\d+)/(\\\\d+)\" (lambda (m) (match (get m :groups) (day month year) (format \"{}-{}-{}\" year month day))) \"em 15/11/2026 e 1/2/2025.\") (replace-all \"x*\" (lambda (m) \"-\") \"abc\") (replace-all \"z\" (lambda (m) \"!\") \"abc\") (replace-all \"\\\\w+\" (lambda (m) (uppercase (get m :text))) \"ação é\"))",
+      "value": "(\"em 2026-11-15 e 2025-2-1.\" \"-a-b-c-\" \"abc\" \"AÇÃO É\")",
+      "output": ""
+    },
+    {
+      "id": "library-268",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(replace-all \"a\" (lambda (m) 1) \"banana\")",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-269",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(list (split-pattern \",\\\\s*\" \"a, b,c,   d\") (split-pattern \",\" \",a,\") (split-pattern \",\" \"abc\") (split-pattern \",\" \"\") (split-pattern \"x*\" \"abc\"))",
+      "value": "((\"a\" \"b\" \"c\" \"d\") (\"\" \"a\" \"\") (\"abc\") (\"\") (\"\" \"a\" \"b\" \"c\" \"\"))",
+      "output": ""
+    },
+    {
+      "id": "library-270",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(list (find-match \"\\u{1F600}+\" \"a\\u{1F600}\\u{1F600}b\") (find-match \"ç+\" \"maçã ççç\") (map (lambda (m) (get m :end)) (find-all \"ã|ç\" \"maçã\")))",
+      "value": "({:start 1 :end 3 :text \"\\u{1F600}\\u{1F600}\" :groups ()} {:start 2 :end 3 :text \"ç\" :groups ()} (3 4))",
+      "output": ""
+    },
+    {
+      "id": "library-271",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(define digit (compile-pattern \"\\\\d(x)?\"))\n(list (equal? (find-all digit \"a1b2x\") (find-all \"\\\\d(x)?\" \"a1b2x\")) (find-all digit \"a1b2x\") (matches? digit \"2x\"))",
+      "value": "(#true ({:start 1 :end 2 :text \"1\" :groups (#void)} {:start 3 :end 5 :text \"2x\" :groups (\"x\")}) #true)",
+      "output": ""
+    },
+    {
+      "id": "library-272",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(map (lambda (source) (catch (lambda () (compile-pattern source)) (lambda (e) (list (get e :kind) (get e :message) (first (rest (get e :values))))))) '(\"*a\" \"a**\" \"(+)\" \"a|?b\" \"^*\" \"a$+\" \"{2}\"))",
+      "value": "((:domain-error \"compile-pattern: nothing to repeat\" 1) (:domain-error \"compile-pattern: nothing to repeat\" 3) (:domain-error \"compile-pattern: nothing to repeat\" 2) (:domain-error \"compile-pattern: nothing to repeat\" 3) (:domain-error \"compile-pattern: nothing to repeat\" 2) (:domain-error \"compile-pattern: nothing to repeat\" 3) (:domain-error \"compile-pattern: nothing to repeat\" 1))",
+      "output": ""
+    },
+    {
+      "id": "library-273",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(map (lambda (source) (catch (lambda () (compile-pattern source)) (lambda (e) (list (get e :kind) (get e :message) (first (rest (get e :values))))))) '(\"a{\" \"a{,3}\" \"a{3,2}\" \"a{1001}\" \"a{2,x}\" \"a{1,1001}\" \"a{2\"))",
+      "value": "((:domain-error \"compile-pattern: invalid repetition\" 2) (:domain-error \"compile-pattern: invalid repetition\" 2) (:domain-error \"compile-pattern: invalid repetition\" 2) (:domain-error \"compile-pattern: invalid repetition\" 2) (:domain-error \"compile-pattern: invalid repetition\" 2) (:domain-error \"compile-pattern: invalid repetition\" 2) (:domain-error \"compile-pattern: invalid repetition\" 2))",
+      "output": ""
+    },
+    {
+      "id": "library-274",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(map (lambda (source) (catch (lambda () (compile-pattern source)) (lambda (e) (list (get e :kind) (get e :message) (first (rest (get e :values))))))) '(\"(ab\" \"a(b(c)\" \"[ab\" \"[a-\" \"a)\" \"a]\" \"a}\" \"é*)\"))",
+      "value": "((:domain-error \"compile-pattern: missing )\" 1) (:domain-error \"compile-pattern: missing )\" 2) (:domain-error \"compile-pattern: missing ]\" 1) (:domain-error \"compile-pattern: missing ]\" 1) (:domain-error \"compile-pattern: unexpected )\" 2) (:domain-error \"compile-pattern: unexpected ]\" 2) (:domain-error \"compile-pattern: unexpected }\" 2) (:domain-error \"compile-pattern: unexpected )\" 3))",
+      "output": ""
+    },
+    {
+      "id": "library-275",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(map (lambda (source) (catch (lambda () (compile-pattern source)) (lambda (e) (list (get e :kind) (get e :message) (first (rest (get e :values))))))) '(\"[]\" \"[^]\" \"[z-a]\" \"x[a-\\\\d]\" \"[\\\\d-z]\" \"\\\\q\" \"ab\\\\\" \"[\\\\q]\"))",
+      "value": "((:domain-error \"compile-pattern: empty class\" 1) (:domain-error \"compile-pattern: empty class\" 1) (:domain-error \"compile-pattern: invalid range\" 2) (:domain-error \"compile-pattern: invalid range\" 3) (:domain-error \"compile-pattern: invalid range\" 2) (:domain-error \"compile-pattern: invalid escape\" 1) (:domain-error \"compile-pattern: invalid escape\" 3) (:domain-error \"compile-pattern: invalid escape\" 2))",
+      "output": ""
+    },
+    {
+      "id": "library-276",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(catch (lambda () (find-all \"a(\" \"abc\")) (lambda (e) (get e :values)))",
+      "value": "(\"a(\" 2)",
+      "output": ""
+    },
+    {
+      "id": "library-277",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(compile-pattern (quote a))",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-278",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(find-match 42 \"a\")",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-279",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(matches? \"a\" (quote a))",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-280",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(import text)\n(list (find-match \"(a*)*b\" (pad-left 20000 \"a\" \"\")) (find-match \"(x+x+)+y\" (pad-left 5000 \"x\" \"\")) (matches? \"(a|aa)*c\" (pad-left 5000 \"a\" \"\")))",
+      "value": "(#void #void #false)",
+      "output": ""
+    },
+    {
+      "id": "library-281",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(import list)\n(define text (apply concatenate (map (lambda (n) (concatenate \"é\" (to-string n) \" \")) (range 0 5000))))\n(let ((found (find-all \"\\\\d+\" text))) (list (count found) (get (first (reverse found)) :text) (count (split-pattern \"\\\\s+\" text)) (count (replace-all \"é\" (lambda (m) \"\") text))))",
+      "value": "(5000 \"4999\" 5001 23890)",
+      "output": ""
+    },
+    {
+      "id": "library-282",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(import pattern p)\n(list (p/matches? \"a+\" \"aa\") (get (p/find-match \"b\" \"ab\") :start))",
+      "value": "(#true 1)",
+      "output": ""
+    },
+    {
+      "id": "library-283",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(find-match \"a\" \"a\")",
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "library-284",
+      "kind": "eval",
+      "section": "4.12",
+      "program": "(import pattern)\n(list (characters \"ab\") (reverse '(1 2)) (uppercase \"a\"))",
+      "value": "((\"a\" \"b\") (2 1) \"A\")",
       "output": ""
     }
   ]
