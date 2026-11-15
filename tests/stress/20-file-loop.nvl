@@ -1,0 +1,26 @@
+; write-file!, read-file!, list-directory! and file-kind! at every step of a
+; loop: each step replaces the same files, so nothing may pile up.
+; scale: 100000
+; memory: constant
+(import io)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define step
+  (lambda (n)
+    (let ((text (concatenate "line " (to-string n) "\n")))
+      (check "write" (write-file! "data.txt" text) (list :ok #void))
+      (check "read" (read-file! "data.txt") (list :ok text))
+      (check "missing" (read-file! "missing.txt") (list :error :not-found "missing.txt"))
+      (check "list" (list-directory! ".") (list :ok (list "data.txt" "main.nvl")))
+      (check "kind" (file-kind! "data.txt") :file))))
+
+(define loop
+  (lambda (n)
+    (if (= n 0) #true
+        otherwise (sequence (step n) (loop (- n 1))))))
+(loop size)
+(display! "ok\n")

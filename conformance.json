@@ -1,10 +1,10 @@
 {
-  "spec": "Core Specification — Novelo, version 0.15.0",
+  "spec": "Core Specification — Novelo, version 0.16.0",
   "format": {
     "read": "Read 'input' (UTF-8). With 'equivalent': also read that text and compare the two datum sequences with equal?. With 'types': the sequence read has exactly these types, in order.",
     "read-error": "Read 'input' (or the bytes of 'input_hex'). Reading MUST fail with the code 'error' at position [line, column].",
     "read-positions": "Read 'input'. For each entry, 'path' indexes the sequence read and then list elements (0-based); the node found MUST be in the position table with 'position'.",
-    "eval": "Evaluate 'program' as a file (section 8.7), with only the library io available to import (section 8.9), with 'input' (or the bytes of 'input_hex') as standard input (empty if absent). Standard output MUST be exactly 'output'. With 'value': the program terminates normally, and the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'. With 'error_position': the descriptor of that error has a :position whose :line and :column are the pair [line, column]; when it is null, the descriptor has no :position. With 'arguments': a list of strings, the program's arguments (section 8.7); without it, there are none. Standard error MUST be exactly 'error_output', or empty when absent; it holds only what the program wrote there, not the message of an uncaught error. With 'exit_code': the program terminates by calling exit! with that code, instead of ending with 'value' or 'error'."
+    "eval": "Evaluate 'program' as a file (section 8.7), with only the library io available to import (section 8.9), with 'input' (or the bytes of 'input_hex') as standard input (empty if absent). Standard output MUST be exactly 'output'. With 'value': the program terminates normally, and the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'. With 'error_position': the descriptor of that error has a :position whose :line and :column are the pair [line, column]; when it is null, the descriptor has no :position. With 'arguments': a list of strings, the program's arguments (section 8.7); without it, there are none. Standard error MUST be exactly 'error_output', or empty when absent; it holds only what the program wrote there, not the message of an uncaught error. With 'exit_code': the program terminates by calling exit! with that code, instead of ending with 'value' or 'error'. With 'files_after': an object from relative paths to texts; once the program has ended, the files other than main.nvl are exactly these, holding exactly these texts."
   },
   "cases": [
     {
@@ -4928,6 +4928,373 @@
       "section": "8.5",
       "program": "(import io)\n(define f (lambda (x) (if (= x 3) (exit! 22) otherwise x)))\n(list (f 1) (f 2) (f 3) (f 4))",
       "exit_code": 22,
+      "output": ""
+    },
+    {
+      "id": "files-001",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(read-file! \"data.txt\")",
+      "files": {
+        "data.txt": "a\nb"
+      },
+      "value": "(:ok \"a\\nb\")",
+      "files_after": {
+        "data.txt": "a\nb"
+      },
+      "output": ""
+    },
+    {
+      "id": "files-002",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(read-file! \"missing.txt\")",
+      "value": "(:error :not-found \"missing.txt\")",
+      "files_after": {},
+      "output": ""
+    },
+    {
+      "id": "files-003",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(read-file! \"notes\")",
+      "files": {
+        "notes/a.txt": "x"
+      },
+      "value": "(:error :not-a-file \"notes\")",
+      "output": ""
+    },
+    {
+      "id": "files-004",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(read-file! \"data.txt/inside\")",
+      "files": {
+        "data.txt": "x"
+      },
+      "value": "(:error :not-found \"data.txt/inside\")",
+      "output": ""
+    },
+    {
+      "id": "files-005",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(read-file! \"\")",
+      "value": "(:error :not-a-file \"\")",
+      "output": ""
+    },
+    {
+      "id": "files-006",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(write-file! \"out.txt\" \"hi\")",
+      "value": "(:ok #void)",
+      "files_after": {
+        "out.txt": "hi"
+      },
+      "output": ""
+    },
+    {
+      "id": "files-007",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(write-file! \"out.txt\" \"new\")",
+      "files": {
+        "out.txt": "old text"
+      },
+      "value": "(:ok #void)",
+      "files_after": {
+        "out.txt": "new"
+      },
+      "output": ""
+    },
+    {
+      "id": "files-008",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(list (append-file! \"log.txt\" \"a\\n\") (append-file! \"log.txt\" \"b\\n\"))",
+      "value": "((:ok #void) (:ok #void))",
+      "files_after": {
+        "log.txt": "a\nb\n"
+      },
+      "output": ""
+    },
+    {
+      "id": "files-009",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(append-file! \"log.txt\" \"c\\n\")",
+      "files": {
+        "log.txt": "a\nb\n"
+      },
+      "value": "(:ok #void)",
+      "files_after": {
+        "log.txt": "a\nb\nc\n"
+      },
+      "output": ""
+    },
+    {
+      "id": "files-010",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(write-file! \"copy.txt\" \"x y\")\n(read-file! \"copy.txt\")",
+      "value": "(:ok \"x y\")",
+      "files_after": {
+        "copy.txt": "x y"
+      },
+      "output": ""
+    },
+    {
+      "id": "files-011",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(write-file! \"nowhere/out.txt\" \"x\")",
+      "value": "(:error :not-found \"nowhere/out.txt\")",
+      "files_after": {},
+      "output": ""
+    },
+    {
+      "id": "files-012",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(list (write-file! \"notes\" \"x\") (append-file! \"notes\" \"x\"))",
+      "files": {
+        "notes/a.txt": "x"
+      },
+      "value": "((:error :not-a-file \"notes\") (:error :not-a-file \"notes\"))",
+      "files_after": {
+        "notes/a.txt": "x"
+      },
+      "output": ""
+    },
+    {
+      "id": "files-013",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(write-file! \"notes/b.txt\" \"two\")",
+      "files": {
+        "notes/a.txt": "one"
+      },
+      "value": "(:ok #void)",
+      "files_after": {
+        "notes/a.txt": "one",
+        "notes/b.txt": "two"
+      },
+      "output": ""
+    },
+    {
+      "id": "files-014",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(list (read-file! \"notes/../notes/./a.txt\") (read-file! \"/notes/a.txt\") (read-file! \"notes//a.txt\"))",
+      "files": {
+        "notes/a.txt": "x"
+      },
+      "value": "((:ok \"x\") (:ok \"x\") (:ok \"x\"))",
+      "output": ""
+    },
+    {
+      "id": "files-015",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(list-directory! \".\")",
+      "files": {
+        "b.txt": "",
+        "a.txt": "",
+        "notes/c.txt": ""
+      },
+      "value": "(:ok (\"a.txt\" \"b.txt\" \"main.nvl\" \"notes\"))",
+      "output": ""
+    },
+    {
+      "id": "files-016",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(list-directory! \"notes\")",
+      "files": {
+        "notes/c.txt": "",
+        "notes/deep/d.txt": "",
+        "notes/deep/e.txt": ""
+      },
+      "value": "(:ok (\"c.txt\" \"deep\"))",
+      "output": ""
+    },
+    {
+      "id": "files-017",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(list-directory! \"names\")",
+      "files": {
+        "names/z.txt": "",
+        "names/é.txt": "",
+        "names/B.txt": "",
+        "names/a.txt": ""
+      },
+      "value": "(:ok (\"B.txt\" \"a.txt\" \"z.txt\" \"é.txt\"))",
+      "output": ""
+    },
+    {
+      "id": "files-018",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(list (list-directory! \"data.txt\") (list-directory! \"missing\"))",
+      "files": {
+        "data.txt": ""
+      },
+      "value": "((:error :not-a-directory \"data.txt\") (:error :not-found \"missing\"))",
+      "output": ""
+    },
+    {
+      "id": "files-019",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(list (file-kind! \"data.txt\") (file-kind! \"notes\") (file-kind! \"missing\") (file-kind! \".\") (file-kind! \"data.txt/x\"))",
+      "files": {
+        "data.txt": "",
+        "notes/a.txt": ""
+      },
+      "value": "(:file :directory :none :directory :none)",
+      "output": ""
+    },
+    {
+      "id": "files-020",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(read-file! 1)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "files-021",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(write-file! \"out.txt\" 1)",
+      "error": ":wrong-type",
+      "files_after": {},
+      "output": ""
+    },
+    {
+      "id": "files-022",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(append-file! :out \"x\")",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "files-023",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(list-directory! (list \".\"))",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "files-024",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(file-kind! #void)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "files-025",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(read-file!)",
+      "error": ":wrong-arguments",
+      "output": ""
+    },
+    {
+      "id": "files-026",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(write-file! \"out.txt\")",
+      "error": ":wrong-arguments",
+      "output": ""
+    },
+    {
+      "id": "files-027",
+      "kind": "eval",
+      "section": "8.9",
+      "program": "(read-file! \"data.txt\")",
+      "files": {
+        "data.txt": ""
+      },
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "files-028",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(write-file! \"made.nvl\" \"(define made 42)\")\n(include \"made.nvl\")\nmade",
+      "value": "42",
+      "files_after": {
+        "made.nvl": "(define made 42)"
+      },
+      "output": ""
+    },
+    {
+      "id": "files-029",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(list (read-file! \"a\\u{0}b\") (write-file! \"a\\u{0}b\" \"x\") (list-directory! \"\\u{0}\") (file-kind! \"a\\u{0}b\"))",
+      "value": "((:error :not-found \"a\\u{0}b\") (:error :not-found \"a\\u{0}b\") (:error :not-found \"\\u{0}\") :none)",
+      "files_after": {},
+      "output": ""
+    },
+    {
+      "id": "files-030",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(write-file! \"empty.txt\" \"\")\n(read-file! \"empty.txt\")",
+      "value": "(:ok \"\")",
+      "files_after": {
+        "empty.txt": ""
+      },
+      "output": ""
+    },
+    {
+      "id": "files-031",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(write-file! \"text.txt\" \"ação ✓\\n\")\n(read-file! \"text.txt\")",
+      "value": "(:ok \"ação ✓\\n\")",
+      "files_after": {
+        "text.txt": "ação ✓\n"
+      },
+      "output": ""
+    },
+    {
+      "id": "files-032",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(define size\n  (lambda (path)\n    (match (read-file! path)\n      (:ok text) (count (string-to-code-points text))\n      (:error :not-found _) 0)))\n(list (size \"data.txt\") (size \"missing.txt\"))",
+      "files": {
+        "data.txt": "four"
+      },
+      "value": "(4 0)",
+      "output": ""
+    },
+    {
+      "id": "files-033",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(define loop (lambda (n) (if (= n 0) (read-file! \"log.txt\") otherwise (sequence (append-file! \"log.txt\" \"x\") (loop (- n 1))))))\n(loop 1000)",
+      "value": "(:ok \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\")",
+      "files_after": {
+        "log.txt": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "output": ""
+    },
+    {
+      "id": "files-034",
+      "kind": "eval",
+      "section": "9",
+      "program": "(import io)\n(write-file! \"main.nvl\" \"changed\")\n(read-file! \"main.nvl\")",
+      "value": "(:ok \"changed\")",
+      "files_after": {},
       "output": ""
     },
     {

@@ -45,28 +45,61 @@ LispInput lisp_input_from_stream(FILE *stream);
 /* Input that is always at its end. */
 LispInput lisp_input_empty(void);
 
-/* Reads a whole file. read_file stores the contents in *contents and returns
- * true, or returns false if the file cannot be opened or read. Paths are
- * absolute and use '/' (core §8.8). */
+/* core §8.8, §9 — the file system. Paths are absolute, normalized and use
+ * '/'. Each operation says how it went; the library io turns the expected
+ * failures into results and the others into :io-error. */
+typedef enum LispFileStatus {
+    LISP_FILE_OK,
+    LISP_FILE_NOT_FOUND,         /* the path, or a directory on the way to it, does not exist */
+    LISP_FILE_PERMISSION_DENIED,
+    LISP_FILE_NOT_A_FILE,        /* a directory where a file was expected */
+    LISP_FILE_NOT_A_DIRECTORY,   /* a file where a directory was expected */
+    LISP_FILE_FAILED,            /* any other failure of the system */
+} LispFileStatus;
+
+typedef enum LispFileKind {
+    LISP_FILE_KIND_NONE,
+    LISP_FILE_KIND_FILE,
+    LISP_FILE_KIND_DIRECTORY,
+} LispFileKind;
+
 typedef struct LispFileSystem {
-    bool (*read_file)(void *context, const char *path, LispBuffer *contents);
+    /* Stores the whole file in *contents. */
+    LispFileStatus (*read_file)(void *context, const char *path, LispBuffer *contents);
+    /* Creates or replaces the file, or with `append` adds to its end,
+     * creating it if needed; its directory must exist. */
+    LispFileStatus (*write_file)(void *context, const char *path, const char *bytes, size_t length, bool append);
+    /* Stores the names of the directory's entries, each followed by a NUL,
+     * in no particular order, without "." and "..". */
+    LispFileStatus (*list_directory)(void *context, const char *path, LispBuffer *names);
+    /* Stores what the path names; a path that does not exist is
+     * LISP_FILE_KIND_NONE with LISP_FILE_OK. */
+    LispFileStatus (*kind)(void *context, const char *path, LispFileKind *kind);
     void *context;
 } LispFileSystem;
 
 /* The disk. */
 LispFileSystem lisp_file_system_disk(void);
 
-/* Files in memory: an array of absolute paths and their texts, which must
- * outlive the file system. */
+/* A file given to an in-memory file system. */
 typedef struct LispMemoryFile {
-    const char *path;
+    const char *path; /* absolute */
     const char *text;
     size_t length;
 } LispMemoryFile;
 
-typedef struct LispMemoryFiles {
-    const LispMemoryFile *files;
+/* Files in memory, which the file system changes as the program writes.
+ * The store owns copies of its paths and texts. A directory exists when it
+ * is the root or when some file lies inside it; there is no permission. */
+typedef struct LispMemoryStore {
+    LispMemoryFile *files;
     size_t count;
-} LispMemoryFiles;
+    size_t capacity;
+} LispMemoryStore;
 
-LispFileSystem lisp_file_system_from_memory(const LispMemoryFiles *files);
+/* Starts a store with copies of `count` files. */
+void lisp_memory_store_init(LispMemoryStore *store, const LispMemoryFile *files, size_t count);
+void lisp_memory_store_free(LispMemoryStore *store);
+
+/* A file system over the store, which must outlive it. */
+LispFileSystem lisp_file_system_from_memory(LispMemoryStore *store);

@@ -21,6 +21,7 @@ extern const TestSuite eval_suite;
 extern const TestSuite include_suite;
 extern const TestSuite library_suite;
 extern const TestSuite repl_suite;
+extern const TestSuite files_suite;
 
 static const TestSuite *const suites[] = {
     &buffer_suite,
@@ -33,6 +34,7 @@ static const TestSuite *const suites[] = {
     &include_suite,
     &library_suite,
     &repl_suite,
+    &files_suite,
 };
 
 static int failed_checks; /* in the current test */

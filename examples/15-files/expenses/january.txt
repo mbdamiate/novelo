@@ -1,0 +1,4 @@
+food 120.50
+rent 1500
+transport 45.20
+food 33.10

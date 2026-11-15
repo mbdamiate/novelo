@@ -379,6 +379,8 @@ static const char *const awkward_fragments[] = {
     "#{", "#{}", "{}", "#void", "#true", "#false", "#(", "#x", ":", "::", "'", "`", ",", ",@", "&rest",
     "otherwise", "(quote)", "(lambda)", "(define)", "(if)", "(let)", "(match)", "(try)", "(chain)", "(catch)", "(raise)",
     "(exit! 3)", "(exit! 256)", "(program-arguments!)", "(display-to-error! 1)", "(write-to-error! \"e\")",
+    "(read-file! \"main.nvl\")", "(write-file! \"out.txt\" \"x\")", "(append-file! \"out.txt\" \"y\")",
+    "(list-directory! \".\")", "(file-kind! \"main.nvl\")",
     "\"\xe2\x82\xac\"", "\xc2\xa0", "\xe3\x81\x82", "(import io)", "(import list)", "(import text)",
     "(include \"main.nvl\")", "(include \"missing.nvl\")",
 };
@@ -616,7 +618,9 @@ static void run_eval_on_thread(void *argument) {
     LispMemoryFile *files = calloc(seed->file_count + 1, sizeof(LispMemoryFile));
     files[0] = (LispMemoryFile){.path = "/main.nvl", .text = job->program->data, .length = job->program->length};
     for (size_t index = 0; index < seed->file_count; index++) files[index + 1] = seed->files[index];
-    LispMemoryFiles file_system = {.files = files, .count = seed->file_count + 1};
+    LispMemoryStore file_system;
+    lisp_memory_store_init(&file_system, files, seed->file_count + 1);
+    free(files);
     LispTextInput input = {.text = seed->input, .length = seed->input_length};
 
     LispBuffer output;
@@ -670,7 +674,7 @@ static void run_eval_on_thread(void *argument) {
     lisp_state_free(state);
     lisp_buffer_free(&output);
     lisp_buffer_free(&error_output);
-    free(files);
+    lisp_memory_store_free(&file_system);
     check_no_leak();
 }
 

@@ -134,7 +134,7 @@ static Value *library_forms(LispState *state, const LispLibrary *library, Value 
     Value *forms = nullptr;
     LispReadError read_error;
     LispFileSystem disk = lisp_file_system_disk();
-    if (!disk.read_file(disk.context, path, &document)) {
+    if (disk.read_file(disk.context, path, &document) != LISP_FILE_OK) {
         lisp_error(state, "import-error", LISP_LIST(name, lisp_keyword_cstr("cannot-open")),
                    "cannot open the standard library %s (set NOVELO_STDLIB)", path);
     } else if (!lisp_library_source(document.data ? document.data : "", document.length, library->section,

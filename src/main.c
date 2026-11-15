@@ -44,7 +44,7 @@ static int run_program(LispState *state, const char *path) {
     LispBuffer source;
     lisp_buffer_init(&source);
     LispFileSystem disk = lisp_file_system_disk();
-    if (!disk.read_file(disk.context, path, &source)) {
+    if (disk.read_file(disk.context, path, &source) != LISP_FILE_OK) {
         fprintf(stderr, "novelo: cannot read %s\n", path);
         lisp_buffer_free(&source);
         return 2;

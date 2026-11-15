@@ -42,7 +42,7 @@ static void t_path_resolution(void) {
 typedef struct FileRun {
     LispState *state;
     LispBuffer output;
-    LispMemoryFiles files;
+    LispMemoryStore files;
     LispRunResult result;
     Value *value;
 } FileRun;
@@ -52,7 +52,8 @@ static void file_run(FileRun *run, const char *program, size_t file_count, const
     LispMemoryFile *all = calloc(file_count + 1, sizeof(LispMemoryFile));
     all[0] = (LispMemoryFile){"/main.nvl", program, strlen(program)};
     if (file_count > 0) memcpy(all + 1, files, file_count * sizeof(LispMemoryFile)); /* files may be nullptr */
-    run->files = (LispMemoryFiles){all, file_count + 1};
+    lisp_memory_store_init(&run->files, all, file_count + 1);
+    free(all);
     lisp_buffer_init(&run->output);
     LispStateOptions options = {
         .output = lisp_output_to_buffer(&run->output),
@@ -69,7 +70,7 @@ static void file_run_finish(FileRun *run) {
     lisp_release(run->value);
     lisp_state_free(run->state);
     lisp_buffer_free(&run->output);
-    free((void *)run->files.files);
+    lisp_memory_store_free(&run->files);
 }
 
 #define FILE(path, text) ((LispMemoryFile){(path), (text), sizeof(text) - 1})
@@ -198,8 +199,10 @@ static void t_definitions_before_error_remain(void) {
 /* A file that could not be opened may be included later (as in the REPL). */
 static void t_retry_after_failure(void) {
     LispMemoryFile file = FILE("/later.nvl", "(define later :here)");
-    LispMemoryFiles empty = {nullptr, 0};
-    LispMemoryFiles with_file = {&file, 1};
+    LispMemoryStore empty;
+    lisp_memory_store_init(&empty, nullptr, 0);
+    LispMemoryStore with_file;
+    lisp_memory_store_init(&with_file, &file, 1);
     LispBuffer output;
     lisp_buffer_init(&output);
     LispStateOptions options = {
@@ -219,6 +222,8 @@ static void t_retry_after_failure(void) {
     lisp_release(value);
     lisp_state_free(state);
     lisp_buffer_free(&output);
+    lisp_memory_store_free(&empty);
+    lisp_memory_store_free(&with_file);
 }
 
 static void t_disk(void) {

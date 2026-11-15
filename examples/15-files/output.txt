@@ -1,0 +1,9 @@
+examples/15-files/expenses/january.txt: 4 expenses
+examples/15-files/expenses/february.txt: 3 expenses, skipped lines 4, 6
+examples/15-files/expenses/march.txt: not found
+examples/15-files/expenses: a directory, not a file
+
+food           251.90
+rent          3000.00
+transport       96.20
+total         3348.10

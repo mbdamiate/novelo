@@ -245,7 +245,8 @@ Value *lisp_include(LispState *state, Value *form, Value *context) {
         include_error(state, LISP_LIST(path, lisp_keyword_cstr("cycle")), "the file is still being loaded");
     } else if (was_included(state, absolute_path, target)) {
         result = LISP_VOID; /* already loaded in this context */
-    } else if (!state->files.read_file(state->files.context, lisp_as_string(absolute_path)->data, &contents)) {
+    } else if (state->files.read_file(state->files.context, lisp_as_string(absolute_path)->data, &contents)
+               != LISP_FILE_OK) {
         include_error(state, LISP_LIST(path, lisp_keyword_cstr("cannot-open")), "cannot open the file");
     } else if (!lisp_read_file(contents.data ? contents.data : "", contents.length,
                                lisp_as_string(absolute_path)->data, &forms, &read_error)) {

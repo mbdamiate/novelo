@@ -122,6 +122,44 @@ check "example 14: lines only" 0 "     2 lines
 c
 " "$interpreter" "$tool" -l
 
+# ---- files: relative paths name files from the current directory -----------------------
+
+mkdir -p tools
+printf 'from the current directory' > data.txt
+printf 'next to the program' > tools/data.txt
+printf '(import io)\n(write! (read-file! "data.txt"))\n(write-file! "written.txt" "w")\n' > tools/reader.nvl
+check "a relative path is resolved against the current directory" 0 '(:ok "from the current directory")' "" "" \
+    "$interpreter" tools/reader.nvl
+check "a file the program wrote" 0 "w" "" "" cat written.txt
+
+if [ "$(id -u)" != 0 ]; then # root reads every file
+    printf 'secret' > secret.txt
+    chmod 000 secret.txt
+    printf '(import io)\n(write! (read-file! "secret.txt"))\n' > secret.nvl
+    check "a file without permission to read" 0 '(:error :permission-denied "secret.txt")' "" "" "$interpreter" secret.nvl
+    chmod 600 secret.txt
+fi
+
+# Example 15 writes its report with -o, and stops on a usage error or a
+# report it cannot write.
+expenses=$repository/examples/15-files/main.nvl
+expenses_usage='usage: main.nvl [-o report.txt] expenses.txt ...
+'
+printf 'food 10\n' > month.txt
+check "example 15: -o writes the report" 0 "report written to report.txt
+" "" "" "$interpreter" "$expenses" -o report.txt month.txt
+check "example 15: the report written" 0 "month.txt: 1 expense
+
+food            10.00
+total           10.00
+" "" "" cat report.txt
+check "example 15: a report that cannot be written" 1 "" "main.nvl: cannot write tools (:not-a-file)
+" "" "$interpreter" "$expenses" -o tools month.txt
+check "example 15: no file" 2 "" "main.nvl: no file to read
+$expenses_usage" "" "$interpreter" "$expenses"
+check "example 15: an unknown option" 2 "" "main.nvl: unknown option -x
+$expenses_usage" "" "$interpreter" "$expenses" -x month.txt
+
 printf 'nothing\n' > bare.nvl
 check "an error with no position" 1 "" "error :unbound-symbol: unbound symbol nothing nothing
 " "" "$interpreter" bare.nvl

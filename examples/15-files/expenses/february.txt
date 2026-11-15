@@ -1,0 +1,6 @@
+food 98.30
+
+rent 1500
+books forty
+transport 51.00
+fun

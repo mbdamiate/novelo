@@ -1,0 +1,135 @@
+; Expenses from several files.
+;
+; Each file named on the command line holds a month of expenses, one per
+; line: a category and an amount, such as "food 12.50". The program adds
+; them up by category, over every file, and prints a report: first a line
+; per file, then the totals. A file that cannot be read, or a line that is
+; not an expense, is reported and left out; it does not stop the program.
+; With -o and a file name, the report goes to that file instead.
+;
+;   build/novelo examples/15-files/main.nvl examples/15-files/expenses/january.txt \
+;       examples/15-files/expenses/february.txt examples/15-files/expenses/march.txt
+;
+; New here: the functions on files (core 0.16.0). `read-file!` returns a
+; result, (:ok text) or a failure such as (:error :not-found path), because
+; a missing file is something a program should expect, not an error; the
+; program looks at it with `match`, as it looks at its own results. Paths
+; are relative to the current directory, where the command runs, not to
+; the directory of this file.
+
+(import io)
+(import list)      ; filter, fold, map, range, reverse, sort, zip
+(import text t)    ; t/characters, t/split, t/format, t/join, t/pad-left, t/pad-right, t/precedes?
+(import map)       ; entries
+(import result)    ; ok, failure
+
+(define usage "usage: main.nvl [-o report.txt] expenses.txt ...\n")
+
+; ---- the command line -----------------------------------------------------------
+
+; (:ok {:files (path …) :output path-or-#void}) or a failure that says what
+; is wrong. The files are gathered newest first and put back in order at
+; the end.
+(define parse-arguments
+  (lambda (arguments options)
+    (match arguments
+      () (if (empty? (get options :files)) (failure "no file to read")
+             otherwise (ok (associate options :files (reverse (get options :files)))))
+      ("-o" path &rest more) (parse-arguments more (associate options :output path))
+      ("-o") (failure "-o needs a file name")
+      (argument &rest more)
+      (match (t/characters argument)
+        ("-" &rest _) (failure (t/format "unknown option {}" argument))
+        otherwise (parse-arguments more (associate options :files (prepend argument (get options :files))))))))
+
+; ---- one file -------------------------------------------------------------------
+
+; A line is a category and an amount. An Integer amount, such as 40, counts
+; as 40.0, so that every amount is a Float.
+(define expense
+  (lambda (line)
+    (match (filter (lambda (word) (not (empty? word))) (t/split " " line))
+      (category amount)
+      (let ((number (string-to-number amount)))
+        (if (float? number) (ok (list category number))
+            (integer? number) (ok (list category (integer-to-float number)))
+            otherwise (failure "not an amount")))
+      otherwise (failure "not a category and an amount"))))
+
+; The expenses of a text, and the numbers of the lines that are not one.
+; Blank lines are neither.
+(define expenses
+  (lambda (text)
+    (let ((lines (t/split "\n" text)))
+      (fold (lambda (found numbered)
+              (let (((number line) numbered))
+                (if (empty? line) found
+                    otherwise (match (expense line)
+                                (:ok item) (associate found :items (prepend item (get found :items)))
+                                (:error _) (associate found :skipped (prepend number (get found :skipped)))))))
+            {:items () :skipped ()}
+            (zip (range 1 (+ 1 (count lines))) lines)))))
+
+; ---- the report -----------------------------------------------------------------
+
+(define plural
+  (lambda (number word)
+    (t/format "{} {}{}" number word (if (= number 1) "" otherwise "s"))))
+
+; What happened to one file, as a line of the report, and the totals so far
+; with its expenses added. Every failure of read-file! is a value here.
+(define add-file
+  (lambda (state file)
+    (let (((path contents) file)
+          (say (lambda (text) (associate state :lines (prepend (t/format "{}: {}\n" path text) (get state :lines))))))
+      (match contents
+        (:error :not-found _) (say "not found")
+        (:error :not-a-file _) (say "a directory, not a file")
+        (:error :invalid-utf8 _ line column) (say (t/format "not text, at line {} column {}" line column))
+        (:error reason _) (say (t/format "cannot be read ({})" reason))
+        (:ok text)
+        (let ((found (expenses text))
+              (skipped (reverse (get found :skipped)))
+              (totals (fold (lambda (totals item)
+                              (let (((category amount) item))
+                                (associate totals category (+ amount (get totals category 0.0)))))
+                            (get state :totals)
+                            (get found :items))))
+          (associate (say (if (empty? skipped) (plural (count (get found :items)) "expense")
+                              otherwise (t/format "{}, skipped {} {}" (plural (count (get found :items)) "expense")
+                                                  (if (= (count skipped) 1) "line" otherwise "lines")
+                                                  (t/join ", " (map to-string skipped)))))
+                     :totals totals))))))
+
+(define money (lambda (amount) (t/pad-left 9 " " (float-to-fixed amount 2))))
+
+(define report
+  (lambda (files)
+    (let ((state (fold add-file {:lines () :totals {}} files))
+          (rows (sort (lambda (a b) (t/precedes? (first a) (first b))) (entries (get state :totals))))
+          (total (fold + 0.0 (map (lambda (row) (first (rest row))) rows))))
+      (concatenate (t/join "" (reverse (get state :lines)))
+                   "\n"
+                   (t/join "" (map (lambda (row) (t/format "{}{}\n" (t/pad-right 12 " " (first row)) (money (first (rest row)))))
+                                   rows))
+                   (t/format "{}{}\n" (t/pad-right 12 " " "total") (money total))))))
+
+; ---- the edge -------------------------------------------------------------------
+
+; Every file is read here, in one place, before anything is added up: each
+; path is paired with what `read-file!` returned, a result. The rest is
+; pure. Writing the report can fail too, and that failure is the end of
+; the program, with exit code 1.
+(define deliver!
+  (lambda (text output)
+    (if (void? output) (display! text)
+        otherwise (match (write-file! output text)
+                    (:ok _) (display! (t/format "report written to {}\n" output))
+                    (:error reason _) (sequence (display-to-error! (t/format "main.nvl: cannot write {} ({})\n" output reason))
+                                                (exit! 1))))))
+
+(match (parse-arguments (program-arguments!) {:files () :output #void})
+  (:ok options) (deliver! (report (map (lambda (path) (list path (read-file! path))) (get options :files)))
+                          (get options :output))
+  (:error message) (sequence (display-to-error! (t/format "main.nvl: {}\n{}" message usage))
+                             (exit! 2)))

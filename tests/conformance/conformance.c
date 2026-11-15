@@ -254,19 +254,20 @@ static void run_eval_on_thread(void *argument) {
     const Json *files = json_member(test_case, "files");
     size_t file_count = files ? files->count : 0;
     LispMemoryFile *memory_files = calloc(file_count + 1, sizeof(LispMemoryFile));
-    char **paths = calloc(file_count + 1, sizeof(char *));
     memory_files[0] = (LispMemoryFile){.path = "/main.nvl", .text = program, .length = program_length};
+    char path[4096];
     for (size_t index = 0; index < file_count; index++) {
-        size_t length = strlen(files->keys[index]) + 2;
-        paths[index] = malloc(length);
-        snprintf(paths[index], length, "/%s", files->keys[index]);
+        snprintf(path, sizeof path, "/%s", files->keys[index]);
         memory_files[index + 1] = (LispMemoryFile){
-            .path = paths[index],
+            .path = strdup(path),
             .text = files->items[index].string,
             .length = files->items[index].string_length,
         };
     }
-    LispMemoryFiles file_system = {.files = memory_files, .count = file_count + 1};
+    LispMemoryStore file_system;
+    lisp_memory_store_init(&file_system, memory_files, file_count + 1);
+    for (size_t index = 0; index < file_count; index++) free((char *)memory_files[index + 1].path);
+    free(memory_files);
 
     /* §8.7 — the program's arguments, `arguments`, none if absent. */
     const Json *argument_list = json_member(test_case, "arguments");
@@ -356,6 +357,26 @@ static void run_eval_on_thread(void *argument) {
         && (error_output.length != strlen(wanted_errors) || memcmp(actual_errors, wanted_errors, error_output.length) != 0)) {
         failure(result, "standard error \"%s\", expected \"%s\"", actual_errors, wanted_errors);
     }
+    /* §9 — with `files_after`, the files other than main.nvl are exactly
+     * these, with these texts, once the program has ended. */
+    const Json *files_after = json_member(test_case, "files_after");
+    if (result->outcome != FAILED && files_after) {
+        size_t present = 0;
+        for (size_t index = 0; index < file_system.count && result->outcome != FAILED; index++) {
+            const LispMemoryFile *file = &file_system.files[index];
+            if (strcmp(file->path, "/main.nvl") == 0) continue;
+            present++;
+            const Json *expected = json_member(files_after, file->path + 1);
+            if (!expected) {
+                failure(result, "unexpected file %s", file->path);
+            } else if (expected->string_length != file->length || memcmp(expected->string, file->text, file->length) != 0) {
+                failure(result, "file %s holds \"%s\", expected \"%s\"", file->path, file->text, expected->string);
+            }
+        }
+        if (result->outcome != FAILED && present != files_after->count) {
+            failure(result, "%zu files, expected %zu", present, files_after->count);
+        }
+    }
 
     lisp_buffer_free(&message);
     lisp_release(last_value);
@@ -364,9 +385,7 @@ static void run_eval_on_thread(void *argument) {
     lisp_buffer_free(&error_output);
     free(arguments);
     lisp_buffer_free(&input);
-    for (size_t index = 0; index < file_count; index++) free(paths[index]);
-    free(paths);
-    free(memory_files);
+    lisp_memory_store_free(&file_system);
 }
 
 static Outcome run_eval(const Json *test_case, CaseResult *result) {

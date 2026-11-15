@@ -149,7 +149,8 @@ static void run_on_thread(void *argument) {
                          : snprintf(texts[index], 128, "(define chain-%d %d)\n", index, index);
         files[index] = (LispMemoryFile){.path = paths[index], .text = texts[index], .length = (size_t)length};
     }
-    LispMemoryFiles file_system = {.files = files, .count = (size_t)chain + 1};
+    LispMemoryStore file_system;
+    lisp_memory_store_init(&file_system, files, (size_t)chain + 1);
 
     LispBuffer output;
     lisp_buffer_init(&output);
@@ -188,6 +189,7 @@ static void run_on_thread(void *argument) {
     free(paths);
     free(texts);
     free(files);
+    lisp_memory_store_free(&file_system);
 
     if (lisp_live_objects() != 0 || lisp_position_count() != 0) {
         fprintf(stderr, "    leak: %zu live objects and %zu position entries after the run\n", lisp_live_objects(),
