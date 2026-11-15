@@ -21,6 +21,12 @@ LispOutput lisp_output_to_stream(FILE *stream) {
     return (LispOutput){.write = write_to_stream, .context = stream};
 }
 
+static void write_nowhere(void *, const char *, size_t) {}
+
+LispOutput lisp_output_discard(void) {
+    return (LispOutput){.write = write_nowhere, .context = nullptr};
+}
+
 static bool read_line_from_text(void *context, LispBuffer *line) {
     LispTextInput *source = context;
     lisp_buffer_clear(line);

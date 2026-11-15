@@ -27,8 +27,17 @@ struct LispState {
     Value *contexts;       /* Map: full prefix (String) → context (§8.8) */
     Value *imported;       /* Map: (library full-prefix) → #true (§8.9) */
     LispOutput output;
+    LispOutput error_output; /* standard error, for write-to-error! and display-to-error! */
     LispInput input;
     LispFileSystem files;
+    /* §8.7 — the program's arguments, as given; checked as UTF-8 when
+     * program-arguments! reads them */
+    const char *const *arguments;
+    size_t argument_count;
+    /* §9 — set by exit!: evaluation unwinds like an error, with no
+     * descriptor pending, and no catch stops it */
+    bool exiting;
+    int exit_code;
     Value *working_directory; /* String: absolute; resolves relative paths outside files (§8.8) */
     Value *loading;        /* List of Strings: absolute paths of the files still loading, innermost first */
     Value *included;       /* Map: (path full-prefix) → #true, files loaded per context (§8.8) */
@@ -44,7 +53,11 @@ struct LispState {
 
 typedef struct LispStateOptions {
     LispOutput output;
+    LispOutput error_output;       /* default: discarded */
     LispInput input;
+    /* The program's arguments (§8.7); the strings must outlive the state. */
+    const char *const *arguments;
+    size_t argument_count;
     LispFileSystem files;          /* default: the disk */
     const char *working_directory; /* absolute; default: the process's current directory */
     const char *library_path;      /* the standard library document; default: lisp_default_library_path() */
@@ -61,6 +74,7 @@ typedef enum LispRunResult {
     LISP_RUN_OK,
     LISP_RUN_READ_ERROR, /* *read_error is filled; nothing ran (§8.7) */
     LISP_RUN_ERROR,      /* an uncaught error; state->error holds the descriptor */
+    LISP_RUN_EXIT,       /* the program called exit!; state->exit_code holds the code */
 } LispRunResult;
 
 /* Reads the whole source, then processes each top-level form in turn

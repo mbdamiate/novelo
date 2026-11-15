@@ -1,0 +1,97 @@
+; Counting lines, words and characters.
+;
+; Reads text from standard input and prints how many lines, words and
+; characters it has, as the Unix tool wc does. The options on the command
+; line choose what to count:
+;
+;   -l  lines        -w  words        -c  characters
+;
+; Options can be joined, as in -lw, and in any order; the counts always
+; come out as lines, words, characters. With no option the program counts
+; all three. Anything else is a usage error: the program writes what went
+; wrong to standard error and ends with exit code 2, the usual code for a
+; command used the wrong way.
+;
+;   build/novelo examples/14-tool/main.nvl -c -wl < examples/14-tool/input.txt
+;
+; New here: the arguments the program was started with,
+; `program-arguments!`, a second output, standard error, written with
+; `display-to-error!`, and the exit code, `exit!` (core 0.15.0). Making
+; sense of the arguments is pure work that returns a result, as reading
+; JSON does in 12; only the last form of the file touches the world.
+;
+; Friction: a word here is what lies between spaces, because `t/split`
+; splits on one exact separator. Splitting on any run of spaces and tabs
+; would need a pattern, which the language does not have yet.
+
+(import io)
+(import list)      ; append, filter, fold, map, any?
+(import text t)    ; t/characters, t/split, t/format, t/join, t/pad-left
+(import result)    ; ok, failure, then, map-results
+
+(define usage "usage: main.nvl [-l] [-w] [-c] < text\n")
+
+; ---- options ------------------------------------------------------------------
+
+(define every-count (list :lines :words :characters))
+
+(define count-for-letter {"l" :lines "w" :words "c" :characters})
+
+; What one argument asks for: "-lw" gives (:ok (:lines :words)), and "-lx"
+; or "words" a failure that says why. `map-results` checks every letter and
+; stops at the first that is not an option.
+(define option-counts
+  (lambda (argument)
+    (match (t/characters argument)
+      ("-" letter &rest letters)
+      (map-results (lambda (character)
+                     (if (contains? count-for-letter character) (ok (get count-for-letter character))
+                         otherwise (failure (t/format "unknown option -{}" character))))
+                   (prepend letter letters))
+      otherwise (failure (t/format "unexpected argument \"{}\"" argument)))))
+
+; The counts every argument asks for, in the order of `every-count`, each
+; once; all of them when no argument asks for any.
+(define chosen-counts
+  (lambda (arguments)
+    (chain then ((groups (map-results option-counts arguments)))
+      (let ((chosen (fold append () groups)))
+        (ok (if (empty? chosen) every-count
+                otherwise (filter (lambda (kind) (any? (lambda (wanted) (equal? wanted kind)) chosen))
+                                  every-count)))))))
+
+; ---- counting -----------------------------------------------------------------
+
+(define words
+  (lambda (line)
+    (filter (lambda (word) (not (empty? word))) (t/split " " line))))
+
+(define total (lambda (numbers) (fold + 0 numbers)))
+
+; `read-lines!` drops the line breaks, so each line adds one back to the
+; characters, as if the text ended with a line break.
+(define measure
+  (lambda (kind lines)
+    (match kind
+      :lines (count lines)
+      :words (total (map (lambda (line) (count (words line))) lines))
+      :characters (+ (count lines) (total (map (lambda (line) (count (t/characters line))) lines))))))
+
+(define names {:lines "lines" :words "words" :characters "characters"})
+
+(define report
+  (lambda (kinds lines)
+    (t/join "" (map (lambda (kind)
+                      (t/format "{} {}\n" (t/pad-left 6 " " (to-string (measure kind lines))) (get names kind)))
+                    kinds))))
+
+; ---- the edge -------------------------------------------------------------------
+
+; Everything above is pure. Here the program reads its arguments and its
+; input, and either prints the report or complains and stops with code 2.
+; Without `exit!` the program would end with 0, which a shell script reads
+; as success.
+(match (chosen-counts (program-arguments!))
+  (:ok kinds) (display! (report kinds (read-lines!)))
+  (:error message) (sequence (display-to-error! (t/format "main.nvl: {}\n{}" message usage))
+                             (exit! 2)))

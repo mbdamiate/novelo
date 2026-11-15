@@ -52,12 +52,13 @@ static void import_libraries(LispState *state, const LispReplOptions *options) {
     }
 }
 
-/* Evaluates the datums of one input in turn; an error discards the rest. */
+/* Evaluates the datums of one input in turn; an error discards the rest,
+ * and exit! ends the session (§8.7). */
 static void evaluate(LispState *state, const LispReplOptions *options, Value *datums) {
     for (const Value *rest = datums; rest->kind == LISP_KIND_PAIR; rest = lisp_rest(rest)) {
         Value *value = lisp_process_top_level(state, lisp_first(rest), nullptr);
         if (!value) {
-            report_error(state, options);
+            if (!state->exiting) report_error(state, options);
             return;
         }
         if (value != LISP_VOID) {
@@ -90,6 +91,10 @@ void lisp_repl(LispState *state, const LispReplOptions *options) {
         if (lisp_read(input.data, input.length, &datums, &read_error)) {
             evaluate(state, options, datums);
             lisp_release(datums);
+            if (state->exiting) { /* exit! ends the session; the rest is not read */
+                lisp_buffer_clear(&input);
+                break;
+            }
         } else if (lisp_read_error_is_incomplete(read_error.code)) {
             continue; /* a collection or string is still open: read one more line */
         } else {

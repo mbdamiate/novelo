@@ -652,14 +652,14 @@ PRIMITIVE(raise) {
 }
 
 /* (catch body handler): exit-only; an error inside the handler goes to the
- * next enclosing catch. */
+ * next enclosing catch, and exit! passes through. */
 PRIMITIVE(catch) {
     (void)argument_count;
     if (!expect_function(state, "catch", arguments[0]) || !expect_function(state, "catch", arguments[1])) {
         return nullptr;
     }
     Value *result = lisp_apply(state, arguments[0], 0, nullptr);
-    if (result) return result;
+    if (result || state->exiting) return result; /* exit! is not an error (§8.5) */
     Value *descriptor = lisp_take_error(state);
     result = lisp_apply(state, arguments[1], 1, &descriptor);
     lisp_release(descriptor);

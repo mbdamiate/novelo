@@ -1,8 +1,10 @@
 #!/bin/sh
 # Runs each example, examples/NAME/main.nvl, with the interpreter and checks
 # that it exits with 0 and prints exactly examples/NAME/output.txt. When
-# examples/NAME/input.txt exists, it is the program's standard input. Other
-# files in the directory belong to the example, such as files it includes.
+# examples/NAME/input.txt exists, it is the program's standard input, and
+# when examples/NAME/arguments.txt exists, each of its lines is one argument
+# of the program. Other files in the directory belong to the example, such
+# as files it includes.
 #
 #   tests/examples.sh build/novelo
 
@@ -21,7 +23,11 @@ for program in examples/*/main.nvl; do
     directory=${program%/main.nvl}
     input=/dev/null
     [ -f "$directory/input.txt" ] && input=$directory/input.txt
-    if "$interpreter" "$program" < "$input" > "$actual"; then
+    set --
+    if [ -f "$directory/arguments.txt" ]; then
+        while IFS= read -r argument; do set -- "$@" "$argument"; done < "$directory/arguments.txt"
+    fi
+    if "$interpreter" "$program" "$@" < "$input" > "$actual"; then
         if cmp -s "$actual" "$directory/output.txt"; then
             passed=$((passed + 1))
             continue

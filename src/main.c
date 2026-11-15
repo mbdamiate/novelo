@@ -1,9 +1,9 @@
-/* core §8.7 — the command line: `novelo file.nvl` runs a program,
- * `novelo` alone starts the REPL.
+/* core §8.7 — the command line: `novelo file.nvl argument…` runs a program
+ * with the arguments that follow its file, `novelo` alone starts the REPL.
  *
  * Exit codes: 0 when every form was evaluated (or the REPL reached the end
- * of its input), 1 for a read error or an uncaught error, 2 for bad
- * arguments or a program file that cannot be read.
+ * of its input), the code given to exit!, 1 for a read error or an uncaught
+ * error, 2 for bad arguments or a program file that cannot be read.
  */
 #include "error.h"
 #include "program.h"
@@ -15,6 +15,8 @@
 
 typedef struct Run {
     const char *path; /* nullptr: the REPL */
+    const char *const *arguments; /* the program's arguments (§8.7) */
+    size_t argument_count;
     int exit_code;
 } Run;
 
@@ -25,8 +27,9 @@ static void write_to_stderr(void *, const char *bytes, size_t length) {
 }
 
 static void usage(FILE *stream) {
-    fputs("usage: novelo [file.nvl]\n"
-          "  with a file, runs the program; without one, starts the REPL.\n"
+    fputs("usage: novelo [file.nvl [argument ...]]\n"
+          "  with a file, runs the program, which receives the arguments after it;\n"
+          "  without one, starts the REPL.\n"
           "  NOVELO_STDLIB names the standard library document (standard-library.md).\n",
           stream);
 }
@@ -63,6 +66,7 @@ static int run_program(LispState *state, const char *path) {
         write_error(&message);
     }
     lisp_buffer_free(&message);
+    if (result == LISP_RUN_EXIT) return state->exit_code;
     return result == LISP_RUN_OK ? 0 : 1;
 }
 
@@ -70,7 +74,10 @@ static void run(void *argument) {
     Run *request = argument;
     LispStateOptions options = {
         .output = lisp_output_to_stream(stdout),
+        .error_output = {.write = write_to_stderr, .context = nullptr},
         .input = lisp_input_from_stream(stdin),
+        .arguments = request->arguments,
+        .argument_count = request->argument_count,
         .stack_limit = lisp_large_stack_limit(),
     };
     LispState *state = lisp_state_new(&options);
@@ -86,7 +93,7 @@ static void run(void *argument) {
         };
         lisp_repl(state, &repl);
         if (interactive) fputc('\n', stdout);
-        request->exit_code = 0;
+        request->exit_code = state->exiting ? state->exit_code : 0;
     }
     lisp_state_free(state);
     fflush(stdout);
@@ -94,15 +101,21 @@ static void run(void *argument) {
 
 int main(int argument_count, char **arguments) {
     Run request = {.path = nullptr, .exit_code = 0};
+    /* Options of the interpreter come before the file; every word after the
+     * file belongs to the program. */
     if (argument_count == 2 && (strcmp(arguments[1], "-h") == 0 || strcmp(arguments[1], "--help") == 0)) {
         usage(stdout);
         return 0;
     }
-    if (argument_count > 2 || (argument_count == 2 && arguments[1][0] == '-')) {
+    if (argument_count >= 2 && arguments[1][0] == '-') {
         usage(stderr);
         return 2;
     }
-    if (argument_count == 2) request.path = arguments[1];
+    if (argument_count >= 2) {
+        request.path = arguments[1];
+        request.arguments = (const char *const *)arguments + 2;
+        request.argument_count = (size_t)argument_count - 2;
+    }
     /* Deep non-tail recursion uses the C stack: run on a large one. */
     if (!lisp_run_on_large_stack(run, &request)) {
         fputs("novelo: cannot create the interpreter thread\n", stderr);

@@ -27,6 +27,8 @@ LispOutput lisp_output_to_buffer(LispBuffer *buffer);
 
 /* Output written to a stdio stream. */
 LispOutput lisp_output_to_stream(FILE *stream);
+/* Output that is thrown away. */
+LispOutput lisp_output_discard(void);
 
 /* Input read from text in memory; the text must outlive the input. */
 typedef struct LispTextInput {

@@ -87,6 +87,29 @@ static void t_read_line(void) {
     CHECK_SESSION("(read-line!)\nnext line\n(read-line!)\n", "\"next line\"\n", "");
 }
 
+/* exit! ends the session: the rest of the input is not evaluated, and the
+ * state records the code (core §8.7). */
+static void t_exit(void) {
+    LispBuffer output;
+    lisp_buffer_init(&output);
+    const char *input = "(+ 1 2)\n(define kept (list 1 2)) (exit! 4) (display! \"never\")\n(+ 5 6)\n(list 1\n";
+    LispTextInput text = {input, strlen(input), 0};
+    LispStateOptions options = {.output = lisp_output_to_buffer(&output), .input = lisp_input_from_text(&text)};
+    LispState *state = lisp_state_new(&options);
+    LispReplOptions repl = {.errors = lisp_output_to_buffer(&output), .prompt = nullptr};
+    lisp_repl(state, &repl);
+    CHECK(state->exiting);
+    CHECK_INT(state->exit_code, 4);
+    CHECK_STR(output.data ? output.data : "", "3\n");
+    lisp_state_free(state);
+    lisp_buffer_free(&output);
+    /* an exit! that is caught is still an exit */
+    CHECK_SESSION("(catch (lambda () (exit! 0)) (lambda (problem) 1))\n2\n", "", "");
+    CHECK_SESSION("(program-arguments!)\n", "()\n", "");
+    /* with no error output given, what the program writes there is discarded */
+    CHECK_SESSION("(display-to-error! \"lost\")\n", "", "");
+}
+
 const TestSuite repl_suite = {"repl", (const TestCase[]){
     {"values", t_values},
     {"every library is imported", t_libraries_imported},
@@ -94,5 +117,6 @@ const TestSuite repl_suite = {"repl", (const TestCase[]){
     {"errors", t_errors},
     {"read-line! shares the input", t_read_line},
     {"a missing standard library is reported", t_missing_library},
+    {"exit! ends the session", t_exit},
     {},
 }};

@@ -1,6 +1,6 @@
 #!/bin/sh
-# The command line (src/main.c, core §8.7): exit codes 0, 1 and 2, and the
-# messages on standard error. Each check runs the interpreter in a temporary
+# The command line (src/main.c, core §8.7): exit codes 0, 1 and 2 and those
+# of exit!, the program's arguments, and the messages on standard error. Each check runs the interpreter in a temporary
 # directory and compares the exit code, standard output and standard error.
 #
 #   tests/cli.sh build/novelo
@@ -15,6 +15,7 @@ case $interpreter in
 *) interpreter=$(pwd)/$interpreter ;;
 esac
 
+repository=$(pwd)
 directory=$(mktemp -d)
 trap 'rm -rf "$directory"' EXIT
 cd "$directory" || exit 2
@@ -43,8 +44,9 @@ check() {
     echo "  stderr: $(cat errors.txt)" >&2
 }
 
-usage='usage: novelo [file.nvl]
-  with a file, runs the program; without one, starts the REPL.
+usage='usage: novelo [file.nvl [argument ...]]
+  with a file, runs the program, which receives the arguments after it;
+  without one, starts the REPL.
   NOVELO_STDLIB names the standard library document (standard-library.md).
 '
 
@@ -53,7 +55,9 @@ usage='usage: novelo [file.nvl]
 check "-h prints the usage" 0 "$usage" "" "" "$interpreter" -h
 check "--help prints the usage" 0 "$usage" "" "" "$interpreter" --help
 check "an unknown option" 2 "" "$usage" "" "$interpreter" -x
-check "two files" 2 "" "$usage" "" "$interpreter" a.nvl b.nvl
+check "an option before the file" 2 "" "$usage" "" "$interpreter" -h a.nvl
+check "a missing file, with arguments" 2 "" "novelo: cannot read a.nvl
+" "" "$interpreter" a.nvl b.nvl
 check "a missing file" 2 "" "novelo: cannot read missing.nvl
 " "" "$interpreter" missing.nvl
 check "a directory" 2 "" "novelo: cannot read .
@@ -79,6 +83,44 @@ printf '(import io)\n(display! "before\\n")\n(list 1\n  (quotient 1 0))\n' > unc
 check "an uncaught error, after the output" 1 "before
 " "uncaught.nvl:4:3: error :division-by-zero: quotient: division by zero
 " "" "$interpreter" uncaught.nvl
+
+# ---- the program's arguments, standard error and exit! ----------------------------------
+
+printf '(import io)\n(write! (program-arguments!))\n' > arguments.nvl
+check "the words after the file are the program's arguments" 0 '("-h" "--help" "-x" "" "two words")' "" "" \
+    "$interpreter" arguments.nvl -h --help -x "" "two words"
+check "a program with no arguments" 0 "()" "" "" "$interpreter" arguments.nvl
+
+check "an argument that is not UTF-8" 1 "" "arguments.nvl:2:9: error :io-error: program-arguments!: argument 1 is not valid UTF-8 at byte 1 :invalid-utf8 1
+" "" "$interpreter" arguments.nvl ok "a$(printf '\377')"
+
+printf '(import io)\n(display! "out ")\n(display-to-error! "error ")\n(write-to-error! "w")\n(display! "more")\n' > streams.nvl
+check "display-to-error! and write-to-error! write to standard error" 0 "out more" 'error "w"' "" "$interpreter" streams.nvl
+
+printf '(import io)\n(display! "before\\n")\n(catch (lambda () (exit! 3)) (lambda (problem) 0))\n(display! "after\\n")\n' > exit.nvl
+check "exit! ends the program with its code" 3 "before
+" "" "" "$interpreter" exit.nvl
+
+printf '(import io)\n(exit! 0)\n(first ())\n' > exit-zero.nvl
+check "exit! with 0" 0 "" "" "" "$interpreter" exit-zero.nvl
+
+printf '(import io)\n(exit! 256)\n' > exit-range.nvl
+check "exit! with a code out of range" 1 "" "exit-range.nvl:2:1: error :domain-error: exit! expects a code from 0 to 255 256
+" "" "$interpreter" exit-range.nvl
+
+# Example 14 stops with code 2 on a usage error; its normal run is checked by
+# tests/examples.sh.
+tool=$repository/examples/14-tool/main.nvl
+tool_usage='usage: main.nvl [-l] [-w] [-c] < text
+'
+check "example 14: an unknown option" 2 "" "main.nvl: unknown option -x
+$tool_usage" "" "$interpreter" "$tool" -l -wx
+check "example 14: an argument that is not an option" 2 "" "main.nvl: unexpected argument \"words\"
+$tool_usage" "" "$interpreter" "$tool" words
+check "example 14: lines only" 0 "     2 lines
+" "" "a b
+c
+" "$interpreter" "$tool" -l
 
 printf 'nothing\n' > bare.nvl
 check "an error with no position" 1 "" "error :unbound-symbol: unbound symbol nothing nothing
@@ -135,6 +177,16 @@ check "the REPL imports every library" 0 "(2 4)
 
 check "the REPL reports an input left open" 0 "" "1:1: read error :unclosed-delimiter: '(' is never closed
 " "(list 1
+" "$interpreter"
+
+check "exit! ends the REPL with its code" 4 "3
+" "" "(+ 1 2)
+(exit! 4) (display! \"never\")
+(+ 5 6)
+" "$interpreter"
+
+check "the REPL has no arguments" 0 "()
+" "" "(program-arguments!)
 " "$interpreter"
 
 echo "cli: $passed passed, $failed failed"

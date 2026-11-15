@@ -15,5 +15,5 @@ typedef struct LispReplOptions {
  * each datum at top level in the empty context and printing each value other
  * than #void with the write! rules to state->output, followed by a newline. A
  * read error or an uncaught error is reported and the rest of that input is
- * discarded. */
+ * discarded. A call to exit! ends the session, with state->exiting set. */
 void lisp_repl(LispState *state, const LispReplOptions *options);

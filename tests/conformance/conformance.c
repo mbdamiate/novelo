@@ -268,12 +268,23 @@ static void run_eval_on_thread(void *argument) {
     }
     LispMemoryFiles file_system = {.files = memory_files, .count = file_count + 1};
 
+    /* §8.7 — the program's arguments, `arguments`, none if absent. */
+    const Json *argument_list = json_member(test_case, "arguments");
+    size_t argument_count = argument_list ? argument_list->count : 0;
+    const char **arguments = calloc(argument_count + 1, sizeof(char *));
+    for (size_t index = 0; index < argument_count; index++) arguments[index] = argument_list->items[index].string;
+
     LispBuffer output;
     lisp_buffer_init(&output);
+    LispBuffer error_output;
+    lisp_buffer_init(&error_output);
     LispTextInput text_input = {.text = input.data ? input.data : "", .length = input.length};
     LispStateOptions options = {
         .output = lisp_output_to_buffer(&output),
+        .error_output = lisp_output_to_buffer(&error_output),
         .input = lisp_input_from_text(&text_input),
+        .arguments = arguments,
+        .argument_count = argument_count,
         .files = lisp_file_system_from_memory(&file_system),
         .working_directory = "/",
         .stack_limit = lisp_large_stack_limit(),
@@ -286,12 +297,22 @@ static void run_eval_on_thread(void *argument) {
     const char *expected_value = string_member(test_case, "value");
     const char *expected_error = string_member(test_case, "error");
     const char *expected_output = string_member(test_case, "output");
+    const char *expected_error_output = string_member(test_case, "error_output");
+    const Json *expected_exit = json_member(test_case, "exit_code");
     LispBuffer message;
     lisp_buffer_init(&message);
 
     if (run == LISP_RUN_READ_ERROR) {
         failure(result, "program has a read error: %s at %u:%u", lisp_read_error_name(read_error.code),
                 read_error.position.line, read_error.position.column);
+    } else if (expected_exit) {
+        if (run != LISP_RUN_EXIT) {
+            failure(result, "did not call exit!, expected exit code %lld", (long long)expected_exit->integer);
+        } else if (state->exit_code != expected_exit->integer) {
+            failure(result, "exit code %d, expected %lld", state->exit_code, (long long)expected_exit->integer);
+        }
+    } else if (run == LISP_RUN_EXIT) {
+        failure(result, "called exit! with %d", state->exit_code);
     } else if (expected_error) {
         Value *kind = run == LISP_RUN_ERROR ? lisp_error_kind(state) : nullptr;
         LispBuffer actual;
@@ -327,11 +348,21 @@ static void run_eval_on_thread(void *argument) {
         && (output.length != strlen(expected_output) || memcmp(actual_output, expected_output, output.length) != 0)) {
         failure(result, "output \"%s\", expected \"%s\"", actual_output, expected_output);
     }
+    /* Standard error holds only what the program wrote there: empty unless
+     * the case gives `error_output`. */
+    const char *actual_errors = error_output.data ? error_output.data : "";
+    const char *wanted_errors = expected_error_output ? expected_error_output : "";
+    if (result->outcome != FAILED
+        && (error_output.length != strlen(wanted_errors) || memcmp(actual_errors, wanted_errors, error_output.length) != 0)) {
+        failure(result, "standard error \"%s\", expected \"%s\"", actual_errors, wanted_errors);
+    }
 
     lisp_buffer_free(&message);
     lisp_release(last_value);
     lisp_state_free(state);
     lisp_buffer_free(&output);
+    lisp_buffer_free(&error_output);
+    free(arguments);
     lisp_buffer_free(&input);
     for (size_t index = 0; index < file_count; index++) free(paths[index]);
     free(paths);

@@ -378,6 +378,7 @@ static const char *const awkward_fragments[] = {
     "\"\\u{110000}\"", "\"\\u{D800}\"", "\"\\u{", "\"\\u{41}\"", "\"\\u{0}\"", "\"\\q\"", "\"\\", "#\\",
     "#{", "#{}", "{}", "#void", "#true", "#false", "#(", "#x", ":", "::", "'", "`", ",", ",@", "&rest",
     "otherwise", "(quote)", "(lambda)", "(define)", "(if)", "(let)", "(match)", "(try)", "(chain)", "(catch)", "(raise)",
+    "(exit! 3)", "(exit! 256)", "(program-arguments!)", "(display-to-error! 1)", "(write-to-error! \"e\")",
     "\"\xe2\x82\xac\"", "\xc2\xa0", "\xe3\x81\x82", "(import io)", "(import list)", "(import text)",
     "(include \"main.nvl\")", "(include \"missing.nvl\")",
 };
@@ -620,9 +621,15 @@ static void run_eval_on_thread(void *argument) {
 
     LispBuffer output;
     lisp_buffer_init(&output);
+    LispBuffer error_output;
+    lisp_buffer_init(&error_output);
+    static const char *const arguments[] = {"-x", "a\xc3\xa7\xc3\xa3o", "\xff"};
     LispStateOptions options = {
         .output = lisp_output_to_buffer(&output),
+        .error_output = lisp_output_to_buffer(&error_output),
         .input = lisp_input_from_text(&input),
+        .arguments = arguments,
+        .argument_count = 1 + seed->input_length % 3, /* sometimes an argument that is not UTF-8 */
         .files = lisp_file_system_from_memory(&file_system),
         .working_directory = "/",
         .stack_limit = STACK_LIMIT,
@@ -646,6 +653,11 @@ static void run_eval_on_thread(void *argument) {
         if (!kind || kind->kind != LISP_KIND_KEYWORD) fail("uncaught error without a Keyword :kind%s", "");
         lisp_describe_error(&text, state->error);
         job->exit_code = CHILD_UNCAUGHT_ERROR;
+    } else if (result == LISP_RUN_EXIT) {
+        /* core §9 — exit! leaves no error pending and a code from 0 to 255 */
+        if (state->error) fail("exit! with an error pending%s", "");
+        if (state->exit_code < 0 || state->exit_code > 255) fail("exit code out of range%s", "");
+        job->exit_code = CHILD_OK;
     } else {
         if (!last_value) fail("finished without a value%s", "");
         lisp_print(&text, last_value, LISP_PRINT_WRITE);
@@ -657,6 +669,7 @@ static void run_eval_on_thread(void *argument) {
     lisp_release(last_value);
     lisp_state_free(state);
     lisp_buffer_free(&output);
+    lisp_buffer_free(&error_output);
     free(files);
     check_no_leak();
 }

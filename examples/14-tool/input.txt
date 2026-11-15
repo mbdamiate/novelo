@@ -1,0 +1,6 @@
+A ball of yarn is a single thread,
+wound around itself until it holds.
+
+Pull the loose end and it unwinds
+from its first turn to the rest,
+the way a list does.

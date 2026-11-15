@@ -1,6 +1,6 @@
 # Novelo
 
-An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.14.0) and the standard library (`standard-library.md`, v0.10.0).
+An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.15.0) and the standard library (`standard-library.md`, v0.10.0).
 
 *Novelo* is Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as Novelo's lists are. Source files end in `.nvl`.
 
@@ -8,7 +8,7 @@ Every case of both conformance suites passes:
 
 | Suite | Cases |
 | --- | --- |
-| core | 574 |
+| core | 611 |
 | stdlib | 131 |
 
 Those runs report no leaks, and they also pass under AddressSanitizer and UndefinedBehaviorSanitizer.
@@ -45,13 +45,17 @@ make clean
 ## Running
 
 ```bash
-build/novelo program.nvl   # run a program
-build/novelo               # start the REPL
+build/novelo program.nvl            # run a program
+build/novelo program.nvl -l a.txt   # run it with arguments
+build/novelo                        # start the REPL
 ```
+
+Every word after the program's file is an argument of the program, which reads them with `program-arguments!` (core §8.7), even when it starts with `-`. Options of the interpreter, `-h` and `--help`, come before the file.
 
 | Exit code | Meaning |
 | --- | --- |
 | 0 | every form was evaluated (or the REPL reached the end of its input) |
+| 0–255 | the program called `exit!` with that code, possibly inside a `catch` or `try`, which do not stop it |
 | 1 | a read error or an uncaught error |
 | 2 | bad arguments, or the program file cannot be read |
 
@@ -72,7 +76,7 @@ An uncaught error names the innermost form, read from a file, that contains the 
 **Programs** see only the core primitives until they import a library (core §8.9):
 
 ```lisp
-(import io)            ; write!, display!, read-line!, read-lines!
+(import io)            ; write!, display!, read-line!, read-lines!, write-to-error!, display-to-error!, program-arguments!, exit!
 (import list)          ; map, filter, fold, sort, ...
 (import text t)        ; t/split, t/join, t/format, t/pad-left, t/lowercase, ... (and the names of list, as t/map)
 (import function)      ; partial
@@ -108,18 +112,22 @@ make coverage
 - **Conformance runner (`tests/conformance`):**
   - Has its own JSON parser.
   - Compares results with `equal?` and errors by their `:kind`.
-  - Matches the exact output.
+  - Matches the exact output, and the exact standard error the program wrote with `write-to-error!` and `display-to-error!`.
+  - Passes a case's `arguments` to the program, and checks `exit_code` when the program ends with `exit!`.
   - Runs each case with a fresh state on a large stack. A case's `files` sit in an in-memory file system around `/main.nvl`.
   - After each case, no object and no position entry may remain alive.
 - **Command line (`tests/cli.sh`):** runs `build/novelo` in a temporary directory and checks the exit code, standard output and standard error of each case:
-  - the exit codes 0, 1 and 2;
+  - the exit codes 0, 1 and 2, and those given to `exit!`, also in the REPL;
   - bad arguments and missing files;
+  - the program's arguments, including ones that start with `-` and one that is not UTF-8;
+  - standard output and standard error written by the program;
+  - the usage errors of example 14, which end with code 2;
   - read errors and uncaught errors, with and without a position, after the program's own output;
   - descriptors built by `raise` that lack fields;
   - errors in included files;
   - `NOVELO_STDLIB`;
   - the REPL with standard input that is not a terminal.
-- **Examples (`examples/`):** numbered by complexity, each adding one idea, starting at `01-hello`. Each example is a directory: `main.nvl` is a complete program, commented, run by `build/novelo` through `tests/examples.sh`. It must exit with 0 and print exactly `output.txt`; `input.txt`, when present, is its standard input. Any other file is part of the example, such as the files `08-modules` includes.
+- **Examples (`examples/`):** numbered by complexity, each adding one idea, starting at `01-hello`. Each example is a directory: `main.nvl` is a complete program, commented, run by `build/novelo` through `tests/examples.sh`. It must exit with 0 and print exactly `output.txt`; `input.txt`, when present, is its standard input, and each line of `arguments.txt`, when present, is one of its arguments. Any other file is part of the example, such as the files `08-modules` includes.
 
 ### Stress
 
@@ -225,7 +233,7 @@ Most of the branches left are null checks and the other side of `assert`s.
 | `src/program.h/.c` | core §8.7 | interpreter state, top level, running a source, large-stack thread |
 | `src/include.h/.c` | core §8.8 | contexts and prefixes, path resolution, load once, cycles |
 | `src/library.h/.c` | core §8.9, stdlib §4 | library registry, `import`, reading the libraries from the document |
-| `src/library_io.c` | core §8.9, §9 | the native library `io` |
+| `src/library_io.c` | core §8.7, §8.9, §9 | the native library `io`: standard output and error, standard input, the program's arguments, `exit!` |
 | `src/io.h/.c` | | interfaces for output, input and the file system (disk and memory) |
 | `src/repl.h/.c` | core §8.7 | the REPL |
 | `src/main.c` | core §8.7 | the command line |
@@ -284,6 +292,9 @@ Core 0.2.1 settled the points that versions up to 0.2.0 left open, such as `disp
 
 - **Order of maps and sets.** The specification leaves the iteration order of maps and sets unspecified (core §2.3). Here it is the order of insertion: `keys`, `elements`, printing and the functions of `map` and `set` see the keys and elements in the order they were first added, and replacing a value keeps its key's place. Literals are read in the order they are written.
 - **`:file` in error positions.** For the program, it is the path as given on the command line. For an included file, it is the absolute path. For a library written in the language, it is the path of the standard library document, and the line is its line in that document. In the REPL there is no `:file`, and lines count from the start of each input.
+
+- **Standard error.** The command line flushes standard output before anything goes to standard error, so in a terminal the two appear in the order the program wrote them.
+- **`exit!`.** It unwinds like an error, returning `nullptr` through every C frame, so everything is released, but no descriptor is pending: `state->exiting` and `state->exit_code` say why evaluation stopped, `catch` checks the flag and lets it through, and `lisp_run_source` returns `LISP_RUN_EXIT`.
 
 - **Call depth.** The specification requires at least 10,000 nested non-tail calls. Here the limit is the 512 MB stack of the CLI and the conformance runner, minus a 16 MB margin, which allows well over 100,000 nested calls. Beyond it, `:stack-overflow` is raised.
 - **Libraries that cannot be loaded.** When the standard library document cannot be read, or has no code for the library, `import` gives `:import-error` with `:values` `(name :cannot-open)`. A read error in the document gives `(name code line column)`, with the line and column in the document.

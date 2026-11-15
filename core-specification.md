@@ -22,7 +22,9 @@ The core is a three-stage pipeline:
 
 **Normative terms.** MUST indicates a mandatory requirement. MUST NOT indicates a prohibition. MAY indicates implementation freedom that does not affect observable behavior.
 
-**Version:** core 0.14.0, draft.
+**Version:** core 0.15.0, draft.
+
+**Changes since 0.14.0.** A program can see the arguments it was started with, write to standard error and choose its exit code: the library `io` has four new functions, `write-to-error!`, `display-to-error!`, `program-arguments!` and `exit!` (8.5, 8.7, 8.9, 9). `exit!` is not an error: `catch` and `try` do not stop it, so a program ends with the code it asks for wherever the call is. An `eval` case of the conformance file can give the program's arguments, the exact text on standard error and the exit code (12.4). A program that runs on 0.14.0 gives the same result, unless it defines one of these four names itself after `(import io)`, which now replaces the one of the library.
 
 **Changes since 0.13.0.** A new derived form, `chain`, writes a sequence of dependent steps flat, each one passed to the next by a function the program gives, as `let` writes nested `lambda`s flat (8.3). With a function that stops at the first failure, failures can be values a function returns, instead of errors it raises, without nesting a `lambda` for every step. `chain` is now the name of a derived form, so it cannot name a function called as `(chain …)`.
 
@@ -557,7 +559,7 @@ The call of `step` for the first binding is in tail position when the `chain` is
 
 ### 8.5 Side effects and errors
 
-**Side effects are implicit.** Any function can perform input and output by calling `display!`, `write!`, `read-line!` and `read-lines!`, from the library `io` (8.9), once its file imports it. Since evaluation order is defined (8.1), effects happen in a predictable order. There is no mechanism to intercept or redirect these effects; for code that needs that, the recommended style is callbacks, described below.
+**Side effects are implicit.** Any function can perform input and output by calling the functions of the library `io` (8.9), such as `display!` and `read-line!`, once its file imports it. Since evaluation order is defined (8.1), effects happen in a predictable order. There is no mechanism to intercept or redirect these effects; for code that needs that, the recommended style is callbacks, described below.
 
 **The `!` convention.** The name of a function that interacts with the world outside the program ends in `!`. The rule applies to the input and output primitives and, by convention, to every function that directly calls a function ending in `!`. A function that only calls callbacks received as arguments does not need the mark, because whoever passes the callback decides the effect. The core does not check the convention; a future typing extension MAY check it. Errors (`error`, `raise`) and `generate-symbol` are not marked, because they do not interact with the outside world.
 
@@ -567,7 +569,7 @@ The call of `step` for the first binding is in tail position when the `chain` is
     (display! (concatenate "Hello, " name "\n"))))
 ```
 
-**Error descriptor.** Every error carries a descriptor: a Map with `:kind` (Keyword), `:message` (String) and `:values` (List), and, once the error has left an expression with a known position, `:position` (below). `(error message value …)` creates a descriptor with `:kind :error`. The `:kind`s of core errors are `:unbound-symbol`, `:not-a-function`, `:wrong-arguments`, `:wrong-type`, `:index-out-of-range`, `:missing-key`, `:integer-overflow`, `:float-overflow`, `:division-by-zero`, `:domain-error`, `:invalid-code-point` (9), `:duplicate-key`, `:duplicate-element`, `:no-match` (8.3), `:expansion-error`, `:stack-overflow` (8.4), `:io-error` (section 9, `read-line!` and `read-lines!`), `:include-error` (8.8) and `:import-error` (8.9).
+**Error descriptor.** Every error carries a descriptor: a Map with `:kind` (Keyword), `:message` (String) and `:values` (List), and, once the error has left an expression with a known position, `:position` (below). `(error message value …)` creates a descriptor with `:kind :error`. The `:kind`s of core errors are `:unbound-symbol`, `:not-a-function`, `:wrong-arguments`, `:wrong-type`, `:index-out-of-range`, `:missing-key`, `:integer-overflow`, `:float-overflow`, `:division-by-zero`, `:domain-error`, `:invalid-code-point` (9), `:duplicate-key`, `:duplicate-element`, `:no-match` (8.3), `:expansion-error`, `:stack-overflow` (8.4), `:io-error` (section 9, `read-line!`, `read-lines!` and `program-arguments!`), `:include-error` (8.8) and `:import-error` (8.9).
 
 **Positions in errors.** When an error leaves the expansion or the evaluation of an expression that has a source position, and its descriptor has no key `:position` yet, the descriptor gains `:position`: a Map with `:line` and `:column`, Integers with the coordinates of 6.1, and, when the expression was read from a file, `:file`, a String that names that file. The text of `:file` is implementation-defined; it names the program, the included file (8.8) or the source of a library (8.9).
 
@@ -581,7 +583,7 @@ The position of an expression is the position of the innermost List, Map or Set 
 
 Positions do not change `:kind`, `:message` or `:values`; code that tests an error by its `:kind` is unaffected.
 
-**Catching.** `(catch body handler)` calls `body`, a function with no arguments. If `body` finishes normally, `catch` returns its value. If an error occurs during `body`, evaluation of `body` is abandoned, and `handler` is called with the descriptor; the result of `handler` becomes the result of `catch`. Catching is exit-only: there is no way to return to the point of the error. An error inside `handler` goes to the next enclosing `catch` or `try`.
+**Catching.** `(catch body handler)` calls `body`, a function with no arguments. If `body` finishes normally, `catch` returns its value. If an error occurs during `body`, evaluation of `body` is abandoned, and `handler` is called with the descriptor; the result of `handler` becomes the result of `catch`. Catching is exit-only: there is no way to return to the point of the error. An error inside `handler` goes to the next enclosing `catch` or `try`. A call to `exit!` (9) is not an error: it passes through every `catch` and `try` without calling a handler, and the program ends.
 
 **Re-raising.** `(raise descriptor)` interrupts evaluation with an existing descriptor, keeping its `:position`, if it has one. An argument that is not a Map with a Keyword `:kind` produces `:wrong-type`.
 
@@ -654,6 +656,9 @@ Memory management is otherwise left to the implementation and has no observable 
 | all forms evaluated | none beyond the program's own | 0 |
 | uncaught error | message on standard error, with the position of the error when the descriptor has `:position` | 1 |
 | read error | error code, position and message on standard error | 1 |
+| a call to `exit!` (9) | none beyond the program's own | the code given to `exit!` |
+
+**Arguments.** A program is started with a List of arguments, Strings, which `program-arguments!` (9) returns. How they are given is implementation-defined; a command line passes the words that follow the program's file, in order, with no option of the interpreter among them. A program started with none, and the REPL, see `()`.
 
 **REPL.** The REPL repeats four steps:
 
@@ -661,6 +666,8 @@ Memory management is otherwise left to the implementation and has no observable 
 2. Expand and evaluate the input as a top-level form.
 3. Print the result with `write!`, followed by a newline. If the result is `#void`, print nothing.
 4. On a read error or an uncaught error, show the message, discard the input and go back to step 1.
+
+A call to `exit!` ends the session with the code it was given; the rest of the input is not read.
 
 The REPL starts as if the session began with `(import io)` and then an `import` of each library of the standard library, in the order its specification lists them, in the empty context, so every library the implementation provides is at hand; a library the implementation does not provide is skipped. Step 3 prints with the `write!` rules (section 10) whether or not `write!` is bound.
 
@@ -717,7 +724,7 @@ An `include` is never inside a `catch`, because it is only valid at top level. S
 
 **Errors.** An `import` that fails ends with `:import-error`, whose `:values` are `(name reason …)`: the name as a Symbol, then a Keyword. An `import` of a name the implementation does not provide has the reason `:unknown-library`. When the implementation provides the library but cannot load it, for example because the file holding its definitions is missing, the reason is any other Keyword the implementation chooses, possibly followed by more values. Like `include`, an `import` is never inside a `catch`, so the error terminates the program with exit code 1 (8.7).
 
-**The library `io`.** It provides `write!`, `display!`, `read-line!` and `read-lines!`, in that order, with the behavior given in section 9. Without `(import io)`, these names are unbound like any other.
+**The library `io`.** It provides `write!`, `display!`, `read-line!`, `read-lines!`, `write-to-error!`, `display-to-error!`, `program-arguments!` and `exit!`, in that order, with the behavior given in section 9. Without `(import io)`, these names are unbound like any other.
 
 ```lisp
 (import io)
@@ -748,6 +755,7 @@ Primitives are native functions bound in the global environment, except for the 
 | Functions | `apply` | `(apply f a … list)` calls `f` with `a …` followed by the elements of `list` |
 | Logic | `not` | returns `#true` if the argument is `#false`, and `#false` in any other case; `and` and `or` are derived forms (8.3) |
 | Input and output (library `io`) | `write!`, `display!`, `read-line!`, `read-lines!` | only after `(import io)` (8.9). `write!` and `display!` write a value to standard output, in the form of section 10, and return `#void`. `read-line!` reads a line from standard input and returns it without the line terminator, or `#void` at end of input. The only line terminator is U+000A, as in 6.1: a U+000D before it stays in the returned string, and a U+000D alone does not end a line. A last line without U+000A is returned as it is. A line that is not valid UTF-8 (3.2) produces `:io-error` with `:values` `(:invalid-utf8)`; the line is consumed, so the next `read-line!` reads the one after it. `read-lines!` reads the lines left on standard input, with the same rules, and returns them in order as a new List of Strings, or `()` when none is left; it can follow calls to `read-line!`, and returns the lines after the ones they read. It holds the whole input at once, so a program that must run in constant memory reads one line at a time with `read-line!`. A line that is not valid UTF-8 produces `:io-error` with `:values` `(:invalid-utf8)`; the lines before it and the line itself are consumed and lost, so the next `read-lines!` returns the lines after it |
+| Standard error and the program (library `io`) | `write-to-error!`, `display-to-error!`, `program-arguments!`, `exit!` | only after `(import io)` (8.9). `write-to-error!` and `display-to-error!` write a value to standard error as `write!` and `display!` write it to standard output, and return `#void`. `program-arguments!` returns the program's arguments (8.7) as a new List of Strings, in order; an argument that is not valid UTF-8 (3.2) produces `:io-error` with `:values` `(:invalid-utf8 index)`, where `index` is its position in the List, from 0. `(exit! code)` ends the program with the exit code `code` (8.7), an Integer from 0 to 255: what was written before it stays written, and it never returns. It is not an error, so `catch` and `try` do not stop it (8.5). A `code` that is not an Integer produces `:wrong-type`, and an Integer outside 0 to 255 produces `:domain-error` |
 | Errors | `error`, `raise`, `catch` | `(error message value …)` interrupts with `{:kind :error :message message :values (value …)}`; `(raise descriptor)` interrupts with an existing descriptor; `(catch body handler)` catches errors (8.5) |
 
 ## 10. Printing
@@ -804,6 +812,7 @@ Correspondences with names from other Lisps, for those coming from them:
 | `string-at` | `string-ref` |
 | `generate-symbol` | `gensym` |
 | `display!`, `write!`, `read-line!`, `read-lines!` | `display`, `write`, `read-line`, `read-lines` |
+| `program-arguments!`, `exit!` | `command-line`, `exit` |
 
 ## 12. Conformance
 
@@ -897,18 +906,18 @@ An implementation is conformant when it passes all the cases below. Results are 
 
 ### 12.4 Conformance file
 
-The file `conformance.json` has 574 cases, each with an `id`, the section it tests and a kind:
+The file `conformance.json` has 611 cases, each with an `id`, the section it tests and a kind:
 
 | Kind | Cases | What it checks |
 | --- | --- | --- |
 | `read` | 28 | `input` produces the same sequence of datums as `equivalent`, or datums with the types in `types` |
 | `read-error` | 55 | reading `input`, or the bytes of `input_hex`, fails with the code `error` at `position` |
 | `read-positions` | 3 | the node indicated by each `path` is in the position table with the expected `position` |
-| `eval` | 488 | `program` runs as a file, with `input` (or the bytes of `input_hex`) on standard input; it imports at most the library `io`; the output is exactly `output`, and the program ends with the value `value` or with an uncaught error of the `:kind` given in `error`; with `error_position`, the descriptor of that error has a `:position` whose `:line` and `:column` are the given pair, or, when `error_position` is `null`, no `:position` |
+| `eval` | 525 | `program` runs as a file, with `input` (or the bytes of `input_hex`) on standard input; it imports at most the library `io`; the output is exactly `output`, and the program ends with the value `value` or with an uncaught error of the `:kind` given in `error`; with `error_position`, the descriptor of that error has a `:position` whose `:line` and `:column` are the given pair, or, when `error_position` is `null`, no `:position`; with `arguments`, a List of Strings, they are the program's arguments (8.7), and `()` without it; standard error is exactly `error_output`, or empty when the case does not give it, and holds only what the program wrote there, not the message of an uncaught error; with `exit_code`, the program ends by calling `exit!` with that code, instead of ending with `value` or `error` |
 
 An `eval` case that tests `include` (8.8) also has `files`, an object that maps each relative path, with `/` as separator, to the text of that file. The program is the file `main.nvl`, and the paths are relative to its directory. A path missing from `files` cannot be opened.
 
-The `eval` cases cover the special and derived forms, including `if` with several pairs, `match` and the patterns of `let`, `try`: errors caught, passed on with their position, nested and raised by a result, `chain`: steps that go on and stop, patterns, a step evaluated once, a step of another meaning, a loop of a million steps through it, tail calls with one million iterations, a traversal of a list of one million elements with `empty?`, `first` and `rest` (8.6), a map of one million keys built with `associate`, persistence and `dissociate` on large maps, keys whose hashes may collide (8.6), sets: reading, literals, equality, printing, quasiquote, the primitives and a set of one million elements, 10,000 nested non-tail calls and `:stack-overflow`, equality, arithmetic and overflows, primitives, `read-line!` with invalid UTF-8, `read-lines!`, alone, after `read-line!`, with invalid UTF-8 and over 10,000 lines, the code point conversions, including a String of one million code points, Floats: arithmetic, comparisons, every mix of Integers and Floats, the errors that keep them finite, the conversions, `sqrt`, Floats as keys and in patterns, and how they print, `float-to-fixed`: rounding from the exact binary value, ties away from zero, carries, signs, the extremes and the errors, printing (including `display!` of strings inside collections), `catch` and `raise`, the positions in errors (8.5), both callback patterns, `include` with and without prefixes, and `import` (8.9). Some cases check that what was removed from the core does not exist: `same?`, named `lambda`, the names without `!`, the standard library functions without `import`, and the `io` functions without `import`. The library has its own cases, in the file `stdlib-conformance.json`.
+The `eval` cases cover the special and derived forms, including `if` with several pairs, `match` and the patterns of `let`, `try`: errors caught, passed on with their position, nested and raised by a result, `chain`: steps that go on and stop, patterns, a step evaluated once, a step of another meaning, a loop of a million steps through it, tail calls with one million iterations, a traversal of a list of one million elements with `empty?`, `first` and `rest` (8.6), a map of one million keys built with `associate`, persistence and `dissociate` on large maps, keys whose hashes may collide (8.6), sets: reading, literals, equality, printing, quasiquote, the primitives and a set of one million elements, 10,000 nested non-tail calls and `:stack-overflow`, equality, arithmetic and overflows, primitives, `read-line!` with invalid UTF-8, `read-lines!`, alone, after `read-line!`, with invalid UTF-8 and over 10,000 lines, standard error, the program's arguments and `exit!`: inside `catch` and `try`, deep in a recursion, inside an included file and with codes out of range, the code point conversions, including a String of one million code points, Floats: arithmetic, comparisons, every mix of Integers and Floats, the errors that keep them finite, the conversions, `sqrt`, Floats as keys and in patterns, and how they print, `float-to-fixed`: rounding from the exact binary value, ties away from zero, carries, signs, the extremes and the errors, printing (including `display!` of strings inside collections), `catch` and `raise`, the positions in errors (8.5), both callback patterns, `include` with and without prefixes, and `import` (8.9). Some cases check that what was removed from the core does not exist: `same?`, named `lambda`, the names without `!`, the standard library functions without `import`, and the `io` functions without `import`. The library has its own cases, in the file `stdlib-conformance.json`.
 
 **Behaviors fixed by the tests.** While writing the cases, these points needed an answer that the text above does not give yet:
 
@@ -917,4 +926,4 @@ The `eval` cases cover the special and derived forms, including `if` with severa
 - `dissociate` of a missing key returns the map unchanged.
 - A `raise` with a valid descriptor and a custom `:kind`, such as `:custom`, terminates the program with that `:kind`.
 
-Version 0.2.1 settled the remaining points in the text (see its list of changes), and the cases cover them. Version 0.3.0 added the positions in errors, version 0.4.0 the persistent maps, version 0.5.0 the type Set and version 0.6.0 the `if` with several pairs, version 0.7.0 `match`, version 0.8.0 the code point conversions and version 0.9.0 the type Float and version 0.10.0 `float-to-fixed` and version 0.11.0 the patterns in `let` and version 0.12.0 `read-lines!` and version 0.13.0 `try` and version 0.14.0 `chain`; their cases cover them too. Version 0.10.1 added cases for the behaviors that a measurement of the implementation's coverage found untested.
+Version 0.2.1 settled the remaining points in the text (see its list of changes), and the cases cover them. Version 0.3.0 added the positions in errors, version 0.4.0 the persistent maps, version 0.5.0 the type Set and version 0.6.0 the `if` with several pairs, version 0.7.0 `match`, version 0.8.0 the code point conversions and version 0.9.0 the type Float and version 0.10.0 `float-to-fixed` and version 0.11.0 the patterns in `let` and version 0.12.0 `read-lines!` and version 0.13.0 `try` and version 0.14.0 `chain` and version 0.15.0 standard error, the program's arguments and `exit!`; their cases cover them too. Version 0.10.1 added cases for the behaviors that a measurement of the implementation's coverage found untested.

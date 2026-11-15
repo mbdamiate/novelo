@@ -21,6 +21,9 @@ constexpr size_t LARGE_STACK_MARGIN = 16u << 20;
 LispState *lisp_state_new(const LispStateOptions *options) {
     LispState *state = lisp_xcalloc(1, sizeof(LispState));
     state->output = options->output;
+    state->error_output = options->error_output.write ? options->error_output : lisp_output_discard();
+    state->arguments = options->arguments;
+    state->argument_count = options->argument_count;
     state->input = options->input.read_line ? options->input : lisp_input_empty();
     state->stack_limit = options->stack_limit ? options->stack_limit : DEFAULT_STACK_LIMIT;
     state->files = options->files.read_file ? options->files : lisp_file_system_disk();
@@ -194,7 +197,7 @@ LispRunResult lisp_run_source(LispState *state, const char *source, size_t lengt
     }
     if (path) lisp_loading_pop(state);
     lisp_release(forms);
-    if (!last) return LISP_RUN_ERROR;
+    if (!last) return state->exiting ? LISP_RUN_EXIT : LISP_RUN_ERROR;
     if (last_value) {
         *last_value = last;
     } else {
