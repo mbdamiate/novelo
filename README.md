@@ -33,7 +33,7 @@ make CC=gcc test
 
 ```bash
 make            # builds build/novelo
-make test       # unit tests + both conformance suites + the examples + the command line
+make test       # unit tests + both conformance suites + the examples + the tutorial + the command line
 make asan       # the same, rebuilt in build/asan with ASan + UBSan
 make coverage   # the same, rebuilt in build/coverage with clang's coverage, then a report
 make stress     # the programs of tests/stress at full size, about two minutes
@@ -113,6 +113,7 @@ NOVELO_STDLIB=/usr/local/share/novelo/standard-library.md build/novelo program.n
 make unit
 make conformance
 make examples
+make tutorial   # the REPL sessions, programs and exercise solutions of tutorial/
 make cli
 make coverage
 ./build/unit-tests -k reader/strings --no-fork      # one test, in-process for a debugger

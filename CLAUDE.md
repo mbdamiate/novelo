@@ -13,6 +13,7 @@ This repository specifies **Novelo**, an immutable Lisp (core v0.18.0, standard 
 | `conformance.json` | 696 core cases (`read`, `read-error`, `read-positions`, `eval`, with optional `error_position`, `arguments`, `error_output`, `exit_code`, `files`, `files_after`, `environment`, `current_time`, `monotonic_times`, `entropy` and `error_trace`); programs import at most `io` |
 | `stdlib-conformance.json` | 284 stdlib `eval` cases; programs import `list`, `text`, `function`, `map`, `set`, `number`, `result`, `random`, `json`, `csv`, `time` or `pattern` |
 | `README.md` | Building, running, source map, design, implementation-defined behavior |
+| `tutorial/` | A tutorial for programmers new to Lisp: chapters `NN-topic.md` whose ```novelo blocks with `> ` lines are REPL sessions checked by `make tutorial`, `programs/` laid out like `examples/`, and `exercises/NN-name/` (`answer.nvl` stub, `solution.nvl`, `check.nvl` over `exercises/harness.nvl`), checked by `tutorial/check.sh NAME` |
 | `examples/` | Commented example programs, numbered by complexity, each adding one idea: one directory per example, `NN-name/main.nvl` with an optional `input.txt` (standard input) and `arguments.txt` (one program argument per line), the expected `output.txt`, and any files it includes. The friction they show picks the next extension |
 
 The specs and the conformance files are the only source of truth. When the prose and a conformance case disagree, or the prose is silent, the case wins. Core §12.4 lists behaviors that only the tests fix, such as `first`/`rest` of `()` → `:wrong-type`.
@@ -21,10 +22,11 @@ The specs and the conformance files are the only source of truth. When the prose
 
 ```bash
 make               # build build/novelo (C23, -Wall -Wextra -Wpedantic -Werror)
-make test          # unit tests + both conformance suites + examples + tests/cli.sh; must pass with zero leaks
+make test          # unit tests + both conformance suites + examples + tutorial + tests/cli.sh; must pass with zero leaks
 make unit          # unit tests only
 make conformance   # both conformance suites
 make examples      # run examples/*/main.nvl with build/novelo and compare with output.txt
+make tutorial      # tests/tutorial.sh: every ```novelo REPL session in tutorial/*.md, tutorial/programs, and each exercise's solution (its stub must fail)
 make asan          # rebuild in build/asan with ASan + UBSan and run `make test` there
 make coverage      # rebuild in build/coverage (clang), run `make test`, print llvm-cov's report
 make stress        # tests/stress at full size (~2 min): volume, depth, constant memory by peak RSS

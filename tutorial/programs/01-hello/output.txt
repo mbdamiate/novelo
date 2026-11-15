@@ -1,0 +1,4 @@
+Hello, world!
+Novelo	means "ball of yarn".
+"Novelo\tmeans \"ball of yarn\".\n"
+42

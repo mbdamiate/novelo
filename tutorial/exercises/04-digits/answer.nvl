@@ -1,0 +1,19 @@
+; Exercise 04-digits (chapter 4).
+;
+; Replace each (error "not implemented yet") with the body of the function.
+; Then run: tutorial/check.sh 04-digits
+
+; The sum of the decimal digits of an Integer that is not negative:
+; (sum-digits 2026) is 10, and (sum-digits 0) is 0. The last digit of n is
+; (remainder n 10), and the others are the digits of (quotient n 10).
+(define sum-digits
+  (lambda (n)
+    (error "not implemented yet")))
+
+; The list of the decimal digits of an Integer that is not negative, from
+; the first to the last: (digit-list 2026) is (2 0 2 6), and (digit-list 0)
+; is (0). Hint: taking digits from the end with an accumulator and
+; prepend puts them in the right order. You may define a helper function.
+(define digit-list
+  (lambda (n)
+    (error "not implemented yet")))

@@ -1,0 +1,15 @@
+; Exercise 02-values (chapter 2): a solution.
+
+; The average of the Integers 7, 8 and 10, as a Float.
+(define average (/ (integer-to-float (+ 7 8 10)) 3.0))
+
+; The initials of "Ada Lovelace".
+(define full-name "Ada Lovelace")
+(define initials (concatenate (string-at full-name 0) (string-at full-name 4)))
+
+; A list of the keywords :red, :green and :blue.
+(define colors (list :red :green :blue))
+
+; The price as text, "R$ 12.50".
+(define price 12.5)
+(define price-text (concatenate "R$ " (float-to-fixed price 2)))

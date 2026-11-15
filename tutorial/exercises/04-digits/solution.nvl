@@ -1,0 +1,18 @@
+; Exercise 04-digits (chapter 4): a solution.
+
+(define sum-digits
+  (lambda (n)
+    (if (< n 10) n
+        otherwise (+ (remainder n 10) (sum-digits (quotient n 10))))))
+
+; The digits are taken from the end, and prepend puts each one in front of
+; those already taken, so the list comes out in order.
+(define digit-list-from
+  (lambda (n digits)
+    (if (< n 10) (prepend n digits)
+        otherwise (digit-list-from (quotient n 10)
+                                   (prepend (remainder n 10) digits)))))
+
+(define digit-list
+  (lambda (n)
+    (digit-list-from n '())))

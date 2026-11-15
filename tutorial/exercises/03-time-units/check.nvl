@@ -1,0 +1,9 @@
+; The tests of exercise 03-time-units.
+(include "harness.nvl")
+(include "answer.nvl")
+
+(report! (list (check (seconds-in-hours 2) 7200)
+               (check (seconds-in-hours 0) 0)
+               (check (format-duration 3723) "1h 2m 3s")
+               (check (format-duration 59) "0h 0m 59s")
+               (check (format-duration 86400) "24h 0m 0s")))

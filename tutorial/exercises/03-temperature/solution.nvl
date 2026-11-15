@@ -1,0 +1,13 @@
+; Exercise 03-temperature (chapter 3): a solution.
+
+(define celsius-to-fahrenheit
+  (lambda (celsius)
+    (+ (/ (* celsius 9.0) 5.0) 32.0)))
+
+; The tests run in order, so each one only needs to check the upper bound.
+(define describe-temperature
+  (lambda (celsius)
+    (if (< celsius 0.0) :freezing
+        (< celsius 15.0) :cold
+        (< celsius 25.0) :mild
+        otherwise :hot)))

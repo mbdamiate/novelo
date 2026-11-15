@@ -1,0 +1,15 @@
+; Exercise 01-expressions (chapter 1).
+;
+; A solution.
+
+; 3 × 4 + 5
+(define first-formula (+ (* 3 4) 5))
+
+; (10 − 4) × (2 + 3)
+(define second-formula (* (- 10 4) (+ 2 3)))
+
+; 2 + 3 × (8 − 6) − 1
+(define third-formula (- (+ 2 (* 3 (- 8 6))) 1))
+
+; The minutes in a week: 7 days of 24 hours of 60 minutes.
+(define minutes-in-a-week (* 7 24 60))

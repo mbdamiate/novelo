@@ -1,0 +1,26 @@
+; Exercise 04-list-functions (chapter 4): a solution.
+
+(define size
+  (lambda (items)
+    (if (empty? items) 0
+        otherwise (+ 1 (size (rest items))))))
+
+; The largest of the rest is compared with the first element. A list of one
+; element is its own largest.
+(define largest
+  (lambda (numbers)
+    (if (empty? (rest numbers)) (first numbers)
+        otherwise (let ((largest-of-rest (largest (rest numbers))))
+                    (if (> (first numbers) largest-of-rest) (first numbers)
+                        otherwise largest-of-rest)))))
+
+(define occurrences
+  (lambda (value items)
+    (if (empty? items) 0
+        (equal? (first items) value) (+ 1 (occurrences value (rest items)))
+        otherwise (occurrences value (rest items)))))
+
+(define last-element
+  (lambda (items)
+    (if (empty? (rest items)) (first items)
+        otherwise (last-element (rest items)))))

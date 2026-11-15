@@ -1,0 +1,14 @@
+; The tests of exercise 04-list-functions.
+(include "harness.nvl")
+(include "answer.nvl")
+
+(report! (list (check (size '(a b c)) 3)
+               (check (size '()) 0)
+               (check (largest '(3 9 2)) 9)
+               (check (largest '(-5)) -5)
+               (check (largest '(-5 -2 -9)) -2)
+               (check (occurrences :a '(:a :b :a)) 2)
+               (check (occurrences "x" '()) 0)
+               (check (occurrences '(1) '((1) 1 (1 2))) 1)
+               (check (last-element '(1 2 3)) 3)
+               (check (last-element '(only)) 'only)))

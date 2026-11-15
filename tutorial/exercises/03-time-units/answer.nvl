@@ -1,0 +1,17 @@
+; Exercise 03-time-units (chapter 3).
+;
+; Replace each (error "not implemented yet") with the body of the function.
+; Then run: tutorial/check.sh 03-time-units
+
+; The number of seconds in `hours` hours: (seconds-in-hours 2) is 7200.
+(define seconds-in-hours
+  (lambda (hours)
+    (error "not implemented yet")))
+
+; A number of seconds written as hours, minutes and seconds:
+; (format-duration 3723) is "1h 2m 3s", and (format-duration 59) is
+; "0h 0m 59s". Use let to name the three parts, quotient and remainder to
+; compute them, and to-string and concatenate to write them.
+(define format-duration
+  (lambda (seconds)
+    (error "not implemented yet")))

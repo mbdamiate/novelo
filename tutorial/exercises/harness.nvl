@@ -1,0 +1,64 @@
+; The test harness of the tutorial's exercises.
+;
+; Every exercise has a check.nvl that includes this file and the learner's
+; answer.nvl, then lists its tests:
+;
+;   (report! (list (check (sum-digits 123) 6)
+;                  (check (sum-digits 0) 0)))
+;
+; `check` is a macro (chapter 11): it keeps the expression as written, to
+; name the test, and wraps it in a function, so that a test that raises an
+; error is reported on its own and the tests after it still run.
+;
+; `report!` prints one line per failing test and a summary, and exits with
+; 1 when a test failed, so tutorial/check.sh can tell the two apart.
+
+(import io)
+(import list)
+
+; The outcome of one test, a value: (:passed expression) or
+; (:failed expression expected actual) or (:raised expression descriptor).
+(define run-test
+  (lambda (expression thunk expected)
+    (try (let ((actual (thunk)))
+           (if (equal? actual expected) (list :passed expression)
+               otherwise (list :failed expression expected actual)))
+      problem (list :raised expression problem))))
+
+(define-macro check
+  (lambda (expression expected)
+    `(run-test (quote ,expression) (lambda () ,expression) ,expected)))
+
+(define passed?
+  (lambda (outcome) (equal? (first outcome) :passed)))
+
+(define report-outcome!
+  (lambda (outcome)
+    (match outcome
+      (:passed _) #void
+      (:failed expression expected actual)
+      (sequence (display! "FAIL ") (write! expression)
+                (display! "\n  expected: ") (write! expected)
+                (display! "\n  got:      ") (write! actual)
+                (display! "\n"))
+      (:raised expression {:kind kind :message message :values values})
+      (sequence (display! "FAIL ") (write! expression)
+                (display! "\n  raised:   ") (write! kind)
+                (display! " ") (display! message)
+                (display! " ") (write! values)
+                (display! "\n")))))
+
+(define report-all!
+  (lambda (outcomes)
+    (if (empty? outcomes) #void
+        otherwise (sequence (report-outcome! (first outcomes))
+                            (report-all! (rest outcomes))))))
+
+(define report!
+  (lambda (outcomes)
+    (let ((passed (count (filter passed? outcomes)))
+          (total (count outcomes)))
+      (report-all! outcomes)
+      (display! (concatenate (to-string passed) " of " (to-string total)
+                             " tests passed\n"))
+      (if (< passed total) (exit! 1)))))

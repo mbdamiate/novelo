@@ -1,0 +1,8 @@
+; The tests of exercise 01-expressions.
+(include "harness.nvl")
+(include "answer.nvl")
+
+(report! (list (check first-formula 17)
+               (check second-formula 30)
+               (check third-formula 7)
+               (check minutes-in-a-week 10080)))

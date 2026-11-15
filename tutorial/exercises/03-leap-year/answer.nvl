@@ -1,0 +1,17 @@
+; Exercise 03-leap-year (chapter 3).
+;
+; Replace each (error "not implemented yet") with the body of the function.
+; Then run: tutorial/check.sh 03-leap-year
+
+; #true when `year` is a leap year: divisible by 4, except the years
+; divisible by 100, which are leap years only when divisible by 400. So
+; 2024 and 2000 are leap years, and 1900 and 2023 are not.
+; Write it with and, or and not, without if.
+(define leap-year?
+  (lambda (year)
+    (error "not implemented yet")))
+
+; The number of days in `year`: 366 in a leap year, 365 otherwise.
+(define days-in-year
+  (lambda (year)
+    (error "not implemented yet")))

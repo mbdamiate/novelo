@@ -1,0 +1,12 @@
+; The tests of exercise 03-temperature.
+(include "harness.nvl")
+(include "answer.nvl")
+
+(report! (list (check (celsius-to-fahrenheit 100.0) 212.0)
+               (check (celsius-to-fahrenheit 0.0) 32.0)
+               (check (celsius-to-fahrenheit -40.0) -40.0)
+               (check (describe-temperature -3.5) :freezing)
+               (check (describe-temperature 0.0) :cold)
+               (check (describe-temperature 14.9) :cold)
+               (check (describe-temperature 15.0) :mild)
+               (check (describe-temperature 25.0) :hot)))

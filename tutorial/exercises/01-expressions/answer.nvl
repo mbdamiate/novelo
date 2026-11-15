@@ -1,0 +1,19 @@
+; Exercise 01-expressions (chapter 1).
+;
+; (define name value) gives a name to a value; chapter 3 explains it.
+;
+; Replace each #void with a Novelo expression for the formula in the
+; comment above it. Write the formula itself, not its result: the point is
+; the prefix notation. Then run: tutorial/check.sh 01-expressions
+
+; 3 × 4 + 5
+(define first-formula #void)
+
+; (10 − 4) × (2 + 3)
+(define second-formula #void)
+
+; 2 + 3 × (8 − 6) − 1
+(define third-formula #void)
+
+; The minutes in a week: 7 days of 24 hours of 60 minutes.
+(define minutes-in-a-week #void)

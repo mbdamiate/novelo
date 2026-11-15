@@ -1,0 +1,11 @@
+; The tests of exercise 04-digits.
+(include "harness.nvl")
+(include "answer.nvl")
+
+(report! (list (check (sum-digits 2026) 10)
+               (check (sum-digits 7) 7)
+               (check (sum-digits 0) 0)
+               (check (sum-digits 9999999999) 90)
+               (check (digit-list 2026) '(2 0 2 6))
+               (check (digit-list 0) '(0))
+               (check (digit-list 100) '(1 0 0))))

@@ -1,10 +1,11 @@
 # Novelo — build, tests and sanitizers.
 #
 #   make              build the interpreter, build/novelo
-#   make test         unit tests + conformance suites + examples + command line
+#   make test         unit tests + conformance suites + examples + tutorial + command line
 #   make unit         unit tests only
 #   make conformance  conformance suites only
 #   make examples     run examples/*/main.nvl with the interpreter and check their output
+#   make tutorial     check the tutorial: its REPL sessions, programs and exercise solutions
 #   make cli          check the command line: exit codes and messages
 #   make asan         everything above, rebuilt with AddressSanitizer + UBSan in build/asan
 #   make coverage     everything above, rebuilt with clang's coverage in build/coverage, then a report
@@ -60,11 +61,11 @@ CLI_BIN := $(BUILD)/novelo
 ITERATIONS ?= 20000
 SEED ?= 1
 
-.PHONY: all test unit conformance examples cli asan coverage stress asan-stress fuzz fuzz-run bench bench-baseline clean
+.PHONY: all test unit conformance examples tutorial cli asan coverage stress asan-stress fuzz fuzz-run bench bench-baseline clean
 
 all: $(CLI_BIN)
 
-test: unit conformance examples cli
+test: unit conformance examples tutorial cli
 
 unit: $(UNIT_BIN)
 	./$(UNIT_BIN)
@@ -74,6 +75,9 @@ conformance: $(CONFORMANCE_BIN)
 
 examples: $(CLI_BIN)
 	tests/examples.sh $(CLI_BIN)
+
+tutorial: $(CLI_BIN)
+	tests/tutorial.sh $(CLI_BIN)
 
 cli: $(CLI_BIN)
 	tests/cli.sh $(CLI_BIN)

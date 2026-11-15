@@ -1,0 +1,16 @@
+; Exercise 03-leap-year (chapter 3): a solution.
+
+(define divisible?
+  (lambda (number divisor)
+    (= (remainder number divisor) 0)))
+
+(define leap-year?
+  (lambda (year)
+    (and (divisible? year 4)
+         (or (not (divisible? year 100))
+             (divisible? year 400)))))
+
+(define days-in-year
+  (lambda (year)
+    (if (leap-year? year) 366
+        otherwise 365)))

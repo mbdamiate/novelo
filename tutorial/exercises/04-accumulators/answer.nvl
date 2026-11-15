@@ -1,0 +1,20 @@
+; Exercise 04-accumulators (chapter 4).
+;
+; Write each function with tail calls, so that it works on a list of a
+; million elements. Each one needs a helper with an accumulator.
+; Then run: tutorial/check.sh 04-accumulators
+
+; The running totals of a list of numbers: (running-totals '(1 2 3)) is
+; (1 3 6), each element the sum of the elements up to it. You may use
+; reverse from the library list, which answer files import with
+; (import list).
+(define running-totals
+  (lambda (numbers)
+    (error "not implemented yet")))
+
+; The elements of two lists taken in turn, starting with the first list,
+; and then what is left of the longer one: (interleave '(1 2 3) '(a b)) is
+; (1 a 2 b 3).
+(define interleave
+  (lambda (left right)
+    (error "not implemented yet")))

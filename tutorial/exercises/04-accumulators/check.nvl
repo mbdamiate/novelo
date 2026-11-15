@@ -1,0 +1,12 @@
+; The tests of exercise 04-accumulators.
+(include "harness.nvl")
+(include "answer.nvl")
+
+(report! (list (check (running-totals '(1 2 3)) '(1 3 6))
+               (check (running-totals '()) '())
+               (check (running-totals '(5 -5 5)) '(5 0 5))
+               (check (first (reverse (running-totals (range 0 1000000)))) 499999500000)
+               (check (interleave '(1 2 3) '(a b)) '(1 a 2 b 3))
+               (check (interleave '() '(a b)) '(a b))
+               (check (interleave '(1 2) '(a b c d)) '(1 a 2 b c d))
+               (check (count (interleave (range 0 500000) (range 0 500000))) 1000000)))

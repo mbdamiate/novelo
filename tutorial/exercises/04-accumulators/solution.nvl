@@ -1,0 +1,27 @@
+; Exercise 04-accumulators (chapter 4): a solution.
+
+(import list)   ; reverse, append
+
+; `total` is the sum so far, and `totals` the totals so far, the latest
+; first, so the result is reversed at the end.
+(define running-totals-from
+  (lambda (numbers total totals)
+    (if (empty? numbers) (reverse totals)
+        otherwise (let ((next-total (+ total (first numbers))))
+                    (running-totals-from (rest numbers) next-total
+                                         (prepend next-total totals))))))
+
+(define running-totals
+  (lambda (numbers)
+    (running-totals-from numbers 0 '())))
+
+; The two lists swap places at each step, so the one to take from next is
+; always `left`.
+(define interleave-from
+  (lambda (left right taken)
+    (if (empty? left) (append (reverse taken) right)
+        otherwise (interleave-from right (rest left) (prepend (first left) taken)))))
+
+(define interleave
+  (lambda (left right)
+    (interleave-from left right '())))

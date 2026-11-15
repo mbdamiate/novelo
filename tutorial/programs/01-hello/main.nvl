@@ -1,0 +1,20 @@
+; A first program: greets the world, then shows the difference between
+; display! and write!.
+;
+;   build/novelo tutorial/programs/01-hello/main.nvl
+
+; A program sees only the core until it imports a library. display! and
+; write! live in the library io.
+(import io)
+
+(display! "Hello, world!\n")
+
+; display! prints text as it is; write! prints a value as you would type
+; it, so a String keeps its quotes and its escapes.
+(display! "Novelo\tmeans \"ball of yarn\".\n")
+(write! "Novelo\tmeans \"ball of yarn\".\n")
+(display! "\n")
+
+; Both print any value, not only Strings.
+(display! (+ 40 2))
+(display! "\n")

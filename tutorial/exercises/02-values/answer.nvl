@@ -1,0 +1,22 @@
+; Exercise 02-values (chapter 2).
+;
+; Replace each #void with an expression that computes the value the
+; comment asks for. Then run: tutorial/check.sh 02-values
+
+; The average of the Integers 7, 8 and 10, as a Float. The sum is an
+; Integer, so convert it before you divide.
+(define average #void)
+
+; The initials of "Ada Lovelace": the first character of the first name
+; and the first character of the surname, joined, "AL". Use string-at on
+; the text below, not a literal "AL".
+(define full-name "Ada Lovelace")
+(define initials #void)
+
+; A list of the keywords :red, :green and :blue, in that order.
+(define colors #void)
+
+; The price 12.5 as text with two decimals and "R$ " before it: "R$ 12.50".
+; Build it from the Float below.
+(define price 12.5)
+(define price-text #void)

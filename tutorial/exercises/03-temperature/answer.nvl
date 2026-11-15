@@ -1,0 +1,21 @@
+; Exercise 03-temperature (chapter 3).
+;
+; Replace each (error "not implemented yet") with the body of the function.
+; Then run: tutorial/check.sh 03-temperature
+
+; Degrees Celsius to degrees Fahrenheit, both Floats: F = C × 9 / 5 + 32.
+; (celsius-to-fahrenheit 100.0) is 212.0. Remember that Floats are written
+; with a point: 32.0, not 32.
+(define celsius-to-fahrenheit
+  (lambda (celsius)
+    (error "not implemented yet")))
+
+; A keyword for a temperature in Celsius, a Float:
+;   below 0.0                    :freezing
+;   from 0.0 up to below 15.0    :cold
+;   from 15.0 up to below 25.0   :mild
+;   25.0 or more                 :hot
+; Write one if with several pairs.
+(define describe-temperature
+  (lambda (celsius)
+    (error "not implemented yet")))

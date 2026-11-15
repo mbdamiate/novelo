@@ -1,0 +1,14 @@
+; Exercise 03-time-units (chapter 3): a solution.
+
+(define seconds-in-hours
+  (lambda (hours)
+    (* hours 60 60)))
+
+(define format-duration
+  (lambda (seconds)
+    (let ((hours (quotient seconds 3600))
+          (minutes (quotient (remainder seconds 3600) 60))
+          (left (remainder seconds 60)))
+      (concatenate (to-string hours) "h "
+                   (to-string minutes) "m "
+                   (to-string left) "s"))))

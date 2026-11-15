@@ -1,0 +1,8 @@
+; The tests of exercise 02-values.
+(include "harness.nvl")
+(include "answer.nvl")
+
+(report! (list (check average 8.333333333333334)
+               (check initials "AL")
+               (check colors '(:red :green :blue))
+               (check price-text "R$ 12.50")))

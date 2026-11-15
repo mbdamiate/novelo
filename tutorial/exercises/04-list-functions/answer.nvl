@@ -1,0 +1,26 @@
+; Exercise 04-list-functions (chapter 4).
+;
+; Write each function by recursion over the list, with first, rest, empty?
+; and prepend, without count or the library list.
+; Then run: tutorial/check.sh 04-list-functions
+
+; The number of elements: (size '(a b c)) is 3, (size '()) is 0.
+(define size
+  (lambda (items)
+    (error "not implemented yet")))
+
+; The largest number of a list that is not empty: (largest '(3 9 2)) is 9.
+(define largest
+  (lambda (numbers)
+    (error "not implemented yet")))
+
+; How many elements are equal? to `value`:
+; (occurrences :a '(:a :b :a)) is 2.
+(define occurrences
+  (lambda (value items)
+    (error "not implemented yet")))
+
+; The last element of a list that is not empty: (last-element '(1 2 3)) is 3.
+(define last-element
+  (lambda (items)
+    (error "not implemented yet")))
