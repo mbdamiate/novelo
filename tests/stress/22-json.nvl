@@ -1,0 +1,33 @@
+; The library json at volume and depth: an array of many numbers and
+; strings, and arrays nested as deep, read and written back.
+; scale: 100000
+(import io)
+(import list)
+(import text)
+(import json)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define read-value
+  (lambda (text)
+    (match (read-json text)
+      (:ok value) value
+      otherwise (error "not read" (read-json text)))))
+
+(define numbers (map (lambda (n) (if (= (remainder n 2) 0) n otherwise (concatenate "s" (to-string n)))) (range 0 size)))
+(define flat (write-json numbers))
+(check "flat" (read-value flat) numbers)
+
+(define depth (quotient size 10))
+(define nested (concatenate (join "" (map (lambda (_) "[") (range 0 depth))) "1" (join "" (map (lambda (_) "]") (range 0 depth)))))
+(define unwrap
+  (lambda (value levels)
+    (if (= levels 0) value
+        otherwise (unwrap (first value) (- levels 1)))))
+(check "nested" (unwrap (read-value nested) depth) 1)
+(check "nested written" (write-json (read-value nested)) nested)
+(check "failure" (read-json (concatenate flat " x")) (list :error "text after the value" 1 (+ (count (characters flat)) 2)))
+(display! "ok\n")

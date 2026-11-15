@@ -6,11 +6,21 @@ Nov 10, 2026 · @Matheus Damiate
 
 The standard library is a set of functions written in the language itself, on top of the core primitives. It is not part of the core: an implementation conformant to the core does not need to provide it, and the core tests do not depend on it.
 
-The standard library is made of eight libraries, in the sense of core section 8.9: `list`, `text`, `function`, `map`, `set`, `number`, `result` and `random`. Nothing is loaded before the program: a file imports the libraries it uses, such as `(import list)`, and only then sees their names. Imported with no prefix, the names are ordinary globals, and a program may redefine them. Imported with a prefix, as in `(import list l)`, they are bound as `l/map` and so on.
+The standard library is made of nine libraries, in the sense of core section 8.9: `list`, `text`, `function`, `map`, `set`, `number`, `result`, `random` and `json`. Nothing is loaded before the program: a file imports the libraries it uses, such as `(import list)`, and only then sees their names. Imported with no prefix, the names are ordinary globals, and a program may redefine them. Imported with a prefix, as in `(import list l)`, they are bound as `l/map` and so on.
 
 The reference definitions in section 4 are normative. The implementation MAY replace any of them with a native version, as long as the observable behavior is identical, including errors and the names each library binds.
 
-**Version:** 0.11.1, draft, on top of core 0.18.0.
+**Version:** 0.12.0, draft, on top of core 0.18.0.
+
+**Changes since 0.11.1.** A new library, `json`, reads and writes JSON (sections 3 and 4.9).
+- `read-json` returns a result: `(:ok value)`, or `(:error message line column)` for a text that is not JSON.
+- `write-json` writes a value back as JSON text.
+
+It began as the reader and writer of example 12-json. Two things changed on the way into the library:
+- A failure now gives a line as well as a column, because a whole document can span many lines.
+- A number is gathered as it is read. The example measured each number by counting the rest of the text, which made reading a document take time that grows with the square of its length; `make bench` showed it.
+
+The other libraries are unchanged.
 
 **Changes since 0.11.0.** No change to the libraries. With the traces of core 0.18.0, the functions of a library that an error leaves appear in its `:trace`, as any function does; a case fixes the calls that an error in the function given to `map` shows (section 5).
 
@@ -46,8 +56,8 @@ The reference definitions in section 4 are normative. The implementation MAY rep
 - **The function comes first and the collection last**, as in `(map f xs)` and `(map-values f m)`. This makes partial application with `partial` easier. `merge` takes two maps and `update` takes the key, the function and then the map.
 - **Evaluation is eager.** Every function traverses the whole list and returns the finished result.
 - **Constant memory.** Every function that traverses a list does so by tail recursion, so lists of any size are traversed in constant memory.
-- **Helpers.** Since the core has no local recursion, some functions use helpers defined at the top level of their library: `take-step`, `span-step`, `range-step`, `zip-step`, `merge-sorted`, `split-step`, `precedes-step`, `padding`, `repeat-step`, `format-step`, `check-base`, `digit-value`, `digits-step`, `map-results-step`, `letter-code-point?`, `uppercase-code-point`, `lowercase-code-point`, and the names of `random` that start with `random-` and are not in section 3: `random-jump`, `random-matrix-apply`, `random-matrix-product`, `random-dot`, `random-multiply`, `random-next`, `random-modulo`, `random-below`, `random-below-narrow`, `random-below-wide`, `random-positions`, `random-shuffle-step` and `random-gather`. They are bound by `import` like the other names, but they are not part of the interface: a program should not rely on them, and a native implementation MAY omit them.
-- **Dependencies.** `text`, `function`, `map`, `set`, `number` and `result` import `list` (core 8.9); `random` imports nothing. Importing any of them therefore also binds the names of `list` in the same context. The names of all the libraries are different, so they can be imported together without a prefix.
+- **Helpers.** Since the core has no local recursion, some functions use helpers defined at the top level of their library: `take-step`, `span-step`, `range-step`, `zip-step`, `merge-sorted`, `split-step`, `precedes-step`, `padding`, `repeat-step`, `format-step`, `check-base`, `digit-value`, `digits-step`, `map-results-step`, `letter-code-point?`, `uppercase-code-point`, `lowercase-code-point`, and the names of `random` that start with `random-` and are not in section 3: `random-jump`, `random-matrix-apply`, `random-matrix-product`, `random-dot`, `random-multiply`, `random-next`, `random-modulo`, `random-below`, `random-below-narrow`, `random-below-wide`, `random-positions`, `random-shuffle-step` and `random-gather`, and the names of `json` that start with `json-`. They are bound by `import` like the other names, but they are not part of the interface: a program should not rely on them, and a native implementation MAY omit them.
+- **Dependencies.** `text`, `function`, `map`, `set`, `number` and `result` import `list` (core 8.9); `random` imports nothing; `json` imports `list`, `text`, `number` and `result`. Importing a library therefore also binds the names of the libraries it imports in the same context. The names of all the libraries are different, so they can be imported together without a prefix.
 - **Letters and case.** `text` knows two ranges of letters: ASCII, `A` to `Z` and `a` to `z`, and Latin-1, U+00C0 to U+00FF without U+00D7 `×` and U+00F7 `÷`, which covers the accented letters of Portuguese and the other languages of Western Europe, such as `á`, `ç`, `ê` and `õ`. `uppercase` and `lowercase` pair `A`–`Z` with `a`–`z` and U+00C0–U+00DE with U+00E0–U+00FE; `ß` (U+00DF) and `ÿ` (U+00FF) have no pair in these ranges and stay as they are. Every other character, in any script, is not a letter and keeps its case. `digit?` knows only `0` to `9`, the digits `string-to-number` reads.
 - **Order of text.** `precedes?` orders by code point, not as a dictionary does: every uppercase ASCII letter comes before every lowercase one, so `"Zebra"` precedes `"apple"`, and accented letters come after `z`. To ignore case, compare the `lowercase` of both.
 
@@ -102,6 +112,8 @@ The reference definitions in section 4 are normative. The implementation MAY rep
 | `random` | `random-integer` | `(random-integer generator low high)` | List of an Integer from `low` up to before `high`, as `range` counts, each equally likely, and the next generator: `(random-integer g 1 7)` throws a die. `low` not less than `high` is `:domain-error`, with `:values` `(low high)`; a `low` or `high` that is not an Integer is `:wrong-type`, and a range whose size `high` − `low` is outside the range of Integer is `:integer-overflow` |
 | `random` | `random-float` | `(random-float generator)` | List of a Float greater than 0 and less than 1, and the next generator |
 | `random` | `shuffle` | `(shuffle generator xs)` | List of the elements of `xs` in an order drawn so that every order is equally likely, and the next generator |
+| `json` | `read-json` | `(read-json text)` | `(:ok value)` with the value the JSON `text` holds, objects as Maps with String keys, arrays as Lists and `null` as `#void`; or `(:error message line column)`, a failure with one of the messages of section 4.9 and the position, counted from 1 in characters, where the text stops being JSON. A `text` that is not a String is `:wrong-type` |
+| `json` | `write-json` | `(write-json value)` | the JSON text of `value`, built from `#void`, Booleans, numbers, Strings, Lists and Maps with String keys, with one space after each comma and colon: `(write-json {"a" (list 1 #void)})` is `{"a": [1, null]}`; any other value is `:error`, with that value, or that key, as `:values` |
 | `number` | `round` | `(round x)` | the Integer nearest to the Float `x`; exactly halfway, the one farther from zero: `(round 2.5)` is `3`, `(round -2.5)` is `-3`; errors as `floor` |
 
 There is no `find`. To get the first element that satisfies a predicate, take `first` of the `filter` result after checking that it is not empty; to only ask whether such an element exists, use `any?`. To combine from last to first, `fold` the `reverse` of the list.
@@ -735,8 +747,302 @@ Seeds are the streams of L'Ecuyer's RngStreams: the generator of seed `k` is the
         otherwise (random-gather positions (- index 1) (prepend (get positions index) gathered)))))
 ```
 
+### 4.9 `json`
+
+JSON, as RFC 8259 defines it, read into Novelo values and written back. The types map onto each other directly:
+- an object is a Map with String keys;
+- an array is a List;
+- a string is a String;
+- `true` and `false` are the Booleans, and `null` is `#void`;
+- a number is an Integer when it has no fraction and no exponent, and a Float otherwise.
+
+`read-json` reads a text that holds exactly one value, with any whitespace (space, tab, line feed, carriage return) around it.
+- **Success.** It returns `(:ok value)`, a result of the library `result`. A key that appears twice in an object keeps its last value, as most JSON readers do.
+- **Failure.** A text that is not JSON is an answer the reader expects, not an error, so it returns `(:error message line column)`:
+  - `message` is one of the Strings below;
+  - `line` and `column` give the character where the problem was found, both counted from 1 and in characters (code points);
+  - only a line feed starts a new line;
+  - a problem at the end of the text is at the position just after its last character.
+- **Errors.** A number too large for an Integer or a Float is a failure, `number out of range: …`, not `:integer-overflow` or `:float-overflow`. A `text` that is not a String is `:wrong-type`.
+
+The messages are these:
+
+| Message | The problem |
+| --- | --- |
+| `expected a value, found the end` | the text ends where a value should start |
+| `unexpected c` | a character `c` that cannot start a value |
+| `expected a string as the key` | an object key that is not a string |
+| `expected :` | no colon after a key |
+| `expected , or }` | no comma or brace after a value in an object |
+| `expected , or ]` | no comma or bracket after a value in an array |
+| `expected a digit` | a number without the digits its syntax requires, such as `-`, `1.` or `1e` |
+| `number out of range: n` | a number `n` beyond the range of Integer or Float |
+| `invalid escape` | a backslash followed by anything but `" \ / b f n r t u` |
+| `invalid \u escape` | `\u` not followed by four hexadecimal digits |
+| `unpaired surrogate` | a `\u` escape of a surrogate that is not a high one followed by a low one |
+| `control character in a string` | a character below U+0020 inside a string, unescaped |
+| `unterminated string` | a string that reaches the end of the text |
+| `text after the value` | anything but whitespace after the value |
+
+`write-json` writes a value as JSON text:
+- `#void` as `null`, the Booleans as `true` and `false`;
+- an Integer or a Float with `to-string`, which gives digits JSON reads, such as `13.5` or `6.0e-5`;
+- a String quoted, with `"`, `\` and the control characters escaped;
+- a List as an array, `[1, 2]`;
+- a Map with String keys as an object, `{"a": 1, "b": 2}`, in the order of `keys`.
+
+A comma or a colon is followed by one space. A value with no JSON form, such as a Keyword, a Map with a key that is not a String, a Set or a function, is a mistake in the program and raises `:error`, whose `:values` holds that value, or that key. `read-json` reads back the text that `write-json` writes as a value `equal?` to the one written.
+
+The library imports `list`, `text`, `number` and `result`. The reader walks the list of the text's characters with `match`, as `characters` gives it. Every reading function takes the characters left and returns a result:
+- on success, `(:ok (value more))`, with `more` the characters after the value;
+- on failure, `(:error message left)`, where `left` counts the characters not yet read. `read-json` turns that count into a line and a column. Counting the rest of the text costs a walk over it, so it is done only once, on failure.
+
+```lisp
+(import list)
+(import text)
+(import number)
+(import result)
+
+(define read-json
+  (lambda (text)
+    (let ((characters-of-text (characters text))
+          (result (chain then (((value after) (json-value characters-of-text)))
+                    (let ((after (json-skip-space after)))
+                      (if (empty? after) (ok value)
+                          otherwise (json-fail "text after the value" after))))))
+      (match result
+        (:error message left)
+        (let (((line column) (json-position characters-of-text (- (count characters-of-text) left) 1 1)))
+          (failure message line column))
+        otherwise result))))
+
+(define json-position
+  (lambda (characters-of-text consumed line column)
+    (if (= consumed 0) (list line column)
+        (equal? (first characters-of-text) "\n") (json-position (rest characters-of-text) (- consumed 1) (+ line 1) 1)
+        otherwise (json-position (rest characters-of-text) (- consumed 1) line (+ column 1)))))
+
+(define json-parsed (lambda (value more) (ok (list value more))))
+
+(define json-fail (lambda (message text) (failure message (count text))))
+
+(define json-skip-space
+  (lambda (text)
+    (match text
+      (" " &rest more) (json-skip-space more)
+      ("\t" &rest more) (json-skip-space more)
+      ("\n" &rest more) (json-skip-space more)
+      ("\r" &rest more) (json-skip-space more)
+      otherwise text)))
+```
+
+A value starts with the character that names its type.
+
+```lisp
+(define json-value
+  (lambda (text)
+    (let ((text (json-skip-space text)))
+      (match text
+        ("{" &rest more) (json-object (json-skip-space more) {})
+        ("[" &rest more) (json-array (json-skip-space more) ())
+        ("\"" &rest more) (json-string more ())
+        ("t" "r" "u" "e" &rest more) (json-parsed #true more)
+        ("f" "a" "l" "s" "e" &rest more) (json-parsed #false more)
+        ("n" "u" "l" "l" &rest more) (json-parsed #void more)
+        () (json-fail "expected a value, found the end" text)
+        otherwise (json-number text)))))
+
+(define json-expect
+  (lambda (expected text)
+    (let ((text (json-skip-space text)))
+      (if (and (not (empty? text)) (equal? (first text) expected)) (ok (rest text))
+          otherwise (json-fail (concatenate "expected " expected) text)))))
+```
+
+An object is a key, a colon and a value, then a comma and another, or the closing brace; an array is the same without keys. Each step starts where the step before stopped. The elements of an array are gathered newest first and reversed at the end.
+
+```lisp
+(define json-object
+  (lambda (text object)
+    (match text
+      ("}" &rest more) (json-parsed object more)
+      otherwise
+      (chain then (((key after-key) (json-key text))
+                   (after-colon (json-expect ":" after-key))
+                   ((value after-value) (json-value after-colon)))
+        (let ((object (associate object key value))
+              (after (json-skip-space after-value)))
+          (match after
+            ("," &rest more) (json-object (json-skip-space more) object)
+            ("}" &rest more) (json-parsed object more)
+            otherwise (json-fail "expected , or }" after)))))))
+
+(define json-key
+  (lambda (text)
+    (match text
+      ("\"" &rest more) (json-string more ())
+      otherwise (json-fail "expected a string as the key" text))))
+
+(define json-array
+  (lambda (text elements)
+    (match text
+      ("]" &rest more) (json-parsed (reverse elements) more)
+      otherwise
+      (chain then (((value after-value) (json-value text)))
+        (let ((elements (prepend value elements))
+              (after (json-skip-space after-value)))
+          (match after
+            ("," &rest more) (json-array (json-skip-space more) elements)
+            ("]" &rest more) (json-parsed (reverse elements) more)
+            otherwise (json-fail "expected , or ]" after)))))))
+```
+
+A string gathers its characters, newest first, until the closing quote. `\u` is followed by four hexadecimal digits, which name a UTF-16 unit. A character above U+FFFF is written as two units: a high surrogate, from D800 to DBFF, then a low one, from DC00 to DFFF. Together they give the code point. `digits-to-integer` would also take a sign, which JSON does not allow, so a `-` is checked first.
+
+```lisp
+(define json-escapes {"\"" "\"" "\\" "\\" "/" "/" "b" "\u{8}" "f" "\u{C}" "n" "\n" "r" "\r" "t" "\t"})
+
+(define json-string
+  (lambda (text gathered)
+    (match text
+      ("\"" &rest more) (json-parsed (apply concatenate (reverse gathered)) more)
+      ("\\" "u" a b c d "\\" "u" e f g h &rest more)
+      (chain then ((high (json-unit-value (list a b c d) text))
+                   (low (json-unit-value (list e f g h) text)))
+        (if (and (<= 55296 high 56319) (<= 56320 low 57343))
+            (json-string more (prepend (code-points-to-string (list (json-surrogate-pair high low))) gathered))
+            otherwise (json-unit high text (drop 6 text) gathered)))
+      ("\\" "u" a b c d &rest more)
+      (chain then ((unit (json-unit-value (list a b c d) text)))
+        (json-unit unit text more gathered))
+      ("\\" "u" &rest more) (json-fail "invalid \\u escape" text)
+      ("\\" escape &rest more)
+      (if (contains? json-escapes escape) (json-string more (prepend (get json-escapes escape) gathered))
+          otherwise (json-fail "invalid escape" text))
+      ("\\") (json-fail "unterminated string" text)
+      (character &rest more)
+      (if (< (first (string-to-code-points character)) 32) (json-fail "control character in a string" text)
+          otherwise (json-string more (prepend character gathered)))
+      otherwise (json-fail "unterminated string" text))))
+
+(define json-unit-value
+  (lambda (digits text)
+    (let ((value (if (equal? (first digits) "-") #void
+                     otherwise (digits-to-integer (apply concatenate digits) 16))))
+      (if (void? value) (json-fail "invalid \\u escape" text)
+          otherwise (ok value)))))
+
+(define json-surrogate-pair
+  (lambda (high low)
+    (+ 65536 (* (- high 55296) 1024) (- low 56320))))
+
+(define json-unit
+  (lambda (unit text more gathered)
+    (if (<= 55296 unit 57343) (json-fail "unpaired surrogate" text)
+        otherwise (json-string more (prepend (code-points-to-string (list unit)) gathered)))))
+```
+
+A number is an optional minus, then `0` or digits that do not start with `0`, then optionally a point and digits, then optionally `e` or `E`, a sign and digits. Each part takes the characters left and the characters of the number gathered so far, newest first, and returns a result whose value is both after its part. The number's text then goes to `string-to-number`, which reads every text that this syntax lets through, so a number can only fail by its range. Novelo's syntax is not JSON's: it wants a point before the exponent, a lowercase `e` and no `+` sign. So `json-novelo-number` turns `1e3` into `1.0e3`, `2E-1` into `2.0e-1` and `0.5e+1` into `0.5e1`.
+
+```lisp
+(define json-number
+  (lambda (text)
+    (if (not (or (equal? (first text) "-") (digit? (first text))))
+        (json-fail (concatenate "unexpected " (first text)) text)
+        otherwise
+        (let (((sign after-sign) (match text ("-" &rest more) (list '("-") more) otherwise (list () text))))
+          (chain then (((integer after-integer) (json-integer-part after-sign sign))
+                       ((fraction after-fraction) (json-fraction-part after-integer integer))
+                       ((gathered after) (json-exponent-part after-fraction fraction)))
+            (json-number-value (apply concatenate (reverse gathered)) text after))))))
+
+(define json-digits
+  (lambda (text gathered)
+    (if (and (not (empty? text)) (digit? (first text))) (json-digits (rest text) (prepend (first text) gathered))
+        otherwise (list gathered text))))
+
+(define json-some-digits
+  (lambda (text gathered)
+    (if (and (not (empty? text)) (digit? (first text))) (ok (json-digits text gathered))
+        otherwise (json-fail "expected a digit" text))))
+
+(define json-integer-part
+  (lambda (text gathered)
+    (match text
+      ("0" &rest more) (ok (list (prepend "0" gathered) more))
+      otherwise (json-some-digits text gathered))))
+
+(define json-fraction-part
+  (lambda (text gathered)
+    (match text
+      ("." &rest more) (json-some-digits more (prepend "." gathered))
+      otherwise (ok (list gathered text)))))
+
+(define json-exponent-part
+  (lambda (text gathered)
+    (match text
+      ("e" &rest more) (json-exponent-digits more (prepend "e" gathered))
+      ("E" &rest more) (json-exponent-digits more (prepend "e" gathered))
+      otherwise (ok (list gathered text)))))
+
+(define json-exponent-digits
+  (lambda (text gathered)
+    (match text
+      ("+" &rest more) (json-some-digits more gathered)
+      ("-" &rest more) (json-some-digits more (prepend "-" gathered))
+      otherwise (json-some-digits text gathered))))
+
+(define json-novelo-number
+  (lambda (number-text)
+    (match (split "e" number-text)
+      (mantissa exponent)
+      (concatenate mantissa (if (any? (lambda (character) (equal? character ".")) (characters mantissa)) ""
+                                otherwise ".0")
+                   "e" exponent)
+      otherwise number-text)))
+
+(define json-number-value
+  (lambda (number-text text after)
+    (try (json-parsed (string-to-number (json-novelo-number number-text)) after)
+      {:kind :integer-overflow} (json-fail (concatenate "number out of range: " number-text) text)
+      {:kind :float-overflow} (json-fail (concatenate "number out of range: " number-text) text))))
+```
+
+Writing escapes `"`, `\` and every control character: with a short escape when there is one, as `\u00XX` otherwise.
+
+```lisp
+(define json-short-escapes {"\"" "\\\"" "\\" "\\\\" "\n" "\\n" "\r" "\\r" "\t" "\\t" "\u{8}" "\\b" "\u{C}" "\\f"})
+
+(define json-escape
+  (lambda (character)
+    (if (contains? json-short-escapes character) (get json-short-escapes character)
+        (< (first (string-to-code-points character)) 32)
+        (concatenate "\\u" (pad-left 4 "0" (integer-to-digits (first (string-to-code-points character)) 16)))
+        otherwise character)))
+
+(define json-quote
+  (lambda (text)
+    (concatenate "\"" (apply concatenate (map json-escape (characters text))) "\"")))
+
+(define write-json
+  (lambda (value)
+    (if (void? value) "null"
+        (equal? value #true) "true"
+        (equal? value #false) "false"
+        (or (integer? value) (float? value)) (to-string value)
+        (string? value) (json-quote value)
+        (list? value) (concatenate "[" (join ", " (map write-json value)) "]")
+        (map? value) (concatenate "{" (join ", " (map (lambda (key) (json-member key value)) (keys value))) "}")
+        otherwise (raise {:kind :error :message "write-json: the value has no JSON form" :values (list value)}))))
+
+(define json-member
+  (lambda (key object)
+    (if (string? key) (concatenate (json-quote key) ": " (write-json (get object key)))
+        otherwise (raise {:kind :error :message "write-json: an object key must be a String" :values (list key)}))))
+```
+
 ## 5. Conformance
 
-The file `stdlib-conformance.json` has 166 cases, in the same format as the core `eval` cases, with one difference: the libraries `list`, `text`, `function`, `map`, `set`, `number`, `result` and `random` are available to `import`. Each program imports what it uses. An implementation that provides the library MUST pass all of them, in addition to the core cases.
+The file `stdlib-conformance.json` has 193 cases, in the same format as the core `eval` cases, with one difference: the libraries `list`, `text`, `function`, `map`, `set`, `number`, `result`, `random` and `json` are available to `import`. Each program imports what it uses. An implementation that provides the library MUST pass all of them, in addition to the core cases.
 
-The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that imports a library, a traversal of one hundred thousand elements, which only passes if the functions run in constant memory, every function of `map` with its errors, a map of one hundred thousand keys built with `from-entries` and reduced with `filter-entries`, every function of `set`, sets of one hundred thousand elements, the order of `precedes?` and its stable use in `sort`, `uppercase`, `lowercase`, `letter?` and `digit?` at the edges of the ASCII and Latin-1 ranges, `pad-left` and `pad-right` with texts wider than the width, accented fills and fills of the wrong length, `format` with values of every type, braces outside `{}` and too few or too many values, `join` of a single part that is returned as it is, and `join` of two hundred thousand parts and `format` of ten thousand values, which only pass in reasonable time if they grow linearly, `max` and `min` with Integers, with Floats, with their errors and over one hundred thousand arguments, `abs`, `floor`, `ceiling` and `round` at negative numbers, `-0.0`, halfway values, Floats above 2^52 and the edges of the range of Integer, `characters` of accented letters, of characters outside the BMP and of the empty text, and its use with `match`, `digits-to-integer` and `integer-to-digits` in bases 2, 8, 10, 16 and 36, with uppercase digits, signs, texts that are not numbers, the smallest and largest Integer, overflow, every base error and a round trip in every base, `span` with a test that always or never holds and a test it stops calling, and with a `let` pattern, `zip` of lists of different lengths and as the input of `from-entries`, both over one hundred thousand elements, `ok`, `failure` with no detail and with several, `ok?` and `failure?` over values of every shape, `then` going on, stopping and rejecting what is not a result, as the step of a `chain` with patterns, `map-results` stopping at the first failure without calling `f` again, and over one hundred thousand elements, `random-generator` for the first seeds, the largest one and one from `random-seed!`, the exact draws of `random-float` and of `random-integer` over small, negative, one-element, wide and edge ranges, sixty thousand throws of a die, `shuffle` of short lists, of lists too short to draw from and of twenty thousand elements, and every error of `random`, the trace of an error in the function given to `map`, and `import` itself: names unbound without it, prefixes, the dependencies of `text`, `function`, `map`, `set`, `number` and `result` on `list`, and repeated imports.
+The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that imports a library, a traversal of one hundred thousand elements, which only passes if the functions run in constant memory, every function of `map` with its errors, a map of one hundred thousand keys built with `from-entries` and reduced with `filter-entries`, every function of `set`, sets of one hundred thousand elements, the order of `precedes?` and its stable use in `sort`, `uppercase`, `lowercase`, `letter?` and `digit?` at the edges of the ASCII and Latin-1 ranges, `pad-left` and `pad-right` with texts wider than the width, accented fills and fills of the wrong length, `format` with values of every type, braces outside `{}` and too few or too many values, `join` of a single part that is returned as it is, and `join` of two hundred thousand parts and `format` of ten thousand values, which only pass in reasonable time if they grow linearly, `max` and `min` with Integers, with Floats, with their errors and over one hundred thousand arguments, `abs`, `floor`, `ceiling` and `round` at negative numbers, `-0.0`, halfway values, Floats above 2^52 and the edges of the range of Integer, `characters` of accented letters, of characters outside the BMP and of the empty text, and its use with `match`, `digits-to-integer` and `integer-to-digits` in bases 2, 8, 10, 16 and 36, with uppercase digits, signs, texts that are not numbers, the smallest and largest Integer, overflow, every base error and a round trip in every base, `span` with a test that always or never holds and a test it stops calling, and with a `let` pattern, `zip` of lists of different lengths and as the input of `from-entries`, both over one hundred thousand elements, `ok`, `failure` with no detail and with several, `ok?` and `failure?` over values of every shape, `then` going on, stopping and rejecting what is not a result, as the step of a `chain` with patterns, `map-results` stopping at the first failure without calling `f` again, and over one hundred thousand elements, `random-generator` for the first seeds, the largest one and one from `random-seed!`, the exact draws of `random-float` and of `random-integer` over small, negative, one-element, wide and edge ranges, sixty thousand throws of a die, `shuffle` of short lists, of lists too short to draw from and of twenty thousand elements, and every error of `random`, `read-json` over every kind of value, numbers at the edges of Integer and Float and beyond them, every escape and surrogate case, keys that repeat, whitespace, every failure message with its line and column, also across lines, `write-json` of every type, of escapes and of values without a JSON form, a round trip, and an array of twenty thousand numbers, which only passes in reasonable time if reading grows linearly, the trace of an error in the function given to `map`, and `import` itself: names unbound without it, prefixes, the dependencies of `text`, `function`, `map`, `set`, `number` and `result` on `list` and of `json` on four libraries, and repeated imports.

@@ -1,9 +1,9 @@
-; The JSON reader and writer of example 12 over a document the program
-; builds: characters, match on lists of characters and results.
-; scale: 1000
+; The library json over a document the program builds: characters, match
+; on lists of characters and results.
+; scale: 3000
 (import io)
 (import list)
-(include "../../examples/12-json/json.nvl" json)
+(import json)
 (define size (string-to-number (read-line!)))
 (define check
   (lambda (name actual expected)
@@ -16,10 +16,10 @@
      "tags" (list "a" #true #void) "nested" {"depth" (list 1 2 (list 3))}}))
 
 (define records (map record (range 0 size)))
-(define text (json/write records))
-(define value (match (json/read text) (:ok value) value otherwise (error "not read")))
+(define text (write-json records))
+(define value (match (read-json text) (:ok value) value otherwise (error "not read")))
 
 (check "count" (count value) size)
-(check "round trip" (json/write value) text)
+(check "round trip" (write-json value) text)
 (check "last" (get (first (reverse value)) "id") (- size 1))
 (display! "ok\n")

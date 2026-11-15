@@ -8,28 +8,30 @@
 ;
 ;   build/novelo examples/12-json/main.nvl < examples/12-json/input.txt
 ;
-; Reading and writing JSON is in json.nvl, next to this file, written with
-; what the earlier examples used: lists and `match` (04, 05), modules (08),
-; the text library (10, 11). This file is only about orders. A line that
-; is not JSON, or an order of the wrong shape, is not an error here: the
-; functions that read and check return a result, (:ok value) or
-; (:error …), and the program looks at it with `match`.
+; Reading and writing JSON is the library `json` (stdlib 0.12.0): this file
+; is only about orders. A line that is not JSON, or an order of the wrong
+; shape, is not an error here: `read-json` and the functions that check an
+; order return a result, (:ok value) or (:error …), and the program looks at
+; it with `match`.
 ;
-; Writing it showed where the language was awkward; the notes marked
-; "friction" in json.nvl say where. Naming the parts of a result became the
-; patterns of `let` (core 0.11.0); splitting a text into characters and
-; reading and writing hexadecimal became `characters`, `digits-to-integer`
-; and `integer-to-digits` (stdlib 0.8.0).
+; The library began as a file of this example, json.nvl, written with what
+; the earlier examples used: lists and `match` (04, 05), modules (08), the
+; text library (10, 11). Writing it showed where the language was awkward:
+; naming the parts of a result became the patterns of `let` (core 0.11.0);
+; splitting a text into characters and reading and writing hexadecimal
+; became `characters`, `digits-to-integer` and `integer-to-digits` (stdlib
+; 0.8.0); steps that each may fail became `chain` (core 0.14.0) and the
+; library `result` (stdlib 0.10.0). make bench then found it measured each
+; number by counting the rest of the text, which made it quadratic; the
+; library gathers the number's characters as it reads them.
 
 (import io)
-(import list)      ; fold, map, reverse
+(import list)      ; every?, fold, map, reverse
 (import text t)    ; t/format, t/join
 (import number)    ; round
 (import map)       ; map-values
 (import result)    ; ok, failure, then, map-results
-
-; Every name json.nvl defines is bound here as json/<name>.
-(include "json.nvl" json)
+(import json)      ; read-json, write-json
 
 ; ---- orders -------------------------------------------------------------------
 
@@ -53,8 +55,8 @@
       {"price" price "quantity" quantity}
       (if (and (not (void? (as-float price))) (integer? quantity) (>= quantity 0))
           (ok (* (as-float price) (integer-to-float quantity)))
-          otherwise (failure "an item needs a price and a whole quantity" (list (json/write item))))
-      otherwise (failure "an item needs a price and a quantity" (list (json/write item))))))
+          otherwise (failure "an item needs a price and a whole quantity" (list (write-json item))))
+      otherwise (failure "an item needs a price and a quantity" (list (write-json item))))))
 
 ; The sum of the items, or the first item that fails: `map-results` gives
 ; the amounts of all the items, or stops at the first failure.
@@ -91,7 +93,7 @@
   (lambda (state number customer item-count total)
     (let ((totals (get state :totals)))
       (say (associate state :totals (associate totals customer (+ total (get totals customer 0.0))))
-           (t/format "{}: {}, {} {}, {}\n" number (json/string customer) item-count
+           (t/format "{}: {}, {} {}, {}\n" number (write-json customer) item-count
                      (if (= item-count 1) "item" otherwise "items") (float-to-fixed total 2))))))
 
 (define reject
@@ -99,29 +101,35 @@
     (say (associate state :rejected (prepend number (get state :rejected)))
          (t/format "{}: rejected, {}\n" number reason))))
 
-; A line that is not JSON gives the column of the problem; an order of the
-; wrong shape gives its message and values.
+; A line that is not JSON gives the column of the problem (each text read
+; is one line, so its line is always 1); an order of the wrong shape gives
+; its message and values.
 (define record
   (lambda (state number line)
-    (match (json/read line)
-      (:error message column) (reject state number (t/format "column {}: {}" column message))
+    (match (read-json line)
+      (:error message _ column) (reject state number (t/format "column {}: {}" column message))
       (:ok order)
       (match (order-total order)
         (:error message values) (reject state number (t/join " " (prepend message (map to-string values))))
         (:ok (customer item-count total)) (accept state number customer item-count total)))))
 
+; A line of spaces alone holds no order and is skipped.
+(define blank?
+  (lambda (line)
+    (every? (lambda (character) (equal? character " ")) (t/characters line))))
+
 (define read-orders
   (lambda (state number)
     (let ((line (read-line!)))
       (if (void? line) (associate state :lines (- number 1))
-          (json/blank? line) (read-orders state (+ number 1))
+          (blank? line) (read-orders state (+ number 1))
           otherwise (read-orders (record state number line) (+ number 1))))))
 
 (define state (read-orders {:totals {} :rejected () :output ()} 1))
 
 (display! (concatenate (t/join "" (reverse (get state :output)))
                        "\n"
-                       (json/write {"lines" (get state :lines)
+                       (write-json {"lines" (get state :lines)
                                     "rejected" (reverse (get state :rejected))
                                     "totals" (map-values cents (get state :totals))})
                        "\n"))

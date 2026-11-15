@@ -161,6 +161,6 @@ The profile at `-O2` after the five steps, taken the same way as before:
 - **`global_value`** still takes 7–13%. That is now the macro check, the retain and the cache comparison, not the lookup. A primitive such as `+`, called by name, could be bound in its node when the name can never be redefined, but the spec allows a program to redefine any global (§8.1), so this would need a rule first.
 - **Maps.** `associate` copies trie nodes, each with two arrays of its own: 14% in `node_with_slot` and most of the remaining `malloc` in `maps`. Allocating a node and its arrays as one block would halve the allocations. The `qsort` of the first iteration is 4%.
 - **`expect_numbers`** checks the types of arithmetic arguments one at a time. It is 14% of `calls`, a candidate if numbers matter more than they do in the examples.
-- **`json`** is still quadratic. Phase 7a fixes it in the library.
+- **`json`** was still quadratic here. Phase 7a moved the reader into the library `json`, which gathers a number's characters as it reads them, and the program now imports it. Its time grows linearly, so its scale went from 1,000 records to 3,000: 0.92 s in `baseline.txt`, against 3.9 s for 2,000 records before.
 
 None of these is needed by any example now, so phase 6 stops here.

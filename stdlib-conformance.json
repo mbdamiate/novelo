@@ -1,7 +1,7 @@
 {
-  "spec": "Standard Library — Novelo, version 0.11.1",
+  "spec": "Standard Library — Novelo, version 0.12.0",
   "format": {
-    "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text, function, map, set, number, result and random available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
+    "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text, function, map, set, number, result, random and json available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
   },
   "cases": [
     {
@@ -1343,6 +1343,222 @@
         "fold",
         "map"
       ],
+      "output": ""
+    },
+    {
+      "id": "library-167",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(list (read-json \"true\") (read-json \"false\") (read-json \"null\") (read-json \"0\") (read-json \"-12\") (read-json \"\\\"\\\"\") (read-json \"-0\"))",
+      "value": "((:ok #true) (:ok #false) (:ok #void) (:ok 0) (:ok -12) (:ok \"\") (:ok 0))",
+      "output": ""
+    },
+    {
+      "id": "library-168",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(list (read-json \"1.5\") (read-json \"-0.25\") (read-json \"1e3\") (read-json \"1E3\") (read-json \"1e+3\") (read-json \"2E-1\") (read-json \"0.5e1\") (read-json \"-0.0\") (read-json \"1e-999\"))",
+      "value": "((:ok 1.5) (:ok -0.25) (:ok 1000.0) (:ok 1000.0) (:ok 1000.0) (:ok 0.2) (:ok 5.0) (:ok -0.0) (:ok 0.0))",
+      "output": ""
+    },
+    {
+      "id": "library-169",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(list (read-json \"9223372036854775807\") (read-json \"-9223372036854775808\") (read-json \"9223372036854775808\") (read-json \"1e999\") (read-json \"-1.5e400\"))",
+      "value": "((:ok 9223372036854775807) (:ok -9223372036854775808) (:error \"number out of range: 9223372036854775808\" 1 1) (:error \"number out of range: 1e999\" 1 1) (:error \"number out of range: -1.5e400\" 1 1))",
+      "output": ""
+    },
+    {
+      "id": "library-170",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(list (read-json \"[]\") (read-json \"[1, [2, []], \\\"a\\\"]\") (read-json \" \\t\\r\\n[ 1 ,2 ] \\n\"))",
+      "value": "((:ok ()) (:ok (1 (2 ()) \"a\")) (:ok (1 2)))",
+      "output": ""
+    },
+    {
+      "id": "library-171",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(list (read-json \"{}\") (read-json \"{\\\"a\\\": 1, \\\"b\\\": {\\\"c\\\": null, \\\"d\\\": [true]}}\"))",
+      "value": "((:ok {}) (:ok {\"a\" 1 \"b\" {\"c\" #void \"d\" (#true)}}))",
+      "output": ""
+    },
+    {
+      "id": "library-172",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(let (((:ok object) (read-json \"{\\\"b\\\": 1, \\\"a\\\": 2, \\\"b\\\": 3}\"))) (list (keys object) (get object \"b\")))",
+      "value": "((\"b\" \"a\") 3)",
+      "output": ""
+    },
+    {
+      "id": "library-173",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(list (read-json \"\\\"\\\\\\\"\\\\\\\\\\\\/\\\\b\\\\f\\\\n\\\\r\\\\t\\\"\") (read-json \"\\\"\\\\u0041\\\\u00e9\\\\u00E9\\\\u0000\\\"\") (read-json \"\\\"\\\\ud83d\\\\ude00!\\\"\") (read-json \"\\\"é😀 ok\\\"\"))",
+      "value": "((:ok \"\\\"\\\\/\\u{8}\\u{C}\\n\\r\\t\") (:ok \"Aéé\\u{0}\") (:ok \"😀!\") (:ok \"é😀 ok\"))",
+      "output": ""
+    },
+    {
+      "id": "library-174",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(list (read-json \"\\\"\\\\ud83d\\\\u0041\\\"\") (read-json \"\\\"\\\\ude00\\\"\") (read-json \"\\\"a\\\\ud83d\\\"\") (read-json \"\\\"\\\\u12\\\"\") (read-json \"\\\"\\\\u-123\\\"\") (read-json \"\\\"\\\\u00g1\\\"\") (read-json \"\\\"\\\\x\\\"\"))",
+      "value": "((:error \"unpaired surrogate\" 1 2) (:error \"unpaired surrogate\" 1 2) (:error \"unpaired surrogate\" 1 3) (:error \"invalid \\\\u escape\" 1 2) (:error \"invalid \\\\u escape\" 1 2) (:error \"invalid \\\\u escape\" 1 2) (:error \"invalid escape\" 1 2))",
+      "output": ""
+    },
+    {
+      "id": "library-175",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(list (read-json \"\\\"a\\u{1}b\\\"\") (read-json \"\\\"a\\tb\\\"\") (read-json \"\\\"abc\") (read-json \"\\\"abc\\\\\"))",
+      "value": "((:error \"control character in a string\" 1 3) (:error \"control character in a string\" 1 3) (:error \"unterminated string\" 1 5) (:error \"unterminated string\" 1 5))",
+      "output": ""
+    },
+    {
+      "id": "library-176",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(list (read-json \"01\") (read-json \"-\") (read-json \"1.\") (read-json \"1e\") (read-json \"1e+\") (read-json \".5\") (read-json \"+1\") (read-json \"- 1\") (read-json \"1.e3\"))",
+      "value": "((:error \"text after the value\" 1 2) (:error \"expected a digit\" 1 2) (:error \"expected a digit\" 1 3) (:error \"expected a digit\" 1 3) (:error \"expected a digit\" 1 4) (:error \"unexpected .\" 1 1) (:error \"unexpected +\" 1 1) (:error \"expected a digit\" 1 2) (:error \"expected a digit\" 1 3))",
+      "output": ""
+    },
+    {
+      "id": "library-177",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(list (read-json \"\") (read-json \"   \") (read-json \"[1,\") (read-json \"[1 2]\") (read-json \"{\\\"a\\\": 1 \\\"b\\\": 2}\") (read-json \"{1: 2}\") (read-json \"{\\\"a\\\" 1}\") (read-json \"{\\\"a\\\": }\") (read-json \"tru\") (read-json \"nul\") (read-json \"x\"))",
+      "value": "((:error \"expected a value, found the end\" 1 1) (:error \"expected a value, found the end\" 1 4) (:error \"expected a value, found the end\" 1 4) (:error \"expected , or ]\" 1 4) (:error \"expected , or }\" 1 9) (:error \"expected a string as the key\" 1 2) (:error \"expected :\" 1 6) (:error \"unexpected }\" 1 7) (:error \"unexpected t\" 1 1) (:error \"unexpected n\" 1 1) (:error \"unexpected x\" 1 1))",
+      "output": ""
+    },
+    {
+      "id": "library-178",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(list (read-json \"1 2\") (read-json \"{} x\") (read-json \"[] ]\"))",
+      "value": "((:error \"text after the value\" 1 3) (:error \"text after the value\" 1 4) (:error \"text after the value\" 1 4))",
+      "output": ""
+    },
+    {
+      "id": "library-179",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(list (read-json \"{\\n  \\\"a\\\": 1,\\n  \\\"b\\\" 2\\n}\") (read-json \"[\\n1,\\n\\n\") (read-json \"[1,\\r\\n x]\") (read-json \"\\\"é😀\\n\"))",
+      "value": "((:error \"expected :\" 3 7) (:error \"expected a value, found the end\" 4 1) (:error \"unexpected x\" 2 2) (:error \"control character in a string\" 1 4))",
+      "output": ""
+    },
+    {
+      "id": "library-180",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(read-json 12)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-181",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(write-json (list #void #true #false 0 -5 1.5 6.0e-7 1.0e21 \"a\" () {}))",
+      "value": "\"[null, true, false, 0, -5, 1.5, 6.0e-7, 1.0e21, \\\"a\\\", [], {}]\"",
+      "output": ""
+    },
+    {
+      "id": "library-182",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(write-json \"q\\\"b\\\\s/\\u{8}\\u{C}\\n\\r\\t\\u{0}\\u{1F}\\u{7F}é😀\")",
+      "value": "\"\\\"q\\\\\\\"b\\\\\\\\s/\\\\b\\\\f\\\\n\\\\r\\\\t\\\\u0000\\\\u001f\\u{7F}é😀\\\"\"",
+      "output": ""
+    },
+    {
+      "id": "library-183",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(write-json {\"b\" 1 \"a\" (list {\"x\" #void})})",
+      "value": "\"{\\\"b\\\": 1, \\\"a\\\": [{\\\"x\\\": null}]}\"",
+      "output": ""
+    },
+    {
+      "id": "library-184",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(write-json :keyword)",
+      "error": ":error",
+      "output": ""
+    },
+    {
+      "id": "library-185",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(try (write-json (list 1 {\"a\" #{2}}))\n  {:kind :error :values (value)} value)",
+      "value": "#{2}",
+      "output": ""
+    },
+    {
+      "id": "library-186",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(try (write-json {\"a\" 1 :b 2})\n  {:kind :error :values (key)} key)",
+      "value": ":b",
+      "output": ""
+    },
+    {
+      "id": "library-187",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(write-json (lambda (x) x))",
+      "error": ":error",
+      "output": ""
+    },
+    {
+      "id": "library-188",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(let ((value {\"name\" \"Zoë \\\"Z\\\"\\n\" \"tags\" (list \"a\" #false #void) \"n\" (list 0 -1 2.5 -6.0e-5) \"deep\" {\"x\" {\"y\" ()}} \"😀\" \"\\u{1}\"}))\n  (let (((:ok again) (read-json (write-json value))))\n    (list (equal? again value) (equal? (write-json again) (write-json value)))))",
+      "value": "(#true #true)",
+      "output": ""
+    },
+    {
+      "id": "library-189",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(import list)\n(import text)\n(define text (concatenate \"[\" (join \", \" (map to-string (range 0 20000))) \"]\"))\n(let (((:ok numbers) (read-json text))) (list (count numbers) (fold + 0 numbers) (equal? (write-json numbers) text)))",
+      "value": "(20000 199990000 #true)",
+      "output": ""
+    },
+    {
+      "id": "library-190",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(read-json \"1\")",
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "library-191",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(import json j)\n(list (j/read-json \"[1]\") (j/write-json 2))",
+      "value": "((:ok (1)) \"2\")",
+      "output": ""
+    },
+    {
+      "id": "library-192",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(list (characters \"ab\") (ok 1) (digits-to-integer \"ff\" 16) (map - '(1)))",
+      "value": "((\"a\" \"b\") (:ok 1) 255 (-1))",
+      "output": ""
+    },
+    {
+      "id": "library-193",
+      "kind": "eval",
+      "section": "4.9",
+      "program": "(import json)\n(import json)\n(read-json \"1\")",
+      "value": "(:ok 1)",
       "output": ""
     }
   ]

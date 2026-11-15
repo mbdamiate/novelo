@@ -3,7 +3,7 @@
 arithmetic   0.283 1.8
 calls        0.385 1.8
 closures     0.445 40.4
-json         0.981 16.5
+json         0.921 45.2
 lists        0.434 61.9
 maps         0.478 33.3
 match        0.667 2.2

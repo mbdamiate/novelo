@@ -1,6 +1,6 @@
 # Novelo
 
-An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.18.0) and the standard library (`standard-library.md`, v0.11.1).
+An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.18.0) and the standard library (`standard-library.md`, v0.12.0).
 
 *Novelo* is Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as Novelo's lists are. Source files end in `.nvl`.
 
@@ -9,7 +9,7 @@ Every case of both conformance suites passes:
 | Suite | Cases |
 | --- | --- |
 | core | 696 |
-| stdlib | 166 |
+| stdlib | 193 |
 
 Those runs report no leaks, and they also pass under AddressSanitizer and UndefinedBehaviorSanitizer.
 
@@ -101,7 +101,7 @@ An uncaught error names the innermost form, read from a file, that contains the 
 
 **The REPL** starts with all eight libraries imported. An input may span several lines: while a list, map or string is still open, the REPL keeps reading. Each value except `#void` is printed with the `write!` rules. After an error the REPL reports it and reads the next input. The `> ` prompt appears only when standard input is a terminal, so piping a file through the REPL prints only the values.
 
-**The standard library** is not compiled in. On each `import`, `list`, `text`, `function`, `map`, `set`, `number`, `result` and `random` are read from the `lisp` code blocks of `standard-library.md` §4.1–4.8, so the code that runs is the normative code. The build fixes the absolute path of that document. To use another copy, set `NOVELO_STDLIB`:
+**The standard library** is not compiled in. On each `import`, `list`, `text`, `function`, `map`, `set`, `number`, `result`, `random` and `json` are read from the `lisp` code blocks of `standard-library.md` §4.1–4.9, so the code that runs is the normative code. The build fixes the absolute path of that document. To use another copy, set `NOVELO_STDLIB`:
 
 ```bash
 NOVELO_STDLIB=/usr/local/share/novelo/standard-library.md build/novelo program.nvl
@@ -175,10 +175,12 @@ The programs cover:
   - `sort`;
   - a text of a million characters;
   - a million closures, and a chain of a million;
+  - a JSON array of a hundred thousand numbers and strings, read and written back;
 - **depth:**
   - a list nested a million levels deep, compared, hashed, printed and freed;
   - `:stack-overflow` caught and repeated, with memory stable;
   - macro expansions a hundred thousand levels deep;
+  - JSON arrays nested ten thousand levels deep;
   - the reader's nesting limit;
   - a chain of 500 includes.
 
@@ -226,7 +228,7 @@ The times are only reported. A slower program never fails the build, because a t
 | `maps` | `associate`, `get`, `dissociate`, `contains?`, and the libraries `map` and `set` |
 | `text` | `format`, `split`, `join`, `characters`, `lowercase`, `precedes?` |
 | `match` | a stack machine whose steps are `match` and patterns in `let` |
-| `json` | the reader and writer of example 12, which it includes, over a document it builds |
+| `json` | `read-json` and `write-json` of the library `json` over a document it builds |
 | `random` | draws from the library `random`, and `shuffle` |
 
 `make asan-stress` also runs each benchmark once, at a hundredth of its size, under ASan + UBSan (`build/bench --quick`), so they keep working. `tests/bench/profile.md` records where the interpreter spends its time on these programs, measured with macOS's `sample`, and what to optimize first.
