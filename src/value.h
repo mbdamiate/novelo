@@ -51,6 +51,7 @@ typedef struct Value {
     uint32_t refs;
     uint8_t kind;
     uint8_t flags;
+    uint8_t pool;   /* the free list the block returns to; 0 for none (value.c) */
 } Value;
 
 typedef struct LispInteger {
@@ -166,6 +167,9 @@ static inline void lisp_release(Value *value) {
 
 /* Number of live objects that are not immortal (leak detection). */
 size_t lisp_live_objects(void);
+
+/* Number of freed blocks kept for reuse (tests). */
+size_t lisp_pooled_blocks(void);
 
 /* Called when an object with LISP_HAS_POSITION is freed (§6.4). */
 void lisp_set_position_forget_hook(void (*hook)(const Value *node));

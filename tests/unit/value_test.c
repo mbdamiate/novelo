@@ -57,6 +57,28 @@ static void t_integers(void) {
     CHECK_INT(lisp_live_objects(), live);
 }
 
+/* Freed blocks go back to a free list of their size, which keeps a bounded
+ * number of them; under AddressSanitizer there are none. */
+static void t_free_lists(void) {
+    LispListBuilder builder;
+    lisp_list_builder_init(&builder);
+    for (int64_t index = 0; index < 100000; index++) lisp_list_append_take(&builder, lisp_integer(1000000 + index));
+    lisp_release(lisp_list_builder_finish(&builder));
+    size_t pooled = lisp_pooled_blocks();
+    CHECK(pooled <= 9 * 4096); /* 200,000 blocks were freed */
+    if (pooled == 0) return;
+
+    Value *first = lisp_integer(1 << 30);
+    uintptr_t address = (uintptr_t)first;
+    lisp_release(first);
+    CHECK_INT(lisp_pooled_blocks(), pooled);
+    Value *second = lisp_integer(INT64_MAX);
+    CHECK((uintptr_t)second == address); /* the block just freed */
+    CHECK_INT(lisp_integer_value(second), INT64_MAX);
+    CHECK_INT(lisp_pooled_blocks(), pooled - 1);
+    lisp_release(second);
+}
+
 /* §2.4.1, §2.5 */
 static void t_floats(void) {
     Value *zero = lisp_float(0.0), *negative_zero = lisp_float(-0.0), *half = lisp_float(0.5);
@@ -464,6 +486,7 @@ static void t_hash_consistent(void) {
 const TestSuite value_suite = {"value", (const TestCase[]){
     {"singletons", t_singletons},
     {"integers", t_integers},
+    {"freed blocks are reused, up to a limit", t_free_lists},
     {"floats", t_floats},
     {"reference counting", t_reference_counting},
     {"strings count code points", t_strings},

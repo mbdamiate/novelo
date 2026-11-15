@@ -28,12 +28,72 @@ size_t lisp_live_objects(void) { return live_objects; }
 
 void lisp_set_position_forget_hook(void (*hook)(const Value *node)) { position_forget_hook = hook; }
 
+/* Free lists: most objects are a few small sizes (pairs, Integers, Floats,
+ * closures, environments, map nodes), allocated and freed at every step of a
+ * loop. A freed block of up to POOL_LARGEST bytes goes back to the list of
+ * its size, rounded up to 8 bytes, which keeps at most POOL_LIMIT blocks:
+ * memory freed in bulk, such as a long list, returns to malloc.
+ *
+ * Under AddressSanitizer every block goes back to malloc, so that a use
+ * after free is still caught instead of reading a reused block. */
+#if defined(__SANITIZE_ADDRESS__)
+#define LISP_POOLS 0
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define LISP_POOLS 0
+#endif
+#endif
+#ifndef LISP_POOLS
+#define LISP_POOLS 1
+#endif
+
+constexpr size_t POOL_LARGEST = 64;
+constexpr size_t POOL_LIMIT = 4096;
+
+typedef struct FreeBlock {
+    struct FreeBlock *next;
+} FreeBlock;
+
+typedef struct Pool {
+    FreeBlock *blocks;
+    size_t count;
+} Pool;
+
+static Pool pools[POOL_LARGEST / 8 + 1]; /* pools[n]: blocks of 8n bytes */
+
+size_t lisp_pooled_blocks(void) {
+    size_t total = 0;
+    for (size_t index = 0; index < sizeof pools / sizeof pools[0]; index++) total += pools[index].count;
+    return total;
+}
+
 Value *lisp_object_new(LispKind kind, size_t size) {
     assert(size >= sizeof(Value));
-    Value *object = lisp_xmalloc(size);
-    *object = (Value){.refs = 1, .kind = kind};
+    size_t pool = LISP_POOLS && size <= POOL_LARGEST ? (size + 7) / 8 : 0;
+    Value *object;
+    if (pool && pools[pool].blocks) {
+        FreeBlock *block = pools[pool].blocks;
+        pools[pool].blocks = block->next;
+        pools[pool].count--;
+        object = (Value *)block;
+    } else {
+        object = lisp_xmalloc(pool ? pool * 8 : size);
+    }
+    *object = (Value){.refs = 1, .kind = kind, .pool = (uint8_t)pool};
     live_objects++;
     return object;
+}
+
+static void free_object(Value *object) {
+    Pool *pool = &pools[object->pool];
+    if (object->pool && pool->count < POOL_LIMIT) {
+        FreeBlock *block = (FreeBlock *)object;
+        block->next = pool->blocks;
+        pool->blocks = block;
+        pool->count++;
+    } else {
+        free(object);
+    }
 }
 
 /* Objects whose count reached zero, waiting to be destroyed. */
@@ -81,7 +141,7 @@ static void destroy(Value *object) {
         break;
     }
     if ((object->flags & LISP_HAS_POSITION) && position_forget_hook) position_forget_hook(object);
-    free(object);
+    free_object(object);
     live_objects--;
 }
 
