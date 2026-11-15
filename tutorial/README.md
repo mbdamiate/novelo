@@ -10,6 +10,10 @@ The two specifications, [`core-specification.md`](../core-specification.md) and 
 2. [Values](02-values.md): numbers, text, keywords, lists, and what counts as false.
 3. [Names and functions](03-names-and-functions.md): `define`, `lambda`, `let`, `if`, `and`, `or`.
 4. [Recursion and lists](04-recursion-and-lists.md): loops without loops, and the library `list`.
+5. [Functions as values](05-functions-as-values.md): `map`, `filter`, `fold`, `sort`, closures and `partial`.
+6. [Immutable data](06-immutable-data.md): Maps and Sets, and changing data without changing it.
+7. [Pattern matching](07-pattern-matching.md): `match` and patterns in `let`.
+8. [Errors and results](08-errors-and-results.md): `error`, `catch`, `try`, results and `chain`.
 
 ## Before you start
 

@@ -1,0 +1,29 @@
+; Exercise 07-shapes (chapter 7): a solution.
+
+(define pi 3.14159)
+
+(define area
+  (lambda (shape)
+    (match shape
+      (:circle radius) (* pi radius radius)
+      (:rectangle width height) (* width height)
+      (:square side) (* side side))))
+
+(define perimeter
+  (lambda (shape)
+    (match shape
+      (:circle radius) (* 2.0 pi radius)
+      (:rectangle width height) (* 2.0 (+ width height))
+      (:square side) (* 4.0 side))))
+
+; A pattern cannot compare width and height, so the rectangle's case
+; continues with an if.
+(define describe
+  (lambda (shape)
+    (match shape
+      (:circle _) "a circle"
+      (:square _) "a square"
+      (:rectangle width height)
+      (if (> width height) "a wide rectangle"
+          (< width height) "a tall rectangle"
+          otherwise "a square"))))

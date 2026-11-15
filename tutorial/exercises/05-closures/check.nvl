@@ -1,0 +1,15 @@
+; The tests of exercise 05-closures.
+(include "harness.nvl")
+(include "answer.nvl")
+
+(define double (lambda (n) (* n 2)))
+(define increment (lambda (n) (+ n 1)))
+
+(report! (list (check ((make-multiplier 3) 5) 15)
+               (check (map (make-multiplier 10) '(1 2)) '(10 20))
+               (check ((compose-all (list double increment)) 5) 11)
+               (check ((compose-all (list increment double)) 5) 12)
+               (check ((compose-all '()) :same) :same)
+               (check ((repeat-function double 3) 1) 8)
+               (check ((repeat-function double 0) 7) 7)
+               (check ((repeat-function increment 100000) 0) 100000)))

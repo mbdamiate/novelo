@@ -1,0 +1,25 @@
+; Exercise 08-safe-calls (chapter 8): a solution.
+
+(import result)
+(import list)
+
+(define safe-get
+  (lambda (table key)
+    (try (ok (get table key))
+      {:kind :missing-key} (failure "missing key" key))))
+
+(define safe-quotient
+  (lambda (numerator divisor)
+    (try (ok (quotient numerator divisor))
+      {:kind :division-by-zero} (failure "division by zero" numerator))))
+
+(define parse-integer
+  (lambda (text)
+    (let ((number (string-to-number text)))
+      (if (integer? number) (ok number)
+          otherwise (failure "not a number" text)))))
+
+(define sum-texts
+  (lambda (texts)
+    (then (map-results parse-integer texts)
+          (lambda (numbers) (ok (fold + 0 numbers))))))

@@ -1,0 +1,23 @@
+; Exercise 05-own-map (chapter 5).
+;
+; Then run: tutorial/check.sh 05-own-map
+
+(import list)   ; fold, reverse
+
+; map and filter of the library list, written with fold and reverse:
+; (my-map f xs) and (my-filter keep? xs) give what (map f xs) and
+; (filter keep? xs) give. Do not call map or filter.
+(define my-map
+  (lambda (f items)
+    (error "not implemented yet")))
+
+(define my-filter
+  (lambda (keep? items)
+    (error "not implemented yet")))
+
+; The runs of equal? neighbors, each as a list, in order:
+; (group-adjacent '(1 1 2 3 3 3 1)) is ((1 1) (2) (3 3 3) (1)).
+; Recursion or fold, as you prefer.
+(define group-adjacent
+  (lambda (items)
+    (error "not implemented yet")))

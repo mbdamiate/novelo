@@ -1,0 +1,19 @@
+; Exercise 07-run-length (chapter 7).
+;
+; Run-length encoding replaces each run of equal? neighbors by the value
+; and the length of the run:
+;   (encode '(a a a b c c)) is ((a 3) (b 1) (c 2))
+;   (decode '((a 3) (b 1) (c 2))) is (a a a b c c)
+; Use match on the lists. Both should use tail calls, so that a list of a
+; million elements works.
+; Then run: tutorial/check.sh 07-run-length
+
+(import list)   ; reverse
+
+(define encode
+  (lambda (items)
+    (error "not implemented yet")))
+
+(define decode
+  (lambda (runs)
+    (error "not implemented yet")))

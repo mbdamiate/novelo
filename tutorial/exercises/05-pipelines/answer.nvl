@@ -1,0 +1,27 @@
+; Exercise 05-pipelines (chapter 5).
+;
+; Write each function as a pipeline of the library list: map, filter, fold
+; and sort, without a recursion of your own.
+; Then run: tutorial/check.sh 05-pipelines
+
+(import list)   ; map, filter, fold, sort
+(import text)   ; uppercase
+
+; The words longer than 4 characters, in uppercase, in their order:
+; (shout-long-words '("a" "pear" "apple" "banana")) is ("APPLE" "BANANA").
+(define shout-long-words
+  (lambda (words)
+    (error "not implemented yet")))
+
+; The number of characters of all the words together:
+; (total-characters '("ab" "cde")) is 5.
+(define total-characters
+  (lambda (words)
+    (error "not implemented yet")))
+
+; The words from the shortest to the longest, with words of the same length
+; in their original order: (by-length '("pear" "fig" "kiwi" "a")) is
+; ("a" "fig" "pear" "kiwi").
+(define by-length
+  (lambda (words)
+    (error "not implemented yet")))

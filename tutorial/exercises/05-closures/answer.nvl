@@ -1,0 +1,23 @@
+; Exercise 05-closures (chapter 5).
+;
+; Each function returns a function. Then run: tutorial/check.sh 05-closures
+
+; A function that multiplies its argument by `factor`:
+; ((make-multiplier 3) 5) is 15.
+(define make-multiplier
+  (lambda (factor)
+    (error "not implemented yet")))
+
+; A function that applies each function of the list in turn, the first
+; one first: ((compose-all (list f g h)) x) is (h (g (f x))). With an empty
+; list, it returns its argument unchanged.
+(define compose-all
+  (lambda (functions)
+    (error "not implemented yet")))
+
+; A function that applies `f` to its argument `times` times:
+; ((repeat-function (lambda (n) (* n 2)) 3) 1) is 8. Zero times returns
+; the argument unchanged.
+(define repeat-function
+  (lambda (f times)
+    (error "not implemented yet")))

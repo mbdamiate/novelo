@@ -1,0 +1,29 @@
+; Exercise 06-inventory (chapter 6): a solution.
+
+(import list)
+(import map)
+
+(define receive
+  (lambda (stock name quantity price)
+    (if (contains? stock name)
+        (update name (lambda (item) (update :quantity (lambda (old) (+ old quantity)) item))
+                stock)
+        otherwise (associate stock name {:quantity quantity :price price}))))
+
+(define sell
+  (lambda (stock name quantity)
+    (let ((available (get (get stock name {}) :quantity 0)))
+      (if (< available quantity) (error "not enough" name)
+          (= available quantity) (dissociate stock name)
+          otherwise (update name (lambda (item) (associate item :quantity (- available quantity)))
+                            stock)))))
+
+(define stock-value
+  (lambda (stock)
+    (fold-entries (lambda (total name item)
+                    (+ total (* (get item :quantity) (get item :price))))
+                  0 stock)))
+
+(define running-low
+  (lambda (stock limit)
+    (keys (filter-entries (lambda (name item) (< (get item :quantity) limit)) stock))))

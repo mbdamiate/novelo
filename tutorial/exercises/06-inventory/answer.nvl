@@ -1,0 +1,38 @@
+; Exercise 06-inventory (chapter 6).
+;
+; A stock is a Map from a product name, a String, to a Map with its
+; :quantity and its :price, an Integer of cents:
+;
+;   {"pen" {:quantity 10 :price 150}
+;    "ink" {:quantity 2 :price 900}}
+;
+; Each function returns a new stock and leaves the one it was given as it
+; was. Then run: tutorial/check.sh 06-inventory
+
+(import list)   ; fold
+(import map)    ; update, values, fold-entries, filter-entries
+
+; The stock with `quantity` more of `name`. A product not in the stock is
+; added with that quantity and the given `price`; for one already there,
+; `price` is ignored.
+(define receive
+  (lambda (stock name quantity price)
+    (error "not implemented yet")))
+
+; The stock with `quantity` fewer of `name`. When none would be left, the
+; product leaves the stock altogether. Selling more than there is, or a
+; product that is not there, raises an error: (error "not enough" name).
+(define sell
+  (lambda (stock name quantity)
+    (error "not implemented yet")))
+
+; The value of the stock, the sum of quantity × price, in cents.
+(define stock-value
+  (lambda (stock)
+    (error "not implemented yet")))
+
+; The names of the products with fewer than `limit` units, as a List in
+; the order of (keys stock).
+(define running-low
+  (lambda (stock limit)
+    (error "not implemented yet")))

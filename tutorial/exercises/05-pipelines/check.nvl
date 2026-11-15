@@ -1,0 +1,9 @@
+; The tests of exercise 05-pipelines.
+(include "harness.nvl")
+(include "answer.nvl")
+
+(report! (list (check (shout-long-words '("a" "pear" "apple" "banana")) '("APPLE" "BANANA"))
+               (check (shout-long-words '()) '())
+               (check (total-characters '("ab" "cde")) 5)
+               (check (total-characters '()) 0)
+               (check (by-length '("pear" "fig" "kiwi" "a")) '("a" "fig" "pear" "kiwi"))))

@@ -1,0 +1,24 @@
+; The tests of exercise 06-inventory.
+(include "harness.nvl")
+(include "answer.nvl")
+
+(define stock {"pen" {:quantity 10 :price 150}
+               "ink" {:quantity 2 :price 900}})
+
+(report! (list (check (receive stock "pen" 5 999)
+                      {"pen" {:quantity 15 :price 150} "ink" {:quantity 2 :price 900}})
+               (check (receive stock "pad" 3 400)
+                      {"pen" {:quantity 10 :price 150} "ink" {:quantity 2 :price 900}
+                       "pad" {:quantity 3 :price 400}})
+               (check (sell stock "pen" 4)
+                      {"pen" {:quantity 6 :price 150} "ink" {:quantity 2 :price 900}})
+               (check (sell stock "ink" 2) {"pen" {:quantity 10 :price 150}})
+               (check (try (sell stock "ink" 3) {:message message :values values} (list message values))
+                      '("not enough" ("ink")))
+               (check (try (sell stock "pad" 1) {:message message} message) "not enough")
+               (check (let ((_ (sell stock "pen" 4))) stock)
+                      {"pen" {:quantity 10 :price 150} "ink" {:quantity 2 :price 900}})
+               (check (stock-value stock) 3300)
+               (check (stock-value {}) 0)
+               (check (running-low stock 5) '("ink"))
+               (check (running-low stock 1) '())))

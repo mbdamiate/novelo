@@ -171,3 +171,5 @@ tutorial/check.sh 04-digits
 ```
 
 The examples [`03-recursion`](../examples/03-recursion/main.nvl) and [`04-lists`](../examples/04-lists/main.nvl) cover the same ground with more commentary.
+
+Next: [Functions as values](05-functions-as-values.md).

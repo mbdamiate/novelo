@@ -1,0 +1,23 @@
+; Exercise 08-parse-date (chapter 8).
+;
+; (parse-date text) reads a date written YEAR-MONTH-DAY, such as
+; "2026-11-15", and returns a result:
+;   (:ok {:year 2026 :month 11 :day 15})
+; or the first failure among these, checked in this order:
+;   (:error "expected YEAR-MONTH-DAY" text)   not three parts around "-"
+;   (:error "not a number" part)              a part that is not an Integer
+;   (:error "month out of range" month)       a month outside 1 to 12
+;   (:error "day out of range" day)           a day outside the month
+;
+; Write a helper that reads one part as a result, and put the steps
+; together with (chain then …). days-in-month, from the library time,
+; gives the days of a month: (days-in-month 2024 2) is 29.
+; Then run: tutorial/check.sh 08-parse-date
+
+(import result)   ; ok, failure, then
+(import text)     ; split
+(import time)     ; days-in-month
+
+(define parse-date
+  (lambda (text)
+    (error "not implemented yet")))

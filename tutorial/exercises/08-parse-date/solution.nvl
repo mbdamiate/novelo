@@ -1,0 +1,38 @@
+; Exercise 08-parse-date (chapter 8): a solution.
+
+(import result)
+(import text)
+(import time)
+
+(define parse-integer
+  (lambda (part)
+    (let ((number (string-to-number part)))
+      (if (integer? number) (ok number)
+          otherwise (failure "not a number" part)))))
+
+; A result for each check, so that chain can go through them in order.
+(define split-date
+  (lambda (text)
+    (match (split "-" text)
+      (year month day) (ok (list year month day))
+      otherwise (failure "expected YEAR-MONTH-DAY" text))))
+
+(define check-month
+  (lambda (month)
+    (if (and (>= month 1) (<= month 12)) (ok month)
+        otherwise (failure "month out of range" month))))
+
+(define check-day
+  (lambda (year month day)
+    (if (and (>= day 1) (<= day (days-in-month year month))) (ok day)
+        otherwise (failure "day out of range" day))))
+
+(define parse-date
+  (lambda (text)
+    (chain then (((year-text month-text day-text) (split-date text))
+                 (year (parse-integer year-text))
+                 (month (parse-integer month-text))
+                 (day (parse-integer day-text))
+                 (_ (check-month month))
+                 (_ (check-day year month day)))
+      (ok {:year year :month month :day day}))))

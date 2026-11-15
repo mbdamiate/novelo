@@ -1,0 +1,17 @@
+; Exercise 05-pipelines (chapter 5): a solution.
+
+(import list)
+(import text)
+
+(define shout-long-words
+  (lambda (words)
+    (map uppercase (filter (lambda (word) (> (count word) 4)) words))))
+
+(define total-characters
+  (lambda (words)
+    (fold (lambda (total word) (+ total (count word))) 0 words)))
+
+; sort is stable, so words of the same length keep their order.
+(define by-length
+  (lambda (words)
+    (sort (lambda (left right) (< (count left) (count right))) words)))

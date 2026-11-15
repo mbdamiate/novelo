@@ -1,0 +1,15 @@
+; The tests of exercise 07-run-length.
+(include "harness.nvl")
+(include "answer.nvl")
+
+(define many (append (map (lambda (n) :a) (range 0 500000)) (range 0 500000)))
+
+(report! (list (check (encode '(a a a b c c)) '((a 3) (b 1) (c 2)))
+               (check (encode '()) '())
+               (check (encode '("x")) '(("x" 1)))
+               (check (encode '(1 2 1)) '((1 1) (2 1) (1 1)))
+               (check (decode '((a 3) (b 1) (c 2))) '(a a a b c c))
+               (check (decode '()) '())
+               (check (decode '((z 0) (y 2))) '(y y))
+               (check (equal? (decode (encode many)) many) #true)
+               (check (first (encode many)) '(:a 500000))))

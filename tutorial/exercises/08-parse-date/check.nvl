@@ -1,0 +1,15 @@
+; The tests of exercise 08-parse-date.
+(include "harness.nvl")
+(include "answer.nvl")
+
+(report! (list (check (parse-date "2026-11-15") '(:ok {:year 2026 :month 11 :day 15}))
+               (check (parse-date "2024-02-29") '(:ok {:year 2024 :month 2 :day 29}))
+               (check (parse-date "2026/11/15") '(:error "expected YEAR-MONTH-DAY" "2026/11/15"))
+               (check (parse-date "2026-11") '(:error "expected YEAR-MONTH-DAY" "2026-11"))
+               (check (parse-date "2026-xi-15") '(:error "not a number" "xi"))
+               (check (parse-date "2026-11-1.5") '(:error "not a number" "1.5"))
+               (check (parse-date "2026-13-01") '(:error "month out of range" 13))
+               (check (parse-date "2026-00-01") '(:error "month out of range" 0))
+               (check (parse-date "2023-02-29") '(:error "day out of range" 29))
+               (check (parse-date "2026-04-31") '(:error "day out of range" 31))
+               (check (parse-date "2026-04-00") '(:error "day out of range" 0))))

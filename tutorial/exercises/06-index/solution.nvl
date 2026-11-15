@@ -1,0 +1,27 @@
+; Exercise 06-index (chapter 6): a solution.
+
+(import list)
+(import set)
+(import text)
+
+(define add-to-index
+  (lambda (index word)
+    (if (empty? word) index
+        otherwise (let ((initial (string-at word 0)))
+                    (associate index initial (adjoin (get index initial #{}) word))))))
+
+(define index-by-initial
+  (lambda (words)
+    (fold add-to-index {} words)))
+
+(define words-starting-with
+  (lambda (index initial)
+    (sort precedes? (elements (get index initial #{})))))
+
+(define common-words
+  (lambda (left right)
+    (intersection (from-list left) (from-list right))))
+
+(define only-in-first
+  (lambda (left right)
+    (difference (from-list left) (from-list right))))

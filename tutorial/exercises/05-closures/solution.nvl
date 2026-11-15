@@ -1,0 +1,22 @@
+; Exercise 05-closures (chapter 5): a solution.
+
+(import list)   ; fold
+
+(define make-multiplier
+  (lambda (factor)
+    (lambda (n) (* n factor))))
+
+; fold passes the value through each function, the first one first.
+(define compose-all
+  (lambda (functions)
+    (lambda (value)
+      (fold (lambda (result f) (f result)) value functions))))
+
+(define apply-times
+  (lambda (f times value)
+    (if (= times 0) value
+        otherwise (apply-times f (- times 1) (f value)))))
+
+(define repeat-function
+  (lambda (f times)
+    (lambda (value) (apply-times f times value))))

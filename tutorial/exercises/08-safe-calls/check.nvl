@@ -1,0 +1,14 @@
+; The tests of exercise 08-safe-calls.
+(include "harness.nvl")
+(include "answer.nvl")
+
+(report! (list (check (safe-get {:a 1} :a) '(:ok 1))
+               (check (safe-get {:a 1} :b) '(:error "missing key" :b))
+               (check (safe-get {:a #void} :a) '(:ok #void))
+               (check (safe-quotient 17 5) '(:ok 3))
+               (check (safe-quotient 17 0) '(:error "division by zero" 17))
+               (check (try (safe-quotient "17" 5) {:kind kind} kind) :wrong-type)
+               (check (sum-texts '("1" "20" "3")) '(:ok 24))
+               (check (sum-texts '()) '(:ok 0))
+               (check (sum-texts '("1" "x" "y")) '(:error "not a number" "x"))
+               (check (sum-texts '("2.5")) '(:error "not a number" "2.5"))))

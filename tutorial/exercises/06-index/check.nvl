@@ -1,0 +1,13 @@
+; The tests of exercise 06-index.
+(include "harness.nvl")
+(include "answer.nvl")
+
+(define words '("ant" "bee" "ape" "" "bat" "ant"))
+
+(report! (list (check (index-by-initial '("ant" "bee" "ape"))
+                      {"a" #{"ant" "ape"} "b" #{"bee"}})
+               (check (index-by-initial '()) {})
+               (check (words-starting-with (index-by-initial words) "b") '("bat" "bee"))
+               (check (words-starting-with (index-by-initial words) "z") '())
+               (check (common-words '("a" "b" "c" "b") '("b" "c" "d")) #{"b" "c"})
+               (check (only-in-first '("a" "b" "c") '("b")) #{"a" "c"})))

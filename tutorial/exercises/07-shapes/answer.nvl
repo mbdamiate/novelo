@@ -1,0 +1,26 @@
+; Exercise 07-shapes (chapter 7).
+;
+; A shape is a tagged list, with Float sizes:
+;   (:circle radius)
+;   (:rectangle width height)
+;   (:square side)
+; Use match in each function, and 3.14159 for π.
+; Then run: tutorial/check.sh 07-shapes
+
+; The area: πr² for a circle, width × height for a rectangle, side² for a
+; square.
+(define area
+  (lambda (shape)
+    (error "not implemented yet")))
+
+; The perimeter: 2πr, 2 × (width + height), 4 × side.
+(define perimeter
+  (lambda (shape)
+    (error "not implemented yet")))
+
+; A description: "a circle", "a square", and for a rectangle "a wide
+; rectangle" when it is wider than tall, "a tall rectangle" when it is
+; taller than wide, and "a square" when the two are equal.
+(define describe
+  (lambda (shape)
+    (error "not implemented yet")))

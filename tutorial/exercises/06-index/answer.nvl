@@ -1,0 +1,30 @@
+; Exercise 06-index (chapter 6).
+;
+; Then run: tutorial/check.sh 06-index
+
+(import list)   ; fold, map, sort
+(import set)    ; from-list, union, intersection, difference
+(import text)   ; precedes?
+
+; A Map from the first character of each word to the Set of the words that
+; start with it: (index-by-initial '("ant" "bee" "ape")) is
+; {"a" #{"ant" "ape"} "b" #{"bee"}}. An empty word is left out.
+(define index-by-initial
+  (lambda (words)
+    (error "not implemented yet")))
+
+; The words of `index` under `initial`, sorted with precedes?, or () when
+; there are none.
+(define words-starting-with
+  (lambda (index initial)
+    (error "not implemented yet")))
+
+; The words that appear in both lists, as a Set.
+(define common-words
+  (lambda (left right)
+    (error "not implemented yet")))
+
+; The words of `left` that are not in `right`, as a Set.
+(define only-in-first
+  (lambda (left right)
+    (error "not implemented yet")))

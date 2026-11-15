@@ -1,0 +1,27 @@
+; Exercise 08-safe-calls (chapter 8).
+;
+; Turn errors into results. Then run: tutorial/check.sh 08-safe-calls
+
+(import result)   ; ok, failure, map-results, then
+(import list)     ; fold
+
+; (:ok value) with the value of `key` in `table`, or
+; (:error "missing key" key) when it is not there. Call get without a
+; default, and catch its :missing-key error with try.
+(define safe-get
+  (lambda (table key)
+    (error "not implemented yet")))
+
+; (:ok quotient) or (:error "division by zero" numerator). Call quotient
+; and catch its :division-by-zero error with try.
+(define safe-quotient
+  (lambda (numerator divisor)
+    (error "not implemented yet")))
+
+; The sum of a list of texts that each hold an Integer, as a result:
+; (sum-texts '("1" "20" "3")) is (:ok 24), and
+; (sum-texts '("1" "x" "y")) is (:error "not a number" "x"), the first
+; one that fails. Use map-results.
+(define sum-texts
+  (lambda (texts)
+    (error "not implemented yet")))

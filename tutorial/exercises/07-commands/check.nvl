@@ -1,0 +1,16 @@
+; The tests of exercise 07-commands.
+(include "harness.nvl")
+(include "answer.nvl")
+
+(define start {:position {:x 0 :y 0} :facing :north})
+
+(report! (list (check (step start '(:forward 3)) {:position {:x 0 :y 3} :facing :north})
+               (check (step start '(:turn :left)) {:position {:x 0 :y 0} :facing :west})
+               (check (step start '(:turn :right)) {:position {:x 0 :y 0} :facing :east})
+               (check (step start '(:teleport 5 -2)) {:position {:x 5 :y -2} :facing :north})
+               (check (run start '()) start)
+               (check (run start '((:turn :right) (:forward 2) (:turn :right) (:forward 5)))
+                      {:position {:x 2 :y -5} :facing :south})
+               (check (get (run start '((:turn :left) (:turn :left) (:turn :left) (:turn :left))) :facing)
+                      :north)
+               (check (get (run start '((:turn :left) (:forward 4))) :position) {:x -4 :y 0})))

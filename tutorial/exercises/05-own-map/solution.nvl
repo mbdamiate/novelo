@@ -1,0 +1,26 @@
+; Exercise 05-own-map (chapter 5): a solution.
+
+(import list)
+
+; fold builds the results the latest first, so they are reversed at the end.
+(define my-map
+  (lambda (f items)
+    (reverse (fold (lambda (results item) (prepend (f item) results)) '() items))))
+
+(define my-filter
+  (lambda (keep? items)
+    (reverse (fold (lambda (kept item) (if (keep? item) (prepend item kept) otherwise kept))
+                   '() items))))
+
+; The groups are built the latest first, each group too. An item equal to
+; the first element of the latest group joins it; any other starts a new
+; group. At the end, the groups and each group are reversed.
+(define add-to-groups
+  (lambda (groups item)
+    (if (and (not (empty? groups)) (equal? (first (first groups)) item))
+        (prepend (prepend item (first groups)) (rest groups))
+        otherwise (prepend (list item) groups))))
+
+(define group-adjacent
+  (lambda (items)
+    (reverse (map reverse (fold add-to-groups '() items)))))

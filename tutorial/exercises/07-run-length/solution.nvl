@@ -1,0 +1,32 @@
+; Exercise 07-run-length (chapter 7): a solution.
+
+(import list)
+
+; `runs` holds the runs found so far, the latest first. An item equal to
+; the value of the latest run makes it one longer; any other starts a run.
+(define encode-from
+  (lambda (items runs)
+    (match (list items runs)
+      (() _) (reverse runs)
+      ((item &rest more) ((value length) &rest earlier))
+      (if (equal? item value) (encode-from more (prepend (list value (+ length 1)) earlier))
+          otherwise (encode-from more (prepend (list item 1) runs)))
+      ((item &rest more) ()) (encode-from more (list (list item 1))))))
+
+(define encode
+  (lambda (items)
+    (encode-from items '())))
+
+; The runs are written out from the last one, each from its last copy, so
+; that prepend builds the result in order.
+(define decode-from
+  (lambda (reversed-runs items)
+    (match reversed-runs
+      () items
+      ((value 0) &rest earlier) (decode-from earlier items)
+      ((value length) &rest earlier)
+      (decode-from (prepend (list value (- length 1)) earlier) (prepend value items)))))
+
+(define decode
+  (lambda (runs)
+    (decode-from (reverse runs) '())))

@@ -1,0 +1,33 @@
+; Exercise 07-commands (chapter 7): a solution.
+
+(import list)
+
+(define turn-left
+  (lambda (facing)
+    (match facing :north :west :west :south :south :east :east :north)))
+
+(define turn-right
+  (lambda (facing)
+    (match facing :north :east :east :south :south :west :west :north)))
+
+(define move
+  (lambda (position facing steps)
+    (let (({:x x :y y} position))
+      (match facing
+        :north {:x x :y (+ y steps)}
+        :south {:x x :y (- y steps)}
+        :east {:x (+ x steps) :y y}
+        :west {:x (- x steps) :y y}))))
+
+(define step
+  (lambda (state command)
+    (let (({:position position :facing facing} state))
+      (match command
+        (:forward steps) {:position (move position facing steps) :facing facing}
+        (:turn :left) {:position position :facing (turn-left facing)}
+        (:turn :right) {:position position :facing (turn-right facing)}
+        (:teleport x y) {:position {:x x :y y} :facing facing}))))
+
+(define run
+  (lambda (state commands)
+    (fold step state commands)))

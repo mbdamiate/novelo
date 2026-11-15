@@ -1,0 +1,26 @@
+; Exercise 07-commands (chapter 7).
+;
+; A robot stands on a grid at a position {:x x :y y}, facing :north,
+; :east, :south or :west. Its state is a Map:
+;   {:position {:x 0 :y 0} :facing :north}
+; North is y + 1, east is x + 1.
+;
+; The commands are tagged lists:
+;   (:forward steps)   moves `steps` cells the way it faces
+;   (:turn :left)      turns a quarter to the left
+;   (:turn :right)     turns a quarter to the right
+;   (:teleport x y)    moves to the cell (x, y), facing the same way
+; Then run: tutorial/check.sh 07-commands
+
+(import list)   ; fold
+
+; The state after one command. Use match on the command, and patterns on
+; the state.
+(define step
+  (lambda (state command)
+    (error "not implemented yet")))
+
+; The state after every command of the list, in order.
+(define run
+  (lambda (state commands)
+    (error "not implemented yet")))
