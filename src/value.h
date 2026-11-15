@@ -19,6 +19,7 @@
  */
 #pragma once
 
+#include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -149,7 +150,16 @@ static inline Value *lisp_retain(Value *value) {
     return value;
 }
 
-void lisp_release(Value *value);
+/* Destroys an object whose count just reached zero: its children are
+ * released through a work stack, so a long list never recurses in C. */
+void lisp_destroy_unreferenced(Value *value);
+
+/* Inline, since most releases only decrement a count, or skip an immortal. */
+static inline void lisp_release(Value *value) {
+    if (!value || (value->flags & LISP_IMMORTAL)) return;
+    assert(value->refs > 0);
+    if (--value->refs == 0) lisp_destroy_unreferenced(value);
+}
 
 /* Allocates a counted object of the given size (refs = 1, flags = 0). */
 [[nodiscard]] Value *lisp_object_new(LispKind kind, size_t size);

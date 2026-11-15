@@ -85,12 +85,9 @@ static void destroy(Value *object) {
     live_objects--;
 }
 
-void lisp_release(Value *value) {
-    if (!value || (value->flags & LISP_IMMORTAL)) return;
-    assert(value->refs > 0);
-    if (--value->refs) return;
+void lisp_destroy_unreferenced(Value *value) {
     push_pending(value);
-    if (draining) return; /* an outer lisp_release is already emptying the stack */
+    if (draining) return; /* an outer release is already emptying the stack */
     draining = true;
     while (pending_count) destroy(pending_objects[--pending_count]);
     draining = false;
