@@ -33,6 +33,7 @@ static const LispLibrary library_result = {.name = "result", .section = "4.7"};
 static const LispLibrary library_random = {.name = "random", .section = "4.8"};
 static const LispLibrary library_json = {.name = "json", .section = "4.9"};
 static const LispLibrary library_csv = {.name = "csv", .section = "4.10"};
+static const LispLibrary library_time = {.name = "time", .section = "4.11"};
 
 static const LispLibrary *const libraries[] = {
     &lisp_library_io,
@@ -46,12 +47,13 @@ static const LispLibrary *const libraries[] = {
     &library_random,
     &library_json,
     &library_csv,
+    &library_time,
 };
 
 constexpr size_t LIBRARY_COUNT = sizeof libraries / sizeof libraries[0];
 
 const char *const lisp_library_names[] = {"io",     "list",   "text",   "function", "map", "set",
-                                          "number", "result", "random", "json",     "csv", nullptr};
+                                          "number", "result", "random", "json",     "csv", "time", nullptr};
 
 const char *lisp_default_library_path(void) {
     const char *path = getenv("NOVELO_STDLIB");

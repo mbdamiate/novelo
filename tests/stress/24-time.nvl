@@ -1,0 +1,33 @@
+; The library time in a tail loop over every day from 1970: each day's
+; date, its instant and its text agree with the day before, in constant
+; memory. The scale is forty years of days; ten times it is the whole
+; cycle of the calendar, four hundred years.
+; scale: 14610
+; memory: constant
+(import io)
+(import time)
+(define size (string-to-number (read-line!)))
+
+(define next-date
+  (lambda (year month day)
+    (if (< day (days-in-month year month)) (list year month (+ day 1))
+        (< month 12) (list year (+ month 1) 1)
+        otherwise (list (+ year 1) 1 1))))
+
+(define loop
+  (lambda (days year month day weekday)
+    (if (= days size) #true
+        otherwise
+        (let ((instant (* days 86400000))
+              (date (time-to-date instant)))
+          (if (not (and (equal? date {:year year :month month :day day :hour 0 :minute 0 :second 0 :millisecond 0
+                                      :weekday weekday})
+                        (= (date-to-time date) instant)
+                        (equal? (read-time (format-time instant)) (list :ok instant))))
+              (error "the day disagrees" instant date)
+              otherwise
+              (let (((next-year next-month next-day) (next-date year month day)))
+                (loop (+ days 1) next-year next-month next-day (+ (remainder weekday 7) 1))))))))
+
+(loop 0 1970 1 1 4)
+(display! "ok\n")

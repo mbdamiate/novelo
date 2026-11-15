@@ -1,7 +1,7 @@
 {
-  "spec": "Standard Library — Novelo, version 0.13.0",
+  "spec": "Standard Library — Novelo, version 0.14.0",
   "format": {
-    "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text, function, map, set, number, result, random, json and csv available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
+    "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text, function, map, set, number, result, random, json, csv and time available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
   },
   "cases": [
     {
@@ -1743,6 +1743,254 @@
       "section": "4.10",
       "program": "(import csv)\n(import list)\n(import text)\n(list (characters \"ab\") (ok 1) (join \"-\" (list \"a\" \"b\")) (map - '(1)))",
       "value": "((\"a\" \"b\") (:ok 1) \"a-b\" (-1))",
+      "output": ""
+    },
+    {
+      "id": "library-217",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(list (time-to-date 0) (time-to-date -1))",
+      "value": "({:year 1970 :month 1 :day 1 :hour 0 :minute 0 :second 0 :millisecond 0 :weekday 4} {:year 1969 :month 12 :day 31 :hour 23 :minute 59 :second 59 :millisecond 999 :weekday 3})",
+      "output": ""
+    },
+    {
+      "id": "library-218",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(time-to-date 1794753005120)",
+      "value": "{:year 2026 :month 11 :day 15 :hour 14 :minute 30 :second 5 :millisecond 120 :weekday 7}",
+      "output": ""
+    },
+    {
+      "id": "library-219",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(list (time-to-date 951782400000) (time-to-date -2203891200001) (time-to-date 1735689599999))",
+      "value": "({:year 2000 :month 2 :day 29 :hour 0 :minute 0 :second 0 :millisecond 0 :weekday 2} {:year 1900 :month 2 :day 28 :hour 23 :minute 59 :second 59 :millisecond 999 :weekday 3} {:year 2024 :month 12 :day 31 :hour 23 :minute 59 :second 59 :millisecond 999 :weekday 2})",
+      "output": ""
+    },
+    {
+      "id": "library-220",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(list (time-to-date -62167219200000) (time-to-date -62167219200001))",
+      "value": "({:year 0 :month 1 :day 1 :hour 0 :minute 0 :second 0 :millisecond 0 :weekday 6} {:year -1 :month 12 :day 31 :hour 23 :minute 59 :second 59 :millisecond 999 :weekday 5})",
+      "output": ""
+    },
+    {
+      "id": "library-221",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(map (lambda (x) (get (time-to-date x) :weekday)) (list 1794182400000 1794268800000 1794355200000 1794441600000 1794528000000 1794614400000 1794700800000 1794787200000))",
+      "value": "(1 2 3 4 5 6 7 1)",
+      "output": ""
+    },
+    {
+      "id": "library-222",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(list (date-to-time {:year 1970 :month 1 :day 1}) (date-to-time {:year 2000 :month 2 :day 29 :hour 12 :weekday 99 :note \"x\"}) (date-to-time {:year 0 :month 3 :day 1}) (date-to-time {:year 9999 :month 12 :day 31 :hour 23 :minute 59 :second 59 :millisecond 999}))",
+      "value": "(0 951825600000 -62162035200000 253402300799999)",
+      "output": ""
+    },
+    {
+      "id": "library-223",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(map (lambda (x) (equal? (date-to-time (time-to-date x)) x)) (list 0 -1 1 -62167219200000 -62167219200001 951782400000 -86400000 86399999 -9000000000000000))",
+      "value": "(#true #true #true #true #true #true #true #true #true)",
+      "output": ""
+    },
+    {
+      "id": "library-224",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(map (lambda (date) (try (date-to-time date) {:kind kind :values (value)} (list kind value)))\n  (list {:year 2026 :month 2 :day 29} {:year 2026 :month 13 :day 1} {:year 2026 :month 1 :day 0} {:year 2026 :month 4 :day 31} {:year 2026 :month 1 :day 1 :hour 24} {:year 2026 :month 1 :day 1 :minute 60} {:year 2026 :month 1 :day 1 :second -1} {:year 2026 :month 1 :day 1 :millisecond 1000} {:year 2026 :month 1 :day 1.5} {:month 1 :day 1}))",
+      "value": "((:domain-error 29) (:domain-error 13) (:domain-error 0) (:domain-error 31) (:domain-error 24) (:domain-error 60) (:domain-error -1) (:domain-error 1000) (:wrong-type 1.5) (:domain-error {:month 1 :day 1}))",
+      "output": ""
+    },
+    {
+      "id": "library-225",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(date-to-time (list 2026 1 1))",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-226",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(date-to-time {:year 300000000000 :month 1 :day 1})",
+      "error": ":integer-overflow",
+      "output": ""
+    },
+    {
+      "id": "library-227",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(list (format-time 0) (format-time -1) (format-time 1794753005120) (format-time -62167219200000) (format-time 253402300799999))",
+      "value": "(\"1970-01-01T00:00:00.000Z\" \"1969-12-31T23:59:59.999Z\" \"2026-11-15T14:30:05.120Z\" \"0000-01-01T00:00:00.000Z\" \"9999-12-31T23:59:59.999Z\")",
+      "output": ""
+    },
+    {
+      "id": "library-228",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(map (lambda (x) (try (format-time x) {:kind kind :values (value)} (list kind value))) (list -62167219200001 253402300800000))",
+      "value": "((:domain-error -62167219200001) (:domain-error 253402300800000))",
+      "output": ""
+    },
+    {
+      "id": "library-229",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(list (leap-year? 2024) (leap-year? 2026) (leap-year? 1900) (leap-year? 2000) (leap-year? 0) (leap-year? -4) (leap-year? -100))",
+      "value": "(#true #false #false #true #true #true #false)",
+      "output": ""
+    },
+    {
+      "id": "library-230",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(import list)\n(map (lambda (month) (days-in-month 2026 month)) (range 1 13))",
+      "value": "(31 28 31 30 31 30 31 31 30 31 30 31)",
+      "output": ""
+    },
+    {
+      "id": "library-231",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(list (days-in-month 2024 2) (days-in-month 1900 2) (try (days-in-month 2026 13) {:kind kind :values (m)} (list kind m)))",
+      "value": "(29 28 (:domain-error 13))",
+      "output": ""
+    },
+    {
+      "id": "library-232",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(list (read-time \"2026-11-15\") (read-time \"1970-01-01T00:00Z\") (read-time \"2026-11-15T14:30\") (read-time \"2026-11-15T14:30:05\") (read-time \"2026-11-15t14:30:05.120z\") (read-time \"2026-11-15 14:30:05.120\"))",
+      "value": "((:ok 1794700800000) (:ok 0) (:ok 1794753000000) (:ok 1794753005000) (:ok 1794753005120) (:ok 1794753005120))",
+      "output": ""
+    },
+    {
+      "id": "library-233",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(list (read-time \"2026-11-15T11:30:05.120-03:00\") (read-time \"2026-11-15T17:30:05.120+03:00\") (read-time \"2026-11-15T14:30+00:00\") (read-time \"2026-01-01T00:00+05:45\") (read-time \"1969-12-31T21:00-03:00\"))",
+      "value": "((:ok 1794753005120) (:ok 1794753005120) (:ok 1794753000000) (:ok 1767204900000) (:ok 0))",
+      "output": ""
+    },
+    {
+      "id": "library-234",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(list (read-time \"2026-11-15T14:30:05.1Z\") (read-time \"2026-11-15T14:30:05.12Z\") (read-time \"2026-11-15T14:30:05.123456789Z\") (read-time \"2026-11-15T14:30:05.9999Z\"))",
+      "value": "((:ok 1794753005100) (:ok 1794753005120) (:ok 1794753005123) (:ok 1794753005999))",
+      "output": ""
+    },
+    {
+      "id": "library-235",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(list (read-time \"0000-01-01\") (read-time \"9999-12-31T23:59:59.999Z\") (read-time \"2024-02-29\") (read-time \"2000-02-29\"))",
+      "value": "((:ok -62167219200000) (:ok 253402300799999) (:ok 1709164800000) (:ok 951782400000))",
+      "output": ""
+    },
+    {
+      "id": "library-236",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(list (read-time \"\") (read-time \"202\") (read-time \"2026/11/15\") (read-time \"2026-1-15\") (read-time \"2026-11-5\") (read-time \"20261115\"))",
+      "value": "((:error \"expected a digit\" 1) (:error \"expected a digit\" 4) (:error \"expected -\" 5) (:error \"expected a digit\" 7) (:error \"expected a digit\" 10) (:error \"expected -\" 5))",
+      "output": ""
+    },
+    {
+      "id": "library-237",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(list (read-time \"2026-00-10\") (read-time \"2026-13-10\") (read-time \"2026-02-29\") (read-time \"1900-02-29\") (read-time \"2026-04-31\") (read-time \"2026-04-00\"))",
+      "value": "((:error \"month out of range\" 6) (:error \"month out of range\" 6) (:error \"day out of range\" 9) (:error \"day out of range\" 9) (:error \"day out of range\" 9) (:error \"day out of range\" 9))",
+      "output": ""
+    },
+    {
+      "id": "library-238",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(list (read-time \"2026-11-15T24:00\") (read-time \"2026-11-15T23:60\") (read-time \"2026-11-15T23:59:60\") (read-time \"2026-11-15T9:00\") (read-time \"2026-11-15T09\") (read-time \"2026-11-15T0900\") (read-time \"2026-11-15T\"))",
+      "value": "((:error \"hour out of range\" 12) (:error \"minute out of range\" 15) (:error \"second out of range\" 18) (:error \"expected a digit\" 13) (:error \"expected :\" 14) (:error \"expected :\" 14) (:error \"expected a digit\" 12))",
+      "output": ""
+    },
+    {
+      "id": "library-239",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(list (read-time \"2026-11-15T10:00:00.\") (read-time \"2026-11-15T10:00.5\") (read-time \"2026-11-15T10:00+03\") (read-time \"2026-11-15T10:00+24:00\") (read-time \"2026-11-15T10:00-03:60\") (read-time \"2026-11-15T10:00+3:00\"))",
+      "value": "((:error \"expected a digit\" 21) (:error \"text after the time\" 17) (:error \"expected :\" 20) (:error \"offset out of range\" 18) (:error \"offset out of range\" 21) (:error \"expected a digit\" 19))",
+      "output": ""
+    },
+    {
+      "id": "library-240",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(list (read-time \"2026-11-15x\") (read-time \"2026-11-15 \") (read-time \"2026-11-15T10:00Zx\") (read-time \"2026-11-15T10:00 Z\") (read-time \"2026-11-15Z\"))",
+      "value": "((:error \"text after the time\" 11) (:error \"expected a digit\" 12) (:error \"text after the time\" 18) (:error \"text after the time\" 17) (:error \"text after the time\" 11))",
+      "output": ""
+    },
+    {
+      "id": "library-241",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(read-time 20261115)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-242",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(map (lambda (x) (equal? (read-time (format-time x)) (list :ok x))) (list 0 -1 -62167219200000 253402300799999 1794753005120))",
+      "value": "(#true #true #true #true #true)",
+      "output": ""
+    },
+    {
+      "id": "library-243",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(let ((instant (date-to-time {:year 2026 :month 11 :day 16 :hour 1})))\n  (list (get (time-to-date (- instant 10800000)) :day) (format-time (+ instant (* 30 86400000)))))",
+      "value": "(15 \"2026-12-16T01:00:00.000Z\")",
+      "output": ""
+    },
+    {
+      "id": "library-244",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(define count-days\n  (lambda (day last total)\n    (if (> day last) total\n        otherwise\n        (let (((year month date) (list (get (time-to-date (* day 86400000)) :year) (get (time-to-date (* day 86400000)) :month) (get (time-to-date (* day 86400000)) :day))))\n          (count-days (+ day 1) last (+ total (if (= date (days-in-month year month)) 1 otherwise 0)))))))\n(count-days 0 146096 0)",
+      "value": "4800",
+      "output": ""
+    },
+    {
+      "id": "library-245",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(read-time \"2026-11-15\")",
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "library-246",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(import time t)\n(list (t/format-time 0) (t/read-time \"1970-01-01\"))",
+      "value": "(\"1970-01-01T00:00:00.000Z\" (:ok 0))",
+      "output": ""
+    },
+    {
+      "id": "library-247",
+      "kind": "eval",
+      "section": "4.11",
+      "program": "(import time)\n(list (characters \"ab\") (ok 1) (pad-left 3 \"0\" \"7\") (map - '(1)))",
+      "value": "((\"a\" \"b\") (:ok 1) \"007\" (-1))",
       "output": ""
     }
   ]

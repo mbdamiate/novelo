@@ -6,11 +6,19 @@ Nov 10, 2026 · @Matheus Damiate
 
 The standard library is a set of functions written in the language itself, on top of the core primitives. It is not part of the core: an implementation conformant to the core does not need to provide it, and the core tests do not depend on it.
 
-The standard library is made of ten libraries, in the sense of core section 8.9: `list`, `text`, `function`, `map`, `set`, `number`, `result`, `random`, `json` and `csv`. Nothing is loaded before the program: a file imports the libraries it uses, such as `(import list)`, and only then sees their names. Imported with no prefix, the names are ordinary globals, and a program may redefine them. Imported with a prefix, as in `(import list l)`, they are bound as `l/map` and so on.
+The standard library is made of eleven libraries, in the sense of core section 8.9: `list`, `text`, `function`, `map`, `set`, `number`, `result`, `random`, `json`, `csv` and `time`. Nothing is loaded before the program: a file imports the libraries it uses, such as `(import list)`, and only then sees their names. Imported with no prefix, the names are ordinary globals, and a program may redefine them. Imported with a prefix, as in `(import list l)`, they are bound as `l/map` and so on.
 
 The reference definitions in section 4 are normative. The implementation MAY replace any of them with a native version, as long as the observable behavior is identical, including errors and the names each library binds.
 
-**Version:** 0.13.0, draft, on top of core 0.18.0.
+**Version:** 0.14.0, draft, on top of core 0.18.0.
+
+**Changes since 0.13.0.** A new library, `time`, for dates and times of the calendar in UTC, without effects (sections 3 and 4.11). An instant is the Integer of milliseconds that `current-time!` returns.
+- `time-to-date` and `date-to-time` convert an instant to a Map of its fields and back.
+- `format-time` writes an instant in ISO 8601.
+- `read-time` reads the dates and times of RFC 3339 into a result.
+- `leap-year?` and `days-in-month` answer for the Gregorian calendar.
+
+The other libraries are unchanged.
 
 **Changes since 0.12.0.** A new library, `csv`, reads and writes comma-separated values as RFC 4180 defines them (sections 3 and 4.10).
 - `read-csv` returns `(:ok records)`, a List of records, each a List of Strings, or `(:error message line column)`.
@@ -63,8 +71,8 @@ The other libraries are unchanged.
 - **The function comes first and the collection last**, as in `(map f xs)` and `(map-values f m)`. This makes partial application with `partial` easier. `merge` takes two maps and `update` takes the key, the function and then the map.
 - **Evaluation is eager.** Every function traverses the whole list and returns the finished result.
 - **Constant memory.** Every function that traverses a list does so by tail recursion, so lists of any size are traversed in constant memory.
-- **Helpers.** Since the core has no local recursion, some functions use helpers defined at the top level of their library: `take-step`, `span-step`, `range-step`, `zip-step`, `merge-sorted`, `split-step`, `precedes-step`, `padding`, `repeat-step`, `format-step`, `check-base`, `digit-value`, `digits-step`, `map-results-step`, `letter-code-point?`, `uppercase-code-point`, `lowercase-code-point`, and the names of `random` that start with `random-` and are not in section 3: `random-jump`, `random-matrix-apply`, `random-matrix-product`, `random-dot`, `random-multiply`, `random-next`, `random-modulo`, `random-below`, `random-below-narrow`, `random-below-wide`, `random-positions`, `random-shuffle-step` and `random-gather`, and the names of `json` and `csv` that start with `json-` and `csv-`. They are bound by `import` like the other names, but they are not part of the interface: a program should not rely on them, and a native implementation MAY omit them.
-- **Dependencies.** `text`, `function`, `map`, `set`, `number` and `result` import `list` (core 8.9); `random` imports nothing; `json` imports `list`, `text`, `number` and `result`; `csv` imports `list`, `text` and `result`. Importing a library therefore also binds the names of the libraries it imports in the same context. The names of all the libraries are different, so they can be imported together without a prefix.
+- **Helpers.** Since the core has no local recursion, some functions use helpers defined at the top level of their library: `take-step`, `span-step`, `range-step`, `zip-step`, `merge-sorted`, `split-step`, `precedes-step`, `padding`, `repeat-step`, `format-step`, `check-base`, `digit-value`, `digits-step`, `map-results-step`, `letter-code-point?`, `uppercase-code-point`, `lowercase-code-point`, and the names of `random` that start with `random-` and are not in section 3: `random-jump`, `random-matrix-apply`, `random-matrix-product`, `random-dot`, `random-multiply`, `random-next`, `random-modulo`, `random-below`, `random-below-narrow`, `random-below-wide`, `random-positions`, `random-shuffle-step` and `random-gather`, and the names of `json`, `csv` and `time` that start with `json-`, `csv-` and `time-`, except the functions of `time` in section 3. They are bound by `import` like the other names, but they are not part of the interface: a program should not rely on them, and a native implementation MAY omit them.
+- **Dependencies.** `text`, `function`, `map`, `set`, `number` and `result` import `list` (core 8.9); `random` imports nothing; `json` imports `list`, `text`, `number` and `result`; `csv` and `time` import `list`, `text` and `result`. Importing a library therefore also binds the names of the libraries it imports in the same context. The names of all the libraries are different, so they can be imported together without a prefix.
 - **Letters and case.** `text` knows two ranges of letters: ASCII, `A` to `Z` and `a` to `z`, and Latin-1, U+00C0 to U+00FF without U+00D7 `×` and U+00F7 `÷`, which covers the accented letters of Portuguese and the other languages of Western Europe, such as `á`, `ç`, `ê` and `õ`. `uppercase` and `lowercase` pair `A`–`Z` with `a`–`z` and U+00C0–U+00DE with U+00E0–U+00FE; `ß` (U+00DF) and `ÿ` (U+00FF) have no pair in these ranges and stay as they are. Every other character, in any script, is not a letter and keeps its case. `digit?` knows only `0` to `9`, the digits `string-to-number` reads.
 - **Order of text.** `precedes?` orders by code point, not as a dictionary does: every uppercase ASCII letter comes before every lowercase one, so `"Zebra"` precedes `"apple"`, and accented letters come after `z`. To ignore case, compare the `lowercase` of both.
 
@@ -123,6 +131,11 @@ The other libraries are unchanged.
 | `json` | `write-json` | `(write-json value)` | the JSON text of `value`, built from `#void`, Booleans, numbers, Strings, Lists and Maps with String keys, with one space after each comma and colon: `(write-json {"a" (list 1 #void)})` is `{"a": [1, null]}`; any other value is `:error`, with that value, or that key, as `:values` |
 | `csv` | `read-csv`, `read-csv-with` | `(read-csv text)`, `(read-csv-with separator text)` | `(:ok records)`, the records of the CSV `text`, each a List of its fields as Strings, with an empty line as `()`; or `(:error message line column)`, a failure with one of the messages of section 4.10. The separator is `","`, or the one-character String `separator`, which may not be a double quote or a line break (`:domain-error`); a `text` or a `separator` that is not a String is `:wrong-type` |
 | `csv` | `write-csv`, `write-csv-with` | `(write-csv records)`, `(write-csv-with separator records)` | the text of the records, each followed by a line feed, with a field in double quotes only when it holds the separator, a double quote or a line break, and a record of one empty field as `""`; a field that is not a String is `:wrong-type`, and the separator as in `read-csv-with` |
+| `time` | `time-to-date` | `(time-to-date instant)` | the date in UTC of an instant, an Integer of milliseconds since 1970-01-01T00:00:00Z: the Map `{:year :month :day :hour :minute :second :millisecond :weekday}`, with `:weekday` from 1, Monday, to 7, Sunday; any Integer, also before 1970 |
+| `time` | `date-to-time` | `(date-to-time date)` | the instant of a date Map, from its `:year`, `:month` and `:day`, and its `:hour`, `:minute`, `:second` and `:millisecond`, which are 0 when absent; a missing year, month or day, or a field out of its range, is `:domain-error`, a field that is not an Integer `:wrong-type` |
+| `time` | `format-time` | `(format-time instant)` | the instant in ISO 8601, `"2026-11-15T14:30:05.120Z"`; a year outside 0 to 9999 is `:domain-error` |
+| `time` | `read-time` | `(read-time text)` | `(:ok instant)` for a date, `2026-11-15`, or a date and time of RFC 3339, `2026-11-15T14:30:05.120-03:00`, with the seconds, the fraction and the zone optional, and UTC without a zone; or `(:error message column)` with a message of section 4.11 |
+| `time` | `leap-year?`, `days-in-month` | `(leap-year? year)`, `(days-in-month year month)` | whether the year has a February 29, and the days of the month, 28 to 31; a month outside 1 to 12 is `:domain-error` |
 | `number` | `round` | `(round x)` | the Integer nearest to the Float `x`; exactly halfway, the one farther from zero: `(round 2.5)` is `3`, `(round -2.5)` is `-3`; errors as `floor` |
 
 There is no `find`. To get the first element that satisfies a predicate, take `first` of the `filter` result after checking that it is not empty; to only ask whether such an element exists, use `any?`. To combine from last to first, `fold` the `reverse` of the list.
@@ -1212,8 +1225,268 @@ Writing builds the pieces of the whole text, a line feed after each record, and 
         otherwise field)))
 ```
 
+### 4.11 `time`
+
+Dates and times of the civil calendar in UTC, without effects. An instant is an Integer, the milliseconds since 1970-01-01T00:00:00Z, which is what `current-time!` returns (core section 9). The library converts instants to dates and back, and to text and back. Reading the clock stays at the edge of the program.
+
+**The calendar.**
+- The calendar is the Gregorian one, extended back before its adoption in 1582 (the proleptic Gregorian calendar), with a year 0.
+- A day has exactly 86,400 seconds. There are no leap seconds, as in Unix time.
+- There are no named time zones and no daylight saving time, which need the system's zone database. A fixed offset is a number of milliseconds: `(time-to-date (- instant 10800000))` is the date three hours behind UTC, as in Brasília.
+
+**Dates.** A date is a Map with Keyword keys, which map patterns take apart: `{:year 2026 :month 11 :day 15 :hour 14 :minute 30 :second 5 :millisecond 120 :weekday 7}`. `:weekday` counts from 1, Monday, to 7, Sunday, as ISO 8601 does.
+
+**Functions.**
+- `time-to-date` accepts any Integer, including the negative instants before 1970.
+- `date-to-time` needs `:year`, `:month` and `:day`. `:hour`, `:minute`, `:second` and `:millisecond` are 0 when absent, and `:weekday` and any other key are ignored.
+  - A missing key, or a field out of its range, such as day 31 of a month of 30 or hour 24, is `:domain-error`, with `:values` `(date)` or `(field)`.
+  - A field that is not an Integer is `:wrong-type`, and so is a date that is not a Map.
+  - An instant beyond the range of Integer is `:integer-overflow`.
+- `format-time` writes an instant as `"2026-11-15T14:30:05.120Z"`: always UTC, always with milliseconds, so texts sort as their instants do. An instant whose year is not between 0 and 9999 is `:domain-error`, since ISO 8601 writes those years only by agreement.
+- `leap-year?` takes any Integer year. `days-in-month` gives 28 to 31, and a month outside 1 to 12 is `:domain-error`.
+
+**Reading.** `read-time` reads the format of RFC 3339, the part of ISO 8601 that the Internet uses, and a little more:
+- A date alone, `2026-11-15`, is midnight UTC.
+- A date and time: the date, then `T`, `t` or a space, then hours and minutes, `14:30`. Optionally they are followed by seconds, `:05`, and the seconds by a fraction of one or more digits, `.120`, of which only milliseconds count; the rest is dropped, not rounded.
+- Then, optionally, a zone: `Z` or `z` for UTC, or an offset `+03:00` or `-03:00`, the time zone's distance ahead of UTC. A time without a zone is taken as UTC.
+
+The result is `(:ok instant)`, or a failure `(:error message column)`, with the column counted from 1 in characters:
+
+| Message | The problem |
+| --- | --- |
+| `expected a digit` | a field shorter than its digits, or a point with no digit after it |
+| `expected -`, `expected :` | a missing separator inside the date, the time or the offset |
+| `month out of range`, `day out of range` | a month outside 1 to 12, or a day outside the month; the position is the field's |
+| `hour out of range`, `minute out of range`, `second out of range` | an hour above 23, a minute or a second above 59 |
+| `offset out of range` | an offset's hours above 23 or minutes above 59 |
+| `text after the time` | anything else after a complete date or time |
+
+A `text` that is not a String is `:wrong-type`.
+
+The conversions are those of Howard Hinnant's `days_from_civil` and `civil_from_days`. They count in eras of 400 years, the period after which the Gregorian calendar repeats, 146,097 days, so they are exact for every year. They start the year on March 1, so that February, with its leap day, is the last month. Their divisions round down, which `quotient` does not do for negative numbers, so `time-floor` and `time-modulo` write them.
+
+```lisp
+(import list)
+(import text)
+(import result)
+
+(define time-floor
+  (lambda (n divisor)
+    (if (< (remainder n divisor) 0) (- (quotient n divisor) 1)
+        otherwise (quotient n divisor))))
+
+(define time-modulo (lambda (n divisor) (- n (* (time-floor n divisor) divisor))))
+
+(define leap-year?
+  (lambda (year)
+    (and (= (remainder year 4) 0) (or (not (= (remainder year 100) 0)) (= (remainder year 400) 0)))))
+
+(define days-in-month
+  (lambda (year month)
+    (if (not (<= 1 month 12))
+        (raise {:kind :domain-error :message "days-in-month: the month must be from 1 to 12" :values (list month)})
+        (= month 2) (if (leap-year? year) 29 otherwise 28)
+        (or (= month 4) (= month 6) (= month 9) (= month 11)) 30
+        otherwise 31)))
+
+; The days from 1970-01-01 to a date.
+(define time-days
+  (lambda (year month day)
+    (let ((shifted (if (<= month 2) (- year 1) otherwise year))
+          (era (time-floor shifted 400))
+          (year-of-era (- shifted (* era 400)))
+          (day-of-year (+ (quotient (+ (* 153 (if (> month 2) (- month 3) otherwise (+ month 9))) 2) 5) (- day 1)))
+          (day-of-era (+ (* year-of-era 365) (quotient year-of-era 4) (- (quotient year-of-era 100)) day-of-year)))
+      (+ (* era 146097) day-of-era -719468))))
+
+; The date of a number of days from 1970-01-01, as (year month day).
+(define time-civil
+  (lambda (days)
+    (let ((shifted (+ days 719468))
+          (era (time-floor shifted 146097))
+          (day-of-era (- shifted (* era 146097)))
+          (year-of-era (quotient (- (+ day-of-era (quotient day-of-era 36524)) (quotient day-of-era 1460)
+                                    (quotient day-of-era 146096))
+                                 365))
+          (day-of-year (- day-of-era (+ (* 365 year-of-era) (quotient year-of-era 4) (- (quotient year-of-era 100)))))
+          (month-from-march (quotient (+ (* 5 day-of-year) 2) 153))
+          (day (+ (- day-of-year (quotient (+ (* 153 month-from-march) 2) 5)) 1))
+          (month (if (< month-from-march 10) (+ month-from-march 3) otherwise (- month-from-march 9))))
+      (list (+ year-of-era (* era 400) (if (<= month 2) 1 otherwise 0)) month day))))
+
+(define time-to-date
+  (lambda (instant)
+    (let ((days (time-floor instant 86400000))
+          (in-day (- instant (* days 86400000)))
+          ((year month day) (time-civil days)))
+      {:year year :month month :day day
+       :hour (quotient in-day 3600000) :minute (remainder (quotient in-day 60000) 60)
+       :second (remainder (quotient in-day 1000) 60) :millisecond (remainder in-day 1000)
+       :weekday (+ (time-modulo (+ days 3) 7) 1)})))
+```
+
+`date-to-time` checks each field before it computes. 1970-01-01 was a Thursday, day 4 of the week, which is where `:weekday` starts counting above.
+
+```lisp
+(define date-to-time
+  (lambda (date)
+    (if (not (map? date))
+        (raise {:kind :wrong-type :message "date-to-time: the date must be a Map" :values (list date)})
+        otherwise
+        (let ((year (time-field date :year #void))
+              (month (time-field date :month #void))
+              (day (time-field date :day #void))
+              (hour (time-field date :hour 0))
+              (minute (time-field date :minute 0))
+              (second (time-field date :second 0))
+              (millisecond (time-field date :millisecond 0))
+              (_ (time-check month 1 12))
+              (_ (time-check day 1 (days-in-month year month)))
+              (_ (time-check hour 0 23))
+              (_ (time-check minute 0 59))
+              (_ (time-check second 0 59))
+              (_ (time-check millisecond 0 999)))
+          (+ (* (time-days year month day) 86400000) (* hour 3600000) (* minute 60000) (* second 1000) millisecond)))))
+
+; A field of the date, or its default; #void as the default makes it required.
+(define time-field
+  (lambda (date key default)
+    (let ((value (get date key default)))
+      (if (void? value)
+          (raise {:kind :domain-error :message "date-to-time: the date lacks a field" :values (list date)})
+          (not (integer? value))
+          (raise {:kind :wrong-type :message "date-to-time: a field must be an Integer" :values (list value)})
+          otherwise value))))
+
+(define time-check
+  (lambda (value low high)
+    (if (<= low value high) #true
+        otherwise (raise {:kind :domain-error :message "date-to-time: a field is out of range" :values (list value)}))))
+```
+
+`format-time` pads each field with zeros to its width.
+
+```lisp
+(define format-time
+  (lambda (instant)
+    (match (time-to-date instant)
+      {:year year :month month :day day :hour hour :minute minute :second second :millisecond millisecond}
+      (if (not (<= 0 year 9999))
+          (raise {:kind :domain-error :message "format-time: the year must be from 0 to 9999" :values (list instant)})
+          otherwise
+          (format "{}-{}-{}T{}:{}:{}.{}Z" (time-pad 4 year) (time-pad 2 month) (time-pad 2 day)
+                  (time-pad 2 hour) (time-pad 2 minute) (time-pad 2 second) (time-pad 3 millisecond))))))
+
+(define time-pad (lambda (width n) (pad-left width "0" (to-string n))))
+```
+
+`read-time` walks the characters of the text, as `read-json` does. Each step returns a result whose value is what it read and the characters after it, or whose failure counts the characters left. A field of digits is read by code point, so `09` is 9.
+
+```lisp
+(define read-time
+  (lambda (text)
+    (let ((characters-of-text (characters text)))
+      (match (time-read-date characters-of-text)
+        (:error message left) (failure message (+ 1 (- (count characters-of-text) left)))
+        success success))))
+
+(define time-fail (lambda (message text) (failure message (count text))))
+
+(define time-number
+  (lambda (text digits value)
+    (if (= digits 0) (ok (list value text))
+        (and (not (empty? text)) (digit? (first text)))
+        (time-number (rest text) (- digits 1) (+ (* value 10) (- (first (string-to-code-points (first text))) 48)))
+        otherwise (time-fail "expected a digit" text))))
+
+; Two digits from low to high; a value outside fails at the field.
+(define time-two-digits
+  (lambda (text low high message)
+    (chain then (((value after) (time-number text 2 0)))
+      (if (<= low value high) (ok (list value after))
+          otherwise (time-fail message text)))))
+
+(define time-expect
+  (lambda (expected text)
+    (if (and (not (empty? text)) (equal? (first text) expected)) (ok (rest text))
+        otherwise (time-fail (concatenate "expected " expected) text))))
+
+(define time-read-date
+  (lambda (text)
+    (chain then (((year after-year) (time-number text 4 0))
+                 (before-month (time-expect "-" after-year))
+                 ((month after-month) (time-two-digits before-month 1 12 "month out of range"))
+                 (before-day (time-expect "-" after-month))
+                 ((day after-day) (time-number before-day 2 0)))
+      (if (not (<= 1 day (days-in-month year month))) (time-fail "day out of range" before-day)
+          otherwise (time-read-clock after-day (* (time-days year month day) 86400000))))))
+
+(define time-read-clock
+  (lambda (text midnight)
+    (match text
+      () (ok midnight)
+      (separator &rest more)
+      (if (not (or (equal? separator "T") (equal? separator "t") (equal? separator " ")))
+          (time-fail "text after the time" text)
+          otherwise
+          (chain then (((hour after-hour) (time-two-digits more 0 23 "hour out of range"))
+                       (before-minute (time-expect ":" after-hour))
+                       ((minute after-minute) (time-two-digits before-minute 0 59 "minute out of range"))
+                       ((second millisecond after-second) (time-read-seconds after-minute))
+                       ((offset after-zone) (time-read-zone after-second)))
+            (if (empty? after-zone)
+                (ok (- (+ midnight (* hour 3600000) (* minute 60000) (* second 1000) millisecond) offset))
+                otherwise (time-fail "text after the time" after-zone)))))))
+
+; Seconds, then optionally their fraction, as (second millisecond after).
+(define time-read-seconds
+  (lambda (text)
+    (match text
+      (":" &rest more)
+      (chain then (((second after-second) (time-two-digits more 0 59 "second out of range"))
+                   ((millisecond after-fraction) (time-read-fraction after-second)))
+        (ok (list second millisecond after-fraction)))
+      otherwise (ok (list 0 0 text)))))
+
+; The digits after the point: the first three are milliseconds, short ones
+; scaled up, as .5 is 500; the others are read and dropped.
+(define time-read-fraction
+  (lambda (text)
+    (match text
+      ("." &rest more)
+      (if (and (not (empty? more)) (digit? (first more))) (time-fraction-digits more 0 0)
+          otherwise (time-fail "expected a digit" more))
+      otherwise (ok (list 0 text)))))
+
+(define time-fraction-digits
+  (lambda (text read value)
+    (if (and (not (empty? text)) (digit? (first text)))
+        (time-fraction-digits (rest text) (+ read 1)
+                              (if (< read 3) (+ (* value 10) (- (first (string-to-code-points (first text))) 48))
+                                  otherwise value))
+        (= read 1) (ok (list (* value 100) text))
+        (= read 2) (ok (list (* value 10) text))
+        otherwise (ok (list value text)))))
+
+(define time-read-zone
+  (lambda (text)
+    (match text
+      ("Z" &rest more) (ok (list 0 more))
+      ("z" &rest more) (ok (list 0 more))
+      ("+" &rest more) (time-read-offset more 1)
+      ("-" &rest more) (time-read-offset more -1)
+      otherwise (ok (list 0 text)))))
+
+(define time-read-offset
+  (lambda (text sign)
+    (chain then (((hours after-hours) (time-two-digits text 0 23 "offset out of range"))
+                 (before-minutes (time-expect ":" after-hours))
+                 ((minutes after-minutes) (time-two-digits before-minutes 0 59 "offset out of range")))
+      (ok (list (* sign (+ (* hours 3600000) (* minutes 60000))) after-minutes)))))
+```
+
 ## 5. Conformance
 
-The file `stdlib-conformance.json` has 216 cases, in the same format as the core `eval` cases, with one difference: the libraries `list`, `text`, `function`, `map`, `set`, `number`, `result`, `random`, `json` and `csv` are available to `import`. Each program imports what it uses. An implementation that provides the library MUST pass all of them, in addition to the core cases.
+The file `stdlib-conformance.json` has 247 cases, in the same format as the core `eval` cases, with one difference: the libraries `list`, `text`, `function`, `map`, `set`, `number`, `result`, `random`, `json`, `csv` and `time` are available to `import`. Each program imports what it uses. An implementation that provides the library MUST pass all of them, in addition to the core cases.
 
-The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that imports a library, a traversal of one hundred thousand elements, which only passes if the functions run in constant memory, every function of `map` with its errors, a map of one hundred thousand keys built with `from-entries` and reduced with `filter-entries`, every function of `set`, sets of one hundred thousand elements, the order of `precedes?` and its stable use in `sort`, `uppercase`, `lowercase`, `letter?` and `digit?` at the edges of the ASCII and Latin-1 ranges, `pad-left` and `pad-right` with texts wider than the width, accented fills and fills of the wrong length, `format` with values of every type, braces outside `{}` and too few or too many values, `join` of a single part that is returned as it is, and `join` of two hundred thousand parts and `format` of ten thousand values, which only pass in reasonable time if they grow linearly, `max` and `min` with Integers, with Floats, with their errors and over one hundred thousand arguments, `abs`, `floor`, `ceiling` and `round` at negative numbers, `-0.0`, halfway values, Floats above 2^52 and the edges of the range of Integer, `characters` of accented letters, of characters outside the BMP and of the empty text, and its use with `match`, `digits-to-integer` and `integer-to-digits` in bases 2, 8, 10, 16 and 36, with uppercase digits, signs, texts that are not numbers, the smallest and largest Integer, overflow, every base error and a round trip in every base, `span` with a test that always or never holds and a test it stops calling, and with a `let` pattern, `zip` of lists of different lengths and as the input of `from-entries`, both over one hundred thousand elements, `ok`, `failure` with no detail and with several, `ok?` and `failure?` over values of every shape, `then` going on, stopping and rejecting what is not a result, as the step of a `chain` with patterns, `map-results` stopping at the first failure without calling `f` again, and over one hundred thousand elements, `random-generator` for the first seeds, the largest one and one from `random-seed!`, the exact draws of `random-float` and of `random-integer` over small, negative, one-element, wide and edge ranges, sixty thousand throws of a die, `shuffle` of short lists, of lists too short to draw from and of twenty thousand elements, and every error of `random`, `read-json` over every kind of value, numbers at the edges of Integer and Float and beyond them, every escape and surrogate case, keys that repeat, whitespace, every failure message with its line and column, also across lines, `write-json` of every type, of escapes and of values without a JSON form, a round trip, and an array of twenty thousand numbers, which only passes in reasonable time if reading grows linearly, `read-csv` with every kind of line break, empty lines and fields, quoted fields holding separators, line breaks and quotes, a lone carriage return, records of different lengths, every failure with its position, other separators and every separator error, `write-csv` quoting only what needs it, its errors, a round trip with two separators, the idiom that turns a header into Maps, and twenty thousand records read in linear time, the trace of an error in the function given to `map`, and `import` itself: names unbound without it, prefixes, the dependencies of `text`, `function`, `map`, `set`, `number` and `result` on `list` of `json` on four libraries and of `csv` on three, and repeated imports.
+The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that imports a library, a traversal of one hundred thousand elements, which only passes if the functions run in constant memory, every function of `map` with its errors, a map of one hundred thousand keys built with `from-entries` and reduced with `filter-entries`, every function of `set`, sets of one hundred thousand elements, the order of `precedes?` and its stable use in `sort`, `uppercase`, `lowercase`, `letter?` and `digit?` at the edges of the ASCII and Latin-1 ranges, `pad-left` and `pad-right` with texts wider than the width, accented fills and fills of the wrong length, `format` with values of every type, braces outside `{}` and too few or too many values, `join` of a single part that is returned as it is, and `join` of two hundred thousand parts and `format` of ten thousand values, which only pass in reasonable time if they grow linearly, `max` and `min` with Integers, with Floats, with their errors and over one hundred thousand arguments, `abs`, `floor`, `ceiling` and `round` at negative numbers, `-0.0`, halfway values, Floats above 2^52 and the edges of the range of Integer, `characters` of accented letters, of characters outside the BMP and of the empty text, and its use with `match`, `digits-to-integer` and `integer-to-digits` in bases 2, 8, 10, 16 and 36, with uppercase digits, signs, texts that are not numbers, the smallest and largest Integer, overflow, every base error and a round trip in every base, `span` with a test that always or never holds and a test it stops calling, and with a `let` pattern, `zip` of lists of different lengths and as the input of `from-entries`, both over one hundred thousand elements, `ok`, `failure` with no detail and with several, `ok?` and `failure?` over values of every shape, `then` going on, stopping and rejecting what is not a result, as the step of a `chain` with patterns, `map-results` stopping at the first failure without calling `f` again, and over one hundred thousand elements, `random-generator` for the first seeds, the largest one and one from `random-seed!`, the exact draws of `random-float` and of `random-integer` over small, negative, one-element, wide and edge ranges, sixty thousand throws of a die, `shuffle` of short lists, of lists too short to draw from and of twenty thousand elements, and every error of `random`, `read-json` over every kind of value, numbers at the edges of Integer and Float and beyond them, every escape and surrogate case, keys that repeat, whitespace, every failure message with its line and column, also across lines, `write-json` of every type, of escapes and of values without a JSON form, a round trip, and an array of twenty thousand numbers, which only passes in reasonable time if reading grows linearly, `read-csv` with every kind of line break, empty lines and fields, quoted fields holding separators, line breaks and quotes, a lone carriage return, records of different lengths, every failure with its position, other separators and every separator error, `write-csv` quoting only what needs it, its errors, a round trip with two separators, the idiom that turns a header into Maps, and twenty thousand records read in linear time, `time-to-date` at the epoch, before it, at leap days, at the edges of years 0 and 9999 and over a week of weekdays, `date-to-time` with defaults, ignored keys, every range error and overflow, round trips through both, `format-time` and its range, `leap-year?` and `days-in-month` over centuries and negative years, `read-time` of dates, times, fractions, zones and offsets, every failure with its column, the idioms of a fixed offset and of adding days, and every day of four hundred years, the trace of an error in the function given to `map`, and `import` itself: names unbound without it, prefixes, the dependencies of `text`, `function`, `map`, `set`, `number` and `result` on `list` of `json` on four libraries and of `csv` and `time` on three, and repeated imports.

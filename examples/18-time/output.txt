@@ -1,0 +1,19 @@
+2026-11-14 22:10:00  start report
+2026-11-14 22:40:00  start backup
+2026-11-14 22:55:00  end   report
+2026-11-14 23:05:30  end   backup
+2026-11-15 00:30:00  start import
+2026-11-15 09:45:00  end   import
+2026-11-16 00:00:00  start cleanup
+2026-11-16 00:20:15  end   cleanup
+2026-11-16 01:00:00  start archive
+
+report: 0h 45m 00s
+backup: 0h 25m 30s
+import: 9h 15m 00s
+cleanup: 0h 20m 15s
+archive: never ended
+
+left out:
+2026-11-15T25:00:00Z start cleanup: hour out of range at column 12
+yesterday end cleanup: expected a digit at column 1

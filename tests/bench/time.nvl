@@ -1,0 +1,23 @@
+; The library time: instants spread over four centuries turned into dates,
+; text and back.
+; scale: 15000
+(import io)
+(import time)
+(define size (string-to-number (read-line!)))
+
+(define step 2524608000)    ; about 29 days, in milliseconds
+(define start -2208988800000) ; 1900-01-01
+
+(define loop
+  (lambda (index)
+    (if (= index size) #true
+        otherwise
+        (let ((instant (+ start (* index step)))
+              (date (time-to-date instant))
+              (text (format-time instant)))
+          (if (and (= (date-to-time date) instant) (equal? (read-time text) (list :ok instant)))
+              (loop (+ index 1))
+              otherwise (error "round trip failed" instant))))))
+
+(loop 0)
+(display! "ok\n")

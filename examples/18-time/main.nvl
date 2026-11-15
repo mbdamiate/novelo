@@ -1,0 +1,122 @@
+; Durations from a log.
+;
+; Reads a log of tasks starting and ending, one event per line: a time in
+; RFC 3339, the word start or end, and the task. The times come from
+; machines in different time zones, so the program turns each into an
+; instant, sorts the events by it, and prints them in one zone, given on
+; the command line, with how long each task took.
+;
+;   -z OFFSET   the zone to print in, such as -03:00; UTC when not given
+;
+;   build/novelo examples/18-time/main.nvl -z -03:00 < examples/18-time/input.txt
+;
+; New here: the library `time` (stdlib 0.14.0). An instant is an Integer of
+; milliseconds, so sorting and subtracting instants is ordinary arithmetic;
+; `read-time` gives one from a text, or a failure with its column, and
+; `time-to-date` gives the fields of the calendar.
+;
+; Friction: `format-time` writes only UTC, so the local times below are
+; made from the fields of `time-to-date` by hand; and `read-time` takes no
+; offset on its own, so the option reads one by putting a midnight before
+; it.
+
+(import io)
+(import list)      ; filter, fold, map, reverse, sort
+(import text t)    ; t/format, t/join, t/pad-left, t/split
+(import result)    ; ok, failure, then
+(import time)      ; read-time, time-to-date
+
+(define usage "usage: main.nvl [-z OFFSET]\n")
+
+; ---- the zone -----------------------------------------------------------------
+
+; An offset is how far a zone is ahead of UTC. Midnight of 1970-01-01 at
+; that offset is that far before the epoch, so the instant `read-time`
+; gives is the offset with its sign turned.
+(define offset
+  (lambda (arguments)
+    (match arguments
+      () (ok 0)
+      ("-z" zone)
+      (match (read-time (concatenate "1970-01-01T00:00" zone))
+        (:ok instant) (ok (- 0 instant))
+        otherwise (failure (concatenate "not an offset: " zone)))
+      otherwise (failure "unexpected arguments"))))
+
+(define two (lambda (n) (t/pad-left 2 "0" (to-string n))))
+
+(define local
+  (lambda (instant shift)
+    (match (time-to-date (+ instant shift))
+      {:year year :month month :day day :hour hour :minute minute :second second}
+      (t/format "{}-{}-{} {}:{}:{}" year (two month) (two day) (two hour) (two minute) (two second)))))
+
+(define duration
+  (lambda (milliseconds)
+    (let ((seconds (quotient milliseconds 1000)))
+      (t/format "{}h {}m {}s" (quotient seconds 3600) (two (remainder (quotient seconds 60) 60))
+                (two (remainder seconds 60))))))
+
+; ---- the events -----------------------------------------------------------------
+
+; An event is (instant kind task), kind :start or :end. RFC 3339 lets a
+; space stand for the T between date and time, so a line has three words
+; or four.
+(define event
+  (lambda (line)
+    (match (t/split " " line)
+      (time-text kind task) (event-of time-text kind task)
+      (date clock kind task) (event-of (concatenate date " " clock) kind task)
+      otherwise (failure "not a time, start or end, and a task"))))
+
+(define event-of
+  (lambda (time-text kind task)
+    (chain then ((instant (match (read-time time-text)
+                            (:error message column) (failure (t/format "{} at column {}" message column))
+                            success success))
+                 (kind (match kind "start" (ok :start) "end" (ok :end)
+                         otherwise (failure (concatenate "not start or end: " kind)))))
+      (ok (list instant kind task)))))
+
+; Each start waits in `open` for its end; an end without a start, or a
+; start that never ends, is reported.
+(define durations
+  (lambda (events open done)
+    (match events
+      () (list (reverse done) (keys open))
+      ((instant :start task) &rest more) (durations more (associate open task instant) done)
+      ((instant :end task) &rest more)
+      (if (contains? open task)
+          (durations more (dissociate open task) (prepend (list task (- instant (get open task))) done))
+          otherwise (durations more open (prepend (list task #void) done))))))
+
+(define report
+  (lambda (shift lines)
+    (let ((results (map (lambda (line) (list line (event line))) lines))
+          (events (sort (lambda (a b) (< (first a) (first b)))
+                        (map (lambda (pair) (first (rest (first (rest pair)))))
+                             (filter (lambda (pair) (equal? (first (first (rest pair))) :ok)) results))))
+          (bad (filter (lambda (pair) (equal? (first (first (rest pair))) :error)) results))
+          ((done unfinished) (durations events {} ())))
+      (concatenate
+       (t/join "" (map (lambda (event)
+                         (let (((instant kind task) event))
+                           (t/format "{}  {} {}\n" (local instant shift) (if (equal? kind :start) "start" otherwise "end  ") task)))
+                       events))
+       "\n"
+       (t/join "" (map (lambda (pair)
+                         (let (((task took) pair))
+                           (if (void? took) (t/format "{}: ended without a start\n" task)
+                               otherwise (t/format "{}: {}\n" task (duration took)))))
+                       done))
+       (t/join "" (map (lambda (task) (t/format "{}: never ended\n" task)) unfinished))
+       (if (empty? bad) ""
+           otherwise
+           (concatenate "\nleft out:\n"
+                        (t/join "" (map (lambda (pair)
+                                          (let (((line (_ message)) pair)) (t/format "{}: {}\n" line message)))
+                                        bad))))))))
+
+(match (offset (program-arguments!))
+  (:ok shift) (display! (report shift (filter (lambda (line) (not (equal? line ""))) (read-lines!))))
+  (:error message) (sequence (display-to-error! (concatenate message "\n" usage)) (exit! 2)))
