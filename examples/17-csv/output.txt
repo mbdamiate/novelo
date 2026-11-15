@@ -1,0 +1,11 @@
+category,items,total
+"Bebidas, vinhos",1,89.00
+Laticínios,2,23.50
+Mercearia,6,71.76
+Padaria,4,33.50
+Presentes,1,149.90
+
+left out:
+row 7: the quantity is not a whole number: dois
+row 8: the record has too few fields: 4
+row 9: the price is not reais and two digits of centavos: 3,5

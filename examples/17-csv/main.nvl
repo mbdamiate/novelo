@@ -1,0 +1,111 @@
+; Sales in CSV.
+;
+; Reads a spreadsheet of sales from standard input, as a spreadsheet set to
+; Portuguese saves it: fields separated by semicolons, since the comma is
+; the decimal mark of the prices, and a field in double quotes when it
+; holds a semicolon, a double quote or a line break. Prints a report per
+; category as CSV with commas, the way most programs read it, then the
+; sales it had to leave out, and why.
+;
+;   build/novelo examples/17-csv/main.nvl < examples/17-csv/input.txt
+;
+; New here: the library `csv` (stdlib 0.13.0). `read-csv-with` takes the
+; separator and gives a result, as `read-json` does: the records, each a
+; List of Strings, or the line and column where the text stops being CSV.
+; It never converts a field: a price is the String "18,90" until the program
+; says what it means. `write-csv` quotes only the fields that need it, such
+; as a category with a comma.
+;
+; Friction: there is no function that reads all of standard input as one
+; text, and a CSV record may span lines, so the program joins the lines of
+; `read-lines!` back together; a file name would go through `read-file!`.
+
+(import io)
+(import list)      ; filter, fold, map, sort, zip
+(import text t)    ; t/characters, t/digit?, t/format, t/join, t/pad-left, t/precedes?, t/split
+(import map)       ; entries, from-entries
+(import result)    ; ok, failure, then
+(import csv)       ; read-csv-with, write-csv
+
+; ---- one sale -----------------------------------------------------------------
+
+; The first record names the fields; `zip` pairs each record with it, and
+; `from-entries` makes the pairs a Map, so a sale is read by field name.
+; A record with too few fields lacks a key, which the map pattern below
+; reports; extra fields are ignored.
+(define as-map
+  (lambda (header record)
+    (from-entries (zip header record))))
+
+(define digits? (lambda (text) (and (not (equal? text "")) (t/digit? text))))
+
+; Money is counted in cents, an Integer, so sums are exact. A price is
+; reais, a comma and two digits of centavos: "18,90" is 1890.
+(define cents
+  (lambda (price)
+    (match (t/split "," price)
+      (reais centavos)
+      (if (and (digits? reais) (digits? centavos) (= (count (t/characters centavos)) 2))
+          (ok (+ (* 100 (string-to-number reais)) (string-to-number centavos)))
+          otherwise (failure "the price is not reais and two digits of centavos" price))
+      otherwise (failure "the price is not reais and two digits of centavos" price))))
+
+(define quantity
+  (lambda (text)
+    (if (digits? text) (ok (string-to-number text))
+        otherwise (failure "the quantity is not a whole number" text))))
+
+; A sale is (category quantity total-in-cents), or a failure that says
+; what is wrong with its record.
+(define sale
+  (lambda (fields)
+    (match fields
+      {"category" category "quantity" quantity-text "price" price}
+      (chain then ((units (quantity quantity-text))
+                   (unit-cents (cents price)))
+        (ok (list category units (* units unit-cents))))
+      otherwise (failure "the record has too few fields" (count fields)))))
+
+; ---- the report -----------------------------------------------------------------
+
+(define money
+  (lambda (amount)
+    (t/format "{}.{}" (quotient amount 100) (t/pad-left 2 "0" (to-string (remainder amount 100))))))
+
+; The totals per category: a Map from category to (items cents).
+(define add-sale
+  (lambda (totals category units amount)
+    (let (((items sum) (get totals category (list 0 0))))
+      (associate totals category (list (+ items units) (+ sum amount))))))
+
+(define report
+  (lambda (totals)
+    (write-csv (prepend (list "category" "items" "total")
+                        (map (lambda (entry)
+                               (let (((category (items sum)) entry))
+                                 (list category (to-string items) (money sum))))
+                             (sort (lambda (a b) (t/precedes? (first a) (first b))) (entries totals)))))))
+
+; Each record is numbered as the spreadsheet numbers its rows: the header
+; is row 1. A row is not a line: a quoted field may hold a line break.
+(define tally
+  (lambda (header records number totals rejected)
+    (if (empty? records) (list totals (reverse rejected))
+        otherwise
+        (match (sale (as-map header (first records)))
+          (:ok (category units amount))
+          (tally header (rest records) (+ number 1) (add-sale totals category units amount) rejected)
+          (:error message value)
+          (tally header (rest records) (+ number 1) totals
+                 (prepend (t/format "row {}: {}: {}" number message value) rejected))))))
+
+(define summary
+  (lambda (text)
+    (match (read-csv-with ";" text)
+      (:error message line column) (t/format "line {}, column {}: {}\n" line column message)
+      (:ok (header &rest records))
+      (let (((totals rejected) (tally header records 2 {} ())))
+        (concatenate (report totals) "\nleft out:\n" (t/join "" (map (lambda (line) (concatenate line "\n")) rejected))))
+      (:ok ()) "no records\n")))
+
+(display! (summary (t/join "\n" (read-lines!))))

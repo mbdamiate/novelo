@@ -1,0 +1,12 @@
+date;product;category;quantity;price
+2026-11-03;Café torrado 500 g;Mercearia;2;18,90
+2026-11-03;"Pão de queijo; congelado";Padaria;1;12,50
+2026-11-04;"Bolo ""da casa""";Padaria;3;7,00
+2026-11-04;"Cesta de Natal
+(edição limitada)";Presentes;1;149,90
+2026-11-05;Feijão preto 1 kg;Mercearia;4;8,49
+2026-11-05;Leite;Laticínios;dois;5,20
+2026-11-06;Queijo minas;Laticínios;1
+2026-11-06;Iogurte;Laticínios;6;3,5
+2026-11-07;Manteiga;Laticínios;2;11,75
+2026-11-07;"Vinho tinto, safra 2024";"Bebidas, vinhos";1;89,00

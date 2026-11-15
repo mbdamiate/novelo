@@ -1,0 +1,23 @@
+; The library csv over a table the program builds: plain and quoted
+; fields, written and read back.
+; scale: 10000
+(import io)
+(import list)
+(import csv)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define record
+  (lambda (index)
+    (list (to-string index) (concatenate "name " (to-string index)) "a, \"quoted\" field" "line\nbreak" "")))
+
+(define records (map record (range 0 size)))
+(define text (write-csv records))
+(define read-back (match (read-csv text) (:ok value) value otherwise (error "not read")))
+
+(check "count" (count read-back) size)
+(check "round trip" (equal? read-back records) #true)
+(display! "ok\n")

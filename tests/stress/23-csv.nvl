@@ -1,0 +1,18 @@
+; The library csv at volume: a table of many records, quoted and plain,
+; written and read back, and a failure found at its very end.
+; scale: 50000
+(import io)
+(import list)
+(import text)
+(import csv)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define records (map (lambda (n) (list (to-string n) (if (= (remainder n 2) 0) "plain" otherwise "a;\"b\"\r\nc"))) (range 0 size)))
+(define text (write-csv-with ";" records))
+(check "round trip" (read-csv-with ";" text) (list :ok records))
+(check "failure" (read-csv-with ";" (concatenate text "x\"y")) (list :error "quote inside an unquoted field" (+ 1 size (quotient size 2)) 2))
+(display! "ok\n")

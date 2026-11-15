@@ -6,11 +6,18 @@ Nov 10, 2026 · @Matheus Damiate
 
 The standard library is a set of functions written in the language itself, on top of the core primitives. It is not part of the core: an implementation conformant to the core does not need to provide it, and the core tests do not depend on it.
 
-The standard library is made of nine libraries, in the sense of core section 8.9: `list`, `text`, `function`, `map`, `set`, `number`, `result`, `random` and `json`. Nothing is loaded before the program: a file imports the libraries it uses, such as `(import list)`, and only then sees their names. Imported with no prefix, the names are ordinary globals, and a program may redefine them. Imported with a prefix, as in `(import list l)`, they are bound as `l/map` and so on.
+The standard library is made of ten libraries, in the sense of core section 8.9: `list`, `text`, `function`, `map`, `set`, `number`, `result`, `random`, `json` and `csv`. Nothing is loaded before the program: a file imports the libraries it uses, such as `(import list)`, and only then sees their names. Imported with no prefix, the names are ordinary globals, and a program may redefine them. Imported with a prefix, as in `(import list l)`, they are bound as `l/map` and so on.
 
 The reference definitions in section 4 are normative. The implementation MAY replace any of them with a native version, as long as the observable behavior is identical, including errors and the names each library binds.
 
-**Version:** 0.12.0, draft, on top of core 0.18.0.
+**Version:** 0.13.0, draft, on top of core 0.18.0.
+
+**Changes since 0.12.0.** A new library, `csv`, reads and writes comma-separated values as RFC 4180 defines them (sections 3 and 4.10).
+- `read-csv` returns `(:ok records)`, a List of records, each a List of Strings, or `(:error message line column)`.
+- `write-csv` writes records back as text, quoting only the fields that need it.
+- `read-csv-with` and `write-csv-with` take another separator, such as the `;` of spreadsheets that write decimals with a comma.
+
+The other libraries are unchanged.
 
 **Changes since 0.11.1.** A new library, `json`, reads and writes JSON (sections 3 and 4.9).
 - `read-json` returns a result: `(:ok value)`, or `(:error message line column)` for a text that is not JSON.
@@ -56,8 +63,8 @@ The other libraries are unchanged.
 - **The function comes first and the collection last**, as in `(map f xs)` and `(map-values f m)`. This makes partial application with `partial` easier. `merge` takes two maps and `update` takes the key, the function and then the map.
 - **Evaluation is eager.** Every function traverses the whole list and returns the finished result.
 - **Constant memory.** Every function that traverses a list does so by tail recursion, so lists of any size are traversed in constant memory.
-- **Helpers.** Since the core has no local recursion, some functions use helpers defined at the top level of their library: `take-step`, `span-step`, `range-step`, `zip-step`, `merge-sorted`, `split-step`, `precedes-step`, `padding`, `repeat-step`, `format-step`, `check-base`, `digit-value`, `digits-step`, `map-results-step`, `letter-code-point?`, `uppercase-code-point`, `lowercase-code-point`, and the names of `random` that start with `random-` and are not in section 3: `random-jump`, `random-matrix-apply`, `random-matrix-product`, `random-dot`, `random-multiply`, `random-next`, `random-modulo`, `random-below`, `random-below-narrow`, `random-below-wide`, `random-positions`, `random-shuffle-step` and `random-gather`, and the names of `json` that start with `json-`. They are bound by `import` like the other names, but they are not part of the interface: a program should not rely on them, and a native implementation MAY omit them.
-- **Dependencies.** `text`, `function`, `map`, `set`, `number` and `result` import `list` (core 8.9); `random` imports nothing; `json` imports `list`, `text`, `number` and `result`. Importing a library therefore also binds the names of the libraries it imports in the same context. The names of all the libraries are different, so they can be imported together without a prefix.
+- **Helpers.** Since the core has no local recursion, some functions use helpers defined at the top level of their library: `take-step`, `span-step`, `range-step`, `zip-step`, `merge-sorted`, `split-step`, `precedes-step`, `padding`, `repeat-step`, `format-step`, `check-base`, `digit-value`, `digits-step`, `map-results-step`, `letter-code-point?`, `uppercase-code-point`, `lowercase-code-point`, and the names of `random` that start with `random-` and are not in section 3: `random-jump`, `random-matrix-apply`, `random-matrix-product`, `random-dot`, `random-multiply`, `random-next`, `random-modulo`, `random-below`, `random-below-narrow`, `random-below-wide`, `random-positions`, `random-shuffle-step` and `random-gather`, and the names of `json` and `csv` that start with `json-` and `csv-`. They are bound by `import` like the other names, but they are not part of the interface: a program should not rely on them, and a native implementation MAY omit them.
+- **Dependencies.** `text`, `function`, `map`, `set`, `number` and `result` import `list` (core 8.9); `random` imports nothing; `json` imports `list`, `text`, `number` and `result`; `csv` imports `list`, `text` and `result`. Importing a library therefore also binds the names of the libraries it imports in the same context. The names of all the libraries are different, so they can be imported together without a prefix.
 - **Letters and case.** `text` knows two ranges of letters: ASCII, `A` to `Z` and `a` to `z`, and Latin-1, U+00C0 to U+00FF without U+00D7 `×` and U+00F7 `÷`, which covers the accented letters of Portuguese and the other languages of Western Europe, such as `á`, `ç`, `ê` and `õ`. `uppercase` and `lowercase` pair `A`–`Z` with `a`–`z` and U+00C0–U+00DE with U+00E0–U+00FE; `ß` (U+00DF) and `ÿ` (U+00FF) have no pair in these ranges and stay as they are. Every other character, in any script, is not a letter and keeps its case. `digit?` knows only `0` to `9`, the digits `string-to-number` reads.
 - **Order of text.** `precedes?` orders by code point, not as a dictionary does: every uppercase ASCII letter comes before every lowercase one, so `"Zebra"` precedes `"apple"`, and accented letters come after `z`. To ignore case, compare the `lowercase` of both.
 
@@ -114,6 +121,8 @@ The other libraries are unchanged.
 | `random` | `shuffle` | `(shuffle generator xs)` | List of the elements of `xs` in an order drawn so that every order is equally likely, and the next generator |
 | `json` | `read-json` | `(read-json text)` | `(:ok value)` with the value the JSON `text` holds, objects as Maps with String keys, arrays as Lists and `null` as `#void`; or `(:error message line column)`, a failure with one of the messages of section 4.9 and the position, counted from 1 in characters, where the text stops being JSON. A `text` that is not a String is `:wrong-type` |
 | `json` | `write-json` | `(write-json value)` | the JSON text of `value`, built from `#void`, Booleans, numbers, Strings, Lists and Maps with String keys, with one space after each comma and colon: `(write-json {"a" (list 1 #void)})` is `{"a": [1, null]}`; any other value is `:error`, with that value, or that key, as `:values` |
+| `csv` | `read-csv`, `read-csv-with` | `(read-csv text)`, `(read-csv-with separator text)` | `(:ok records)`, the records of the CSV `text`, each a List of its fields as Strings, with an empty line as `()`; or `(:error message line column)`, a failure with one of the messages of section 4.10. The separator is `","`, or the one-character String `separator`, which may not be a double quote or a line break (`:domain-error`); a `text` or a `separator` that is not a String is `:wrong-type` |
+| `csv` | `write-csv`, `write-csv-with` | `(write-csv records)`, `(write-csv-with separator records)` | the text of the records, each followed by a line feed, with a field in double quotes only when it holds the separator, a double quote or a line break, and a record of one empty field as `""`; a field that is not a String is `:wrong-type`, and the separator as in `read-csv-with` |
 | `number` | `round` | `(round x)` | the Integer nearest to the Float `x`; exactly halfway, the one farther from zero: `(round 2.5)` is `3`, `(round -2.5)` is `-3`; errors as `floor` |
 
 There is no `find`. To get the first element that satisfies a predicate, take `first` of the `filter` result after checking that it is not empty; to only ask whether such an element exists, use `any?`. To combine from last to first, `fold` the `reverse` of the list.
@@ -1041,8 +1050,170 @@ Writing escapes `"`, `\` and every control character: with a short escape when t
         otherwise (raise {:kind :error :message "write-json: an object key must be a String" :values (list key)}))))
 ```
 
+### 4.10 `csv`
+
+Comma-separated values, as RFC 4180 defines them: a text of records, one per line, each a list of fields. A record is a List of Strings, and a text is a List of records. Fields are always Strings. A program that wants numbers converts them with `string-to-number`.
+
+`read-csv` reads a text with fields separated by commas. `read-csv-with` reads one with another separator, a String of one character other than a double quote, a carriage return or a line feed, such as `";"`, which spreadsheets use where the comma is the decimal mark.
+
+**Records.**
+- A record ends at a line feed, or at a carriage return followed by a line feed. The line break after the last record is optional.
+- An empty line is the empty record `()`, and an empty text has no records.
+- Records may have different numbers of fields. The library does not check them, since only the program knows how many it expects.
+
+**Fields.**
+- A field that starts with a double quote is quoted. It ends at the next double quote that is not doubled, and it may hold the separator, line breaks, and `""`, which stands for one double quote. After its closing quote comes the separator, a line break or the end of the text.
+- Any other field ends at the separator, a line break or the end of the text, and may not hold a double quote.
+- A carriage return not followed by a line feed is an ordinary character of a field.
+
+The result is `(:ok records)`. A text that does not follow these rules is a failure, `(:error message line column)`, with the line and the column counted from 1 in characters, as in `read-json`:
+
+| Message | The problem |
+| --- | --- |
+| `unterminated quoted field` | a quoted field that reaches the end of the text; the position is that of its opening quote |
+| `character after a closing quote` | anything but the separator or a line break after a quoted field, as in `"a"b`; the position is that character's |
+| `quote inside an unquoted field` | a double quote inside a field that did not start with one, as in `a"b`; the position is that quote's |
+
+A `text` that is not a String is `:wrong-type`. So is a separator that is not a String. A String that is not a valid separator is `:domain-error`, with `:values` `(separator)`.
+
+`write-csv` and `write-csv-with` write a list of records as text:
+- Each record ends with a line feed, the last one too. RFC 4180 asks for a carriage return before it, but the readers accept both, and Unix tools expect the line feed alone.
+- A field is quoted only when it holds the separator, a double quote, a carriage return or a line feed. Its double quotes are doubled.
+- A record of one empty field is written `""`, so that it is not the empty line of the record `()`.
+- A field that is not a String is `:wrong-type`, with the field as `:values`. Numbers go through `to-string` in the program, as everywhere else.
+
+`(read-csv-with separator (write-csv-with separator records))` is `(:ok records)` for every List of Lists of Strings.
+
+A first record that names the fields turns the others into Maps with `zip` and `from-entries`:
+
+```
+(let (((:ok (header &rest rows)) (read-csv text)))
+  (map (lambda (row) (from-entries (zip header row))) rows))
+```
+
+The library imports `list`, `text` and `result`. As in `json`, the reader walks the list of the text's characters, and each step returns a result whose failure counts the characters left; `read-csv-with` turns that count into a line and a column. The fields of a record and the records of a text are gathered newest first, and reversed once each.
+
+```lisp
+(import list)
+(import text)
+(import result)
+
+(define read-csv (lambda (text) (read-csv-with "," text)))
+
+(define write-csv (lambda (records) (write-csv-with "," records)))
+
+(define csv-check-separator
+  (lambda (name separator)
+    (if (not (string? separator))
+        (raise {:kind :wrong-type :message (concatenate name ": the separator must be a String")
+                :values (list separator)})
+        (or (not (= (count separator) 1)) (equal? separator "\"") (equal? separator "\n") (equal? separator "\r"))
+        (raise {:kind :domain-error
+                :message (concatenate name ": the separator must be one character, not a quote or a line break")
+                :values (list separator)})
+        otherwise #true)))
+
+(define read-csv-with
+  (lambda (separator text)
+    (let ((_ (csv-check-separator "read-csv-with" separator))
+          (characters-of-text (characters text)))
+      (match (csv-records characters-of-text separator ())
+        (:error message left)
+        (let (((line column) (csv-position characters-of-text (- (count characters-of-text) left) 1 1)))
+          (failure message line column))
+        success success))))
+
+(define csv-position
+  (lambda (characters-of-text consumed line column)
+    (if (= consumed 0) (list line column)
+        (equal? (first characters-of-text) "\n") (csv-position (rest characters-of-text) (- consumed 1) (+ line 1) 1)
+        otherwise (csv-position (rest characters-of-text) (- consumed 1) line (+ column 1)))))
+
+(define csv-fail (lambda (message text) (failure message (count text))))
+```
+
+A record starts at the beginning of a line. An empty line is the record `()`; anything else is read field by field until the line break that ends it.
+
+```lisp
+(define csv-records
+  (lambda (text separator records)
+    (match text
+      () (ok (reverse records))
+      ("\n" &rest more) (csv-records more separator (prepend () records))
+      ("\r" "\n" &rest more) (csv-records more separator (prepend () records))
+      otherwise
+      (chain then (((record more) (csv-record text separator ())))
+        (csv-records more separator (prepend record records))))))
+
+; The fields of one record: after each field comes the separator, which
+; starts another, or the end of the record.
+(define csv-record
+  (lambda (text separator fields)
+    (chain then (((field after) (csv-field text separator)))
+      (let ((fields (prepend field fields)))
+        (match after
+          () (ok (list (reverse fields) ()))
+          ("\n" &rest more) (ok (list (reverse fields) more))
+          ("\r" "\n" &rest more) (ok (list (reverse fields) more))
+          (character &rest more)
+          (if (equal? character separator) (csv-record more separator fields)
+              otherwise (csv-fail "character after a closing quote" after)))))))
+
+(define csv-field
+  (lambda (text separator)
+    (match text
+      ("\"" &rest more) (csv-quoted more () text)
+      otherwise (csv-plain text separator ()))))
+
+(define csv-plain
+  (lambda (text separator gathered)
+    (match text
+      () (ok (list (apply concatenate (reverse gathered)) text))
+      ("\n" &rest _) (ok (list (apply concatenate (reverse gathered)) text))
+      ("\r" "\n" &rest _) (ok (list (apply concatenate (reverse gathered)) text))
+      ("\"" &rest _) (csv-fail "quote inside an unquoted field" text)
+      (character &rest more)
+      (if (equal? character separator) (ok (list (apply concatenate (reverse gathered)) text))
+          otherwise (csv-plain more separator (prepend character gathered))))))
+
+; `opening` is the text from the opening quote, where an unterminated field
+; is reported.
+(define csv-quoted
+  (lambda (text gathered opening)
+    (match text
+      ("\"" "\"" &rest more) (csv-quoted more (prepend "\"" gathered) opening)
+      ("\"" &rest more) (ok (list (apply concatenate (reverse gathered)) more))
+      () (csv-fail "unterminated quoted field" opening)
+      (character &rest more) (csv-quoted more (prepend character gathered) opening))))
+```
+
+Writing builds the pieces of the whole text, a line feed after each record, and joins them once.
+
+```lisp
+(define write-csv-with
+  (lambda (separator records)
+    (let ((_ (csv-check-separator "write-csv-with" separator)))
+      (apply concatenate (map (lambda (record) (concatenate (csv-line separator record) "\n")) records)))))
+
+(define csv-line
+  (lambda (separator record)
+    (if (equal? record (list "")) "\"\""
+        otherwise (join separator (map (lambda (field) (csv-write-field separator field)) record)))))
+
+(define csv-write-field
+  (lambda (separator field)
+    (if (not (string? field))
+        (raise {:kind :wrong-type :message "write-csv: a field must be a String" :values (list field)})
+        (any? (lambda (character)
+                (or (equal? character separator) (equal? character "\"") (equal? character "\n")
+                    (equal? character "\r")))
+              (characters field))
+        (concatenate "\"" (join "\"\"" (split "\"" field)) "\"")
+        otherwise field)))
+```
+
 ## 5. Conformance
 
-The file `stdlib-conformance.json` has 193 cases, in the same format as the core `eval` cases, with one difference: the libraries `list`, `text`, `function`, `map`, `set`, `number`, `result`, `random` and `json` are available to `import`. Each program imports what it uses. An implementation that provides the library MUST pass all of them, in addition to the core cases.
+The file `stdlib-conformance.json` has 216 cases, in the same format as the core `eval` cases, with one difference: the libraries `list`, `text`, `function`, `map`, `set`, `number`, `result`, `random`, `json` and `csv` are available to `import`. Each program imports what it uses. An implementation that provides the library MUST pass all of them, in addition to the core cases.
 
-The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that imports a library, a traversal of one hundred thousand elements, which only passes if the functions run in constant memory, every function of `map` with its errors, a map of one hundred thousand keys built with `from-entries` and reduced with `filter-entries`, every function of `set`, sets of one hundred thousand elements, the order of `precedes?` and its stable use in `sort`, `uppercase`, `lowercase`, `letter?` and `digit?` at the edges of the ASCII and Latin-1 ranges, `pad-left` and `pad-right` with texts wider than the width, accented fills and fills of the wrong length, `format` with values of every type, braces outside `{}` and too few or too many values, `join` of a single part that is returned as it is, and `join` of two hundred thousand parts and `format` of ten thousand values, which only pass in reasonable time if they grow linearly, `max` and `min` with Integers, with Floats, with their errors and over one hundred thousand arguments, `abs`, `floor`, `ceiling` and `round` at negative numbers, `-0.0`, halfway values, Floats above 2^52 and the edges of the range of Integer, `characters` of accented letters, of characters outside the BMP and of the empty text, and its use with `match`, `digits-to-integer` and `integer-to-digits` in bases 2, 8, 10, 16 and 36, with uppercase digits, signs, texts that are not numbers, the smallest and largest Integer, overflow, every base error and a round trip in every base, `span` with a test that always or never holds and a test it stops calling, and with a `let` pattern, `zip` of lists of different lengths and as the input of `from-entries`, both over one hundred thousand elements, `ok`, `failure` with no detail and with several, `ok?` and `failure?` over values of every shape, `then` going on, stopping and rejecting what is not a result, as the step of a `chain` with patterns, `map-results` stopping at the first failure without calling `f` again, and over one hundred thousand elements, `random-generator` for the first seeds, the largest one and one from `random-seed!`, the exact draws of `random-float` and of `random-integer` over small, negative, one-element, wide and edge ranges, sixty thousand throws of a die, `shuffle` of short lists, of lists too short to draw from and of twenty thousand elements, and every error of `random`, `read-json` over every kind of value, numbers at the edges of Integer and Float and beyond them, every escape and surrogate case, keys that repeat, whitespace, every failure message with its line and column, also across lines, `write-json` of every type, of escapes and of values without a JSON form, a round trip, and an array of twenty thousand numbers, which only passes in reasonable time if reading grows linearly, the trace of an error in the function given to `map`, and `import` itself: names unbound without it, prefixes, the dependencies of `text`, `function`, `map`, `set`, `number` and `result` on `list` and of `json` on four libraries, and repeated imports.
+The cases cover every function in section 3, the errors of `take`, `drop` and `split`, the two-list limit of `append`, the early exit of `any?`, the stability of `sort`, a program redefining a library name, a file included with a prefix that imports a library, a traversal of one hundred thousand elements, which only passes if the functions run in constant memory, every function of `map` with its errors, a map of one hundred thousand keys built with `from-entries` and reduced with `filter-entries`, every function of `set`, sets of one hundred thousand elements, the order of `precedes?` and its stable use in `sort`, `uppercase`, `lowercase`, `letter?` and `digit?` at the edges of the ASCII and Latin-1 ranges, `pad-left` and `pad-right` with texts wider than the width, accented fills and fills of the wrong length, `format` with values of every type, braces outside `{}` and too few or too many values, `join` of a single part that is returned as it is, and `join` of two hundred thousand parts and `format` of ten thousand values, which only pass in reasonable time if they grow linearly, `max` and `min` with Integers, with Floats, with their errors and over one hundred thousand arguments, `abs`, `floor`, `ceiling` and `round` at negative numbers, `-0.0`, halfway values, Floats above 2^52 and the edges of the range of Integer, `characters` of accented letters, of characters outside the BMP and of the empty text, and its use with `match`, `digits-to-integer` and `integer-to-digits` in bases 2, 8, 10, 16 and 36, with uppercase digits, signs, texts that are not numbers, the smallest and largest Integer, overflow, every base error and a round trip in every base, `span` with a test that always or never holds and a test it stops calling, and with a `let` pattern, `zip` of lists of different lengths and as the input of `from-entries`, both over one hundred thousand elements, `ok`, `failure` with no detail and with several, `ok?` and `failure?` over values of every shape, `then` going on, stopping and rejecting what is not a result, as the step of a `chain` with patterns, `map-results` stopping at the first failure without calling `f` again, and over one hundred thousand elements, `random-generator` for the first seeds, the largest one and one from `random-seed!`, the exact draws of `random-float` and of `random-integer` over small, negative, one-element, wide and edge ranges, sixty thousand throws of a die, `shuffle` of short lists, of lists too short to draw from and of twenty thousand elements, and every error of `random`, `read-json` over every kind of value, numbers at the edges of Integer and Float and beyond them, every escape and surrogate case, keys that repeat, whitespace, every failure message with its line and column, also across lines, `write-json` of every type, of escapes and of values without a JSON form, a round trip, and an array of twenty thousand numbers, which only passes in reasonable time if reading grows linearly, `read-csv` with every kind of line break, empty lines and fields, quoted fields holding separators, line breaks and quotes, a lone carriage return, records of different lengths, every failure with its position, other separators and every separator error, `write-csv` quoting only what needs it, its errors, a round trip with two separators, the idiom that turns a header into Maps, and twenty thousand records read in linear time, the trace of an error in the function given to `map`, and `import` itself: names unbound without it, prefixes, the dependencies of `text`, `function`, `map`, `set`, `number` and `result` on `list` of `json` on four libraries and of `csv` on three, and repeated imports.

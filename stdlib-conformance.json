@@ -1,7 +1,7 @@
 {
-  "spec": "Standard Library — Novelo, version 0.12.0",
+  "spec": "Standard Library — Novelo, version 0.13.0",
   "format": {
-    "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text, function, map, set, number, result, random and json available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
+    "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text, function, map, set, number, result, random, json and csv available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
   },
   "cases": [
     {
@@ -1559,6 +1559,190 @@
       "section": "4.9",
       "program": "(import json)\n(import json)\n(read-json \"1\")",
       "value": "(:ok 1)",
+      "output": ""
+    },
+    {
+      "id": "library-194",
+      "kind": "eval",
+      "section": "4.10",
+      "program": "(import csv)\n(list (read-csv \"a,b,c\\n1,2,3\\n\") (read-csv \"a,b\\r\\nc,d\") (read-csv \"a\\nb\\r\\nc\"))",
+      "value": "((:ok ((\"a\" \"b\" \"c\") (\"1\" \"2\" \"3\"))) (:ok ((\"a\" \"b\") (\"c\" \"d\"))) (:ok ((\"a\") (\"b\") (\"c\"))))",
+      "output": ""
+    },
+    {
+      "id": "library-195",
+      "kind": "eval",
+      "section": "4.10",
+      "program": "(import csv)\n(list (read-csv \"\") (read-csv \"\\n\") (read-csv \"\\r\\n\\r\\n\") (read-csv \"a\\n\\nb\\n\"))",
+      "value": "((:ok ()) (:ok (())) (:ok (() ())) (:ok ((\"a\") () (\"b\"))))",
+      "output": ""
+    },
+    {
+      "id": "library-196",
+      "kind": "eval",
+      "section": "4.10",
+      "program": "(import csv)\n(list (read-csv \",\") (read-csv \"a,\") (read-csv \",a\") (read-csv \",,\\n\"))",
+      "value": "((:ok ((\"\" \"\"))) (:ok ((\"a\" \"\"))) (:ok ((\"\" \"a\"))) (:ok ((\"\" \"\" \"\"))))",
+      "output": ""
+    },
+    {
+      "id": "library-197",
+      "kind": "eval",
+      "section": "4.10",
+      "program": "(import csv)\n(list (read-csv \"\\\"a,b\\\",c\") (read-csv \"\\\"line 1\\r\\nline 2\\\"\") (read-csv \"\\\"say \\\"\\\"hi\\\"\\\"\\\"\") (read-csv \"\\\"\\\"\") (read-csv \"\\\"\\\",\\\"\\\"\\n\") (read-csv \"\\\"é😀\\\"\"))",
+      "value": "((:ok ((\"a,b\" \"c\"))) (:ok ((\"line 1\\r\\nline 2\"))) (:ok ((\"say \\\"hi\\\"\"))) (:ok ((\"\"))) (:ok ((\"\" \"\"))) (:ok ((\"é😀\"))))",
+      "output": ""
+    },
+    {
+      "id": "library-198",
+      "kind": "eval",
+      "section": "4.10",
+      "program": "(import csv)\n(list (read-csv \"a\\rb,c\") (read-csv \"\\\"a\\rb\\\"\\r\") (read-csv \" a , b \"))",
+      "value": "((:ok ((\"a\\rb\" \"c\"))) (:error \"character after a closing quote\" 1 6) (:ok ((\" a \" \" b \"))))",
+      "output": ""
+    },
+    {
+      "id": "library-199",
+      "kind": "eval",
+      "section": "4.10",
+      "program": "(import csv)\n(list (read-csv \"a,b,c\\nd\\ne,f\\n\"))",
+      "value": "((:ok ((\"a\" \"b\" \"c\") (\"d\") (\"e\" \"f\"))))",
+      "output": ""
+    },
+    {
+      "id": "library-200",
+      "kind": "eval",
+      "section": "4.10",
+      "program": "(import csv)\n(list (read-csv \"\\\"abc\") (read-csv \"a,b\\nc,\\\"d\\ne\") (read-csv \"\\\"a\\\"b\") (read-csv \"\\\"a\\\" ,b\") (read-csv \"a\\n\\\"x\\ny\\\"z\") (read-csv \"ab\\\"c\") (read-csv \"a,b\\n\\\"c\\\",d\\\"e\"))",
+      "value": "((:error \"unterminated quoted field\" 1 1) (:error \"unterminated quoted field\" 2 3) (:error \"character after a closing quote\" 1 4) (:error \"character after a closing quote\" 1 4) (:error \"character after a closing quote\" 3 3) (:error \"quote inside an unquoted field\" 1 3) (:error \"quote inside an unquoted field\" 2 6))",
+      "output": ""
+    },
+    {
+      "id": "library-201",
+      "kind": "eval",
+      "section": "4.10",
+      "program": "(import csv)\n(list (read-csv-with \";\" \"a;b,c\\n1;\\\"x;y\\\"\\n\"))\n",
+      "value": "((:ok ((\"a\" \"b,c\") (\"1\" \"x;y\"))))",
+      "output": ""
+    },
+    {
+      "id": "library-202",
+      "kind": "eval",
+      "section": "4.10",
+      "program": "(import csv)\n(list (read-csv-with \"\\t\" \"a\\tb\\n\")) ",
+      "value": "((:ok ((\"a\" \"b\"))))",
+      "output": ""
+    },
+    {
+      "id": "library-203",
+      "kind": "eval",
+      "section": "4.10",
+      "program": "(import csv)\n(map (lambda (separator) (try (read-csv-with separator \"a\") {:kind kind :values (value)} (list kind value)))\n     (list \"\" \";;\" \"\\\"\" \"\\n\" \"\\r\" 59))",
+      "value": "((:domain-error \"\") (:domain-error \";;\") (:domain-error \"\\\"\") (:domain-error \"\\n\") (:domain-error \"\\r\") (:wrong-type 59))",
+      "output": ""
+    },
+    {
+      "id": "library-204",
+      "kind": "eval",
+      "section": "4.10",
+      "program": "(import csv)\n(read-csv 12)",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-205",
+      "kind": "eval",
+      "section": "4.10",
+      "program": "(import csv)\n(list (write-csv ()) (write-csv (list ())) (write-csv (list (list \"\"))) (write-csv (list (list \"\" \"\"))))",
+      "value": "(\"\" \"\\n\" \"\\\"\\\"\\n\" \",\\n\")",
+      "output": ""
+    },
+    {
+      "id": "library-206",
+      "kind": "eval",
+      "section": "4.10",
+      "program": "(import csv)\n(write-csv (list (list \"a\" \"b c\" \"d,e\" \"say \\\"hi\\\"\") (list \"l\\nm\" \"r\\rs\" \"é\")))",
+      "value": "\"a,b c,\\\"d,e\\\",\\\"say \\\"\\\"hi\\\"\\\"\\\"\\n\\\"l\\nm\\\",\\\"r\\rs\\\",é\\n\"",
+      "output": ""
+    },
+    {
+      "id": "library-207",
+      "kind": "eval",
+      "section": "4.10",
+      "program": "(import csv)\n(write-csv-with \";\" (list (list \"a,b\" \"c;d\")))",
+      "value": "\"a,b;\\\"c;d\\\"\\n\"",
+      "output": ""
+    },
+    {
+      "id": "library-208",
+      "kind": "eval",
+      "section": "4.10",
+      "program": "(import csv)\n(try (write-csv (list (list \"a\" 1)))\n  {:kind :wrong-type :values (value)} value)",
+      "value": "1",
+      "output": ""
+    },
+    {
+      "id": "library-209",
+      "kind": "eval",
+      "section": "4.10",
+      "program": "(import csv)\n(write-csv-with \"ab\" ())",
+      "error": ":domain-error",
+      "output": ""
+    },
+    {
+      "id": "library-210",
+      "kind": "eval",
+      "section": "4.10",
+      "program": "(import csv)\n(write-csv-with :tab ())",
+      "error": ":wrong-type",
+      "output": ""
+    },
+    {
+      "id": "library-211",
+      "kind": "eval",
+      "section": "4.10",
+      "program": "(import csv)\n(let ((records (list (list \"a\" \"\" \"b,c\" \"\\\"q\\\"\" \"l\\r\\nm\") () (list \"\") (list \"\" \"\") (list \"x;y\" \"é😀\"))))\n  (list (equal? (read-csv (write-csv records)) (list :ok records))\n        (equal? (read-csv-with \";\" (write-csv-with \";\" records)) (list :ok records))))",
+      "value": "(#true #true)",
+      "output": ""
+    },
+    {
+      "id": "library-212",
+      "kind": "eval",
+      "section": "4.10",
+      "program": "(import csv)\n(import list)\n(import text)\n(import map)\n(let (((:ok (header &rest rows)) (read-csv \"name,age\\nAna,31\\nIvo,7\\n\")))\n  (map (lambda (row) (from-entries (zip header row))) rows))",
+      "value": "({\"name\" \"Ana\" \"age\" \"31\"} {\"name\" \"Ivo\" \"age\" \"7\"})",
+      "output": ""
+    },
+    {
+      "id": "library-213",
+      "kind": "eval",
+      "section": "4.10",
+      "program": "(import csv)\n(import list)\n(import text)\n(define text (join \"\" (map (lambda (n) (format \"{},\\\"{} \\\"\\\"x\\\"\\\"\\\"\\n\" n n)) (range 0 20000))))\n(let (((:ok records) (read-csv text)))\n  (list (count records) (first (rest (first (reverse records)))) (equal? (write-csv records) text)))",
+      "value": "(20000 \"19999 \\\"x\\\"\" #true)",
+      "output": ""
+    },
+    {
+      "id": "library-214",
+      "kind": "eval",
+      "section": "4.10",
+      "program": "(read-csv \"a\")",
+      "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "library-215",
+      "kind": "eval",
+      "section": "4.10",
+      "program": "(import csv)\n(import csv c)\n(list (c/read-csv \"a,b\") (c/write-csv (list (list \"x\"))))",
+      "value": "((:ok ((\"a\" \"b\"))) \"x\\n\")",
+      "output": ""
+    },
+    {
+      "id": "library-216",
+      "kind": "eval",
+      "section": "4.10",
+      "program": "(import csv)\n(import list)\n(import text)\n(list (characters \"ab\") (ok 1) (join \"-\" (list \"a\" \"b\")) (map - '(1)))",
+      "value": "((\"a\" \"b\") (:ok 1) \"a-b\" (-1))",
       "output": ""
     }
   ]
