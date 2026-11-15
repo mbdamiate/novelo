@@ -231,6 +231,27 @@ else
     echo "FAIL example 16 without -s prints a seed that runs again the same" >&2
 fi
 
+# ---- traces: the calls an uncaught error left, one line each -----------------------------
+
+printf '(define g (lambda (x) (first x)))\n(define f (lambda (x) (+ 1 (g x))))\n(f 5)\n' > trace.nvl
+check "an error lists the calls it left" 1 "" "trace.nvl:1:23: error :wrong-type: first expects a non-empty List, got Integer 5
+  in g, called at trace.nvl:2:28
+  in f, called at trace.nvl:3:1
+" "" "$interpreter" trace.nvl
+printf '(define f (lambda (x) (first x)))\n(apply f (list 5))\n' > primitive.nvl
+check "a call by a primitive has no position" 1 "" "primitive.nvl:1:23: error :wrong-type: first expects a non-empty List, got Integer 5
+  in f
+" "" "$interpreter" primitive.nvl
+printf '(define f (lambda (n) (if (= n 0) (first n) otherwise (+ 1 (f (- n 1))))))\n(f 40)\n' > deep.nvl
+"$interpreter" deep.nvl 2> errors.txt
+if [ "$(grep -c '^  in f, called at deep.nvl:1:60$' errors.txt)" = 32 ] && [ "$(tail -n 1 errors.txt)" = "  ... and 9 more" ]; then
+    passed=$((passed + 1))
+else
+    failed=$((failed + 1))
+    echo "FAIL a deep trace keeps 32 calls" >&2
+    cat errors.txt >&2
+fi
+
 # ---- the REPL, with standard input not a terminal ----------------------------------
 
 check "the REPL prints values, without prompts" 0 "3
@@ -260,6 +281,13 @@ check "exit! ends the REPL with its code" 4 "3
 " "" "(+ 1 2)
 (exit! 4) (display! \"never\")
 (+ 5 6)
+" "$interpreter"
+
+check "the REPL lists the calls an error left" 0 "" "2:3: error :division-by-zero: quotient: division by zero
+  in f, called at 1:1
+" "(define f (lambda ()
+  (quotient 1 0)))
+(f)
 " "$interpreter"
 
 check "the REPL has no arguments" 0 "()

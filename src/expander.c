@@ -48,6 +48,7 @@ const LispSymbols *lisp_symbols(void) {
             .try_ = lisp_symbol_cstr("try"),
             .chain = lisp_symbol_cstr("chain"),
             .wildcard = lisp_symbol_cstr("_"),
+            .derived_lambda = lisp_symbol_cstr("lambda of a derived form"),
         };
         ready = true;
     }
@@ -59,6 +60,7 @@ const LispSymbols *lisp_symbols(void) {
 static void drop_node(Value *self) {
     LispNode *node = (LispNode *)self;
     lisp_release(node->value);
+    lisp_release(node->name);
     for (size_t index = 0; index < node->child_count; index++) lisp_release(node->children[index]);
     free(node->children);
     free(node->splices);
@@ -228,8 +230,14 @@ static Value *expand_if(LispState *state, Value *form, const Scope *scope, Value
     return expand_if_pairs(state, arguments, paired / 2, has_otherwise, scope, context);
 }
 
-/* (lambda (parameters …) body …) */
-static Value *expand_lambda(LispState *state, Value *form, const Scope *scope, Value *context) {
+void lisp_name_lambda(Value *node, Value *name) {
+    LispNode *lambda = (LispNode *)node;
+    if (lambda->kind != LISP_NODE_LAMBDA || !lambda->traced || lambda->name) return;
+    lambda->name = lisp_retain(name);
+}
+
+/* (lambda (parameters …) body …), traced unless a derived form wrote it */
+static Value *expand_lambda(LispState *state, Value *form, const Scope *scope, Value *context, bool traced) {
     if (lisp_list_length(form) < 3) return lisp_expansion_error(state, form, "lambda needs parameters and a body");
     Value *parameter_list = element(form, 1);
     if (!lisp_is_list(parameter_list)) {
@@ -269,6 +277,7 @@ static Value *expand_lambda(LispState *state, Value *form, const Scope *scope, V
         Scope parameters = {.parent = scope, .names = names, .count = name_count};
         size_t required = has_rest ? name_count - 1 : name_count;
         node = make_lambda(state, &parameters, required, has_rest, lisp_rest(lisp_rest(form)), context, form);
+        if (node) mutable_node(node)->traced = traced;
     }
     free(names);
     return node;
@@ -320,6 +329,7 @@ static Value *expand_let_bindings(LispState *state, Value *bindings, Value *body
     }
     Value *value_node = expand(state, element(binding, 1), scope, context);
     if (!value_node) return nullptr;
+    lisp_name_lambda(value_node, name);
 
     Scope inner = {.parent = scope, .names = &name, .count = 1};
     Value *lambda;
@@ -688,9 +698,9 @@ static Value *expand_try(LispState *state, Value *form, const Scope *scope, Valu
     Value *match = lisp_list_builder_finish(&match_form);
 
     Value *no_parameters = LISP_EMPTY;
-    Value *body = LISP_LIST(symbols->lambda, no_parameters, element(form, 1));
+    Value *body = LISP_LIST(symbols->derived_lambda, no_parameters, element(form, 1));
     Value *parameters = LISP_LIST(problem_name);
-    Value *handler = LISP_LIST(symbols->lambda, parameters, match);
+    Value *handler = LISP_LIST(symbols->derived_lambda, parameters, match);
     Value *rewritten = LISP_LIST(catch_primitive, body, handler);
     Value *node = expand(state, rewritten, scope, context);
 
@@ -751,7 +761,7 @@ static Value *expand_chain(LispState *state, Value *form, const Scope *scope, Va
         Value *pattern_bindings = LISP_LIST(pattern_binding);
         Value *let_form = LISP_LIST(symbols->let, pattern_bindings, inner);
         Value *parameters = LISP_LIST(value_name);
-        Value *continuation = LISP_LIST(symbols->lambda, parameters, let_form);
+        Value *continuation = LISP_LIST(symbols->derived_lambda, parameters, let_form);
         Value *call = LISP_LIST(step_name, element(binding, 1), continuation);
         lisp_release(continuation);
         lisp_release(parameters);
@@ -1024,7 +1034,8 @@ static Value *expand_form(LispState *state, Value *form, const Scope *scope, Val
     Value *head = lisp_first(form);
     if (head == symbols->quote) return expand_quote(state, form);
     if (head == symbols->if_) return expand_if(state, form, scope, context);
-    if (head == symbols->lambda) return expand_lambda(state, form, scope, context);
+    if (head == symbols->lambda) return expand_lambda(state, form, scope, context, true);
+    if (head == symbols->derived_lambda) return expand_lambda(state, form, scope, context, false);
     if (head == symbols->let) return expand_let(state, form, scope, context);
     if (head == symbols->sequence) return expand_sequence(state, form, scope, context);
     if (head == symbols->and_) return expand_and(state, lisp_rest(form), scope, context);

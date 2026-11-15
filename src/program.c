@@ -75,6 +75,7 @@ static Value *process_definition(LispState *state, Value *form, Value *context, 
     Value *name = lisp_first(lisp_rest(form));
     Value *node = lisp_expand(state, lisp_first(lisp_rest(lisp_rest(form))), context);
     if (!node) return nullptr;
+    lisp_name_lambda(node, name);
     Value *value = lisp_eval(state, node, nullptr, context);
     lisp_release(node);
     if (!value) return nullptr;

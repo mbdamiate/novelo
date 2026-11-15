@@ -208,6 +208,38 @@ static void describe_value(LispBuffer *output, const Value *value) {
     lisp_print(output, value, LISP_PRINT_WRITE);
 }
 
+/* core §8.5, §12.4 — with `error_trace`, the names of the :function of
+ * each call of the uncaught descriptor's :trace, in order; [] means no
+ * :trace. */
+static void check_error_trace(const Json *test_case, const Value *descriptor, CaseResult *result) {
+    const Json *expected = json_member(test_case, "error_trace");
+    if (!expected) return;
+    Value *trace = lisp_map_get(descriptor, lisp_keyword_cstr("trace"));
+    LispBuffer actual;
+    lisp_buffer_init(&actual);
+    size_t count = 0;
+    for (const Value *rest = trace ? trace : LISP_EMPTY; rest->kind == LISP_KIND_PAIR; rest = lisp_rest(rest)) {
+        const Value *frame = lisp_first(rest);
+        Value *function = frame->kind == LISP_KIND_MAP ? lisp_map_get(frame, lisp_keyword_cstr("function")) : nullptr;
+        if (count++) lisp_buffer_append_byte(&actual, ' ');
+        if (function) lisp_print(&actual, function, LISP_PRINT_DISPLAY);
+    }
+    LispBuffer wanted;
+    lisp_buffer_init(&wanted);
+    for (size_t index = 0; index < expected->count; index++) {
+        if (index) lisp_buffer_append_byte(&wanted, ' ');
+        lisp_buffer_append_string(&wanted, expected->items[index].string);
+    }
+    bool same = (trace != nullptr) == (expected->count > 0) && count == expected->count
+                && actual.length == wanted.length && (actual.length == 0 || memcmp(actual.data, wanted.data, actual.length) == 0);
+    if (!same) {
+        failure(result, "trace (%.*s), expected (%.*s)", (int)actual.length, actual.data ? actual.data : "",
+                (int)wanted.length, wanted.data ? wanted.data : "");
+    }
+    lisp_buffer_free(&actual);
+    lisp_buffer_free(&wanted);
+}
+
 /* core §8.5, §12.4 — with `error_position`, the uncaught descriptor has a
  * :position with that [line, column]; with null, it has no :position. */
 static void check_error_position(const Json *test_case, const Value *descriptor, CaseResult *result) {
@@ -356,6 +388,7 @@ static void run_eval_on_thread(void *argument) {
             failure(result, "error %s, expected %s", message.data, expected_error);
         } else {
             check_error_position(test_case, state->error, result);
+            check_error_trace(test_case, state->error, result);
         }
         lisp_buffer_free(&actual);
     } else if (run == LISP_RUN_ERROR) {

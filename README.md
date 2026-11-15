@@ -1,6 +1,6 @@
 # Novelo
 
-An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.17.0) and the standard library (`standard-library.md`, v0.11.0).
+An interpreter, written in C23, for **Novelo**: a small, immutable Lisp. It implements the core (`core-specification.md`, v0.18.0) and the standard library (`standard-library.md`, v0.11.1).
 
 *Novelo* is Portuguese for a ball of yarn: a single thread, unwound from its first element to the rest, as Novelo's lists are. Source files end in `.nvl`.
 
@@ -8,8 +8,8 @@ Every case of both conformance suites passes:
 
 | Suite | Cases |
 | --- | --- |
-| core | 675 |
-| stdlib | 165 |
+| core | 696 |
+| stdlib | 166 |
 
 Those runs report no leaks, and they also pass under AddressSanitizer and UndefinedBehaviorSanitizer.
 
@@ -64,6 +64,14 @@ Messages go to standard error, after whatever the program had already printed:
 ```
 program.nvl:3:1: read error :odd-map: map with an odd number of datums
 program.nvl:7:5: error :unbound-symbol: unbound symbol car car
+```
+
+An error raised inside functions is followed by the calls it left, innermost first, from the descriptor's `:trace` (core §8.5). A call in tail position replaced its caller, so the caller is not listed, and past 32 calls the rest are counted:
+
+```
+program.nvl:1:23: error :wrong-type: first expects a non-empty List, got Integer 5
+  in g, called at program.nvl:2:28
+  in f, called at program.nvl:3:1
 ```
 
 An uncaught error names the innermost form, read from a file, that contains the failing expression (core §8.5). A `catch` handler finds the same position in the descriptor, under `:position`:
@@ -232,7 +240,7 @@ Most of the branches left are null checks and the other side of `assert`s.
 | `src/reader.h/.c` | core §3–7 | tokens, literals, escapes, collections, nesting limit, read errors in §7.3 order |
 | `src/positions.h/.c` | core §6, §8.5 | side table: node address → line, column and file; the names of the files read |
 | `src/printer.h/.c` | core §10 | `write!` and `display!` text |
-| `src/error.h/.c` | core §8.5, §8.7 | the pending error `{:kind :message :values}`, its `:position`, the messages for stderr |
+| `src/error.h/.c` | core §8.5, §8.7 | the pending error `{:kind :message :values}`, its `:position` and `:trace`, the messages for stderr |
 | `src/node.h`, `src/expander.h/.c` | core §8.2–8.3 | special forms, derived forms, quasiquote, macros, lexical addresses |
 | `src/eval.h/.c` | core §8.1, 8.2, 8.4 | environments, the evaluation loop with tail calls, application, globals, stack guard |
 | `src/primitives.h/.c` | core §9 | the primitive table |
@@ -291,6 +299,8 @@ Most of the branches left are null checks and the other side of `assert`s.
 - The expander copies the position of each form it expands into the node it builds. Nodes without one of their own, built for derived forms, quasiquote or the output of a macro, take the position of the nearest enclosing form.
 - When a node fails, the evaluator adds `:position` to the pending descriptor, unless it already has one. The innermost failing node does this first, so the position is where the error happened.
 - Expansion errors and errors of top-level forms such as `include` are located the same way.
+
+**Traces: free until an error.** Each run of the evaluation loop that entered a function from a non-tail position keeps, in two local variables, the function's name and the position of the call; a tail call overwrites them. Only when an error leaves the run does it add that call to the end of the descriptor's `:trace` (`lisp_error_add_frame`), so a program that raises nothing pays for no list. `lisp_apply`, the path of primitives such as `catch` and `apply`, starts the run with the function already entered and no position. A `lambda` node carries `traced` and `name`: the expander names the lambda of a `define` or `let` binding, and the lambdas that `let`, `match`, `try` and `chain` produce are not traced, so they never hide the function around them. `try` and `chain` write theirs with an internal symbol, `lambda of a derived form`, which the reader cannot produce.
 
 ## Implementation-defined behavior
 

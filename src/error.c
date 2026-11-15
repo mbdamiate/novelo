@@ -51,17 +51,59 @@ Value *lisp_error_from_descriptor(LispState *state, Value *descriptor) {
     return nullptr;
 }
 
-void lisp_error_locate(LispState *state, LispPosition position) {
-    if (position.line == 0 || !state->error || state->error->kind != LISP_KIND_MAP) return;
-    Value *key = lisp_keyword_cstr("position");
-    if (lisp_map_get(state->error, key)) return;
+/* {:line l :column c :file f}, without :file when the source has no name. */
+static Value *position_map(LispPosition position) {
     Value *where = lisp_map_new(3);
     (void)lisp_map_insert_take(&where, lisp_keyword_cstr("line"), lisp_integer(position.line));
     (void)lisp_map_insert_take(&where, lisp_keyword_cstr("column"), lisp_integer(position.column));
     const char *file = lisp_source_file_name(position.file);
     if (file) (void)lisp_map_insert_take(&where, lisp_keyword_cstr("file"), lisp_string_cstr(file));
+    return where;
+}
+
+void lisp_error_locate(LispState *state, LispPosition position) {
+    if (position.line == 0 || !state->error || state->error->kind != LISP_KIND_MAP) return;
+    Value *key = lisp_keyword_cstr("position");
+    if (lisp_map_get(state->error, key)) return;
+    Value *where = position_map(position);
     Value *descriptor = lisp_map_associate(state->error, key, where);
     lisp_release(where);
+    set_pending(state, descriptor);
+}
+
+void lisp_error_add_frame(LispState *state, Value *name, LispPosition position) {
+    if (!state->error || state->error->kind != LISP_KIND_MAP) return;
+    Value *trace_key = lisp_keyword_cstr("trace");
+    Value *trace = lisp_map_get(state->error, trace_key);
+    if (!trace) trace = LISP_EMPTY;
+    /* a descriptor the program built may hold anything under :trace */
+    if (!lisp_is_list(trace)) return;
+    Value *descriptor;
+    if (lisp_list_length(trace) >= LISP_TRACE_LIMIT) {
+        Value *omitted_key = lisp_keyword_cstr("trace-omitted");
+        Value *omitted = lisp_map_get(state->error, omitted_key);
+        int64_t count = 0;
+        if (omitted) {
+            if (omitted->kind != LISP_KIND_INTEGER || lisp_integer_value(omitted) == INT64_MAX) return;
+            count = lisp_integer_value(omitted);
+        }
+        Value *more = lisp_integer(count + 1);
+        descriptor = lisp_map_associate(state->error, omitted_key, more);
+        lisp_release(more);
+    } else {
+        Value *frame = lisp_map_new(2);
+        (void)lisp_map_insert_take(&frame, lisp_keyword_cstr("function"), lisp_retain(name));
+        if (position.line != 0) (void)lisp_map_insert_take(&frame, lisp_keyword_cstr("position"), position_map(position));
+        LispListBuilder frames;
+        lisp_list_builder_init(&frames);
+        for (const Value *rest = trace; rest->kind == LISP_KIND_PAIR; rest = lisp_rest(rest)) {
+            lisp_list_append_take(&frames, lisp_retain(lisp_first(rest)));
+        }
+        lisp_list_append_take(&frames, frame);
+        Value *longer = lisp_list_builder_finish(&frames);
+        descriptor = lisp_map_associate(state->error, trace_key, longer);
+        lisp_release(longer);
+    }
     set_pending(state, descriptor);
 }
 
@@ -93,24 +135,53 @@ void lisp_describe_error(LispBuffer *output, const Value *descriptor) {
     }
 }
 
+/* "file:line:column" of a position map, or false when it has no line and
+ * column; a descriptor built by the program may hold anything there. */
+static bool describe_position(LispBuffer *output, const Value *position) {
+    if (!position || position->kind != LISP_KIND_MAP) return false;
+    Value *file = lisp_map_get(position, lisp_keyword_cstr("file"));
+    Value *line = lisp_map_get(position, lisp_keyword_cstr("line"));
+    Value *column = lisp_map_get(position, lisp_keyword_cstr("column"));
+    if (!line || !column || line->kind != LISP_KIND_INTEGER || column->kind != LISP_KIND_INTEGER) return false;
+    if (file && file->kind == LISP_KIND_STRING) {
+        lisp_print(output, file, LISP_PRINT_DISPLAY);
+        lisp_buffer_append_byte(output, ':');
+    }
+    char coordinates[48];
+    snprintf(coordinates, sizeof coordinates, "%lld:%lld", (long long)lisp_integer_value(line),
+             (long long)lisp_integer_value(column));
+    lisp_buffer_append_string(output, coordinates);
+    return true;
+}
+
 void lisp_describe_uncaught_error(LispBuffer *output, const Value *descriptor) {
-    /* A descriptor built by the program may hold anything under :position. */
-    Value *position = lisp_map_get(descriptor, lisp_keyword_cstr("position"));
-    if (position && position->kind == LISP_KIND_MAP) {
-        Value *file = lisp_map_get(position, lisp_keyword_cstr("file"));
-        Value *line = lisp_map_get(position, lisp_keyword_cstr("line"));
-        Value *column = lisp_map_get(position, lisp_keyword_cstr("column"));
-        if (line && column && line->kind == LISP_KIND_INTEGER && column->kind == LISP_KIND_INTEGER) {
-            if (file && file->kind == LISP_KIND_STRING) {
-                lisp_print(output, file, LISP_PRINT_DISPLAY);
-                lisp_buffer_append_byte(output, ':');
-            }
-            char coordinates[48];
-            snprintf(coordinates, sizeof coordinates, "%lld:%lld: ", (long long)lisp_integer_value(line),
-                     (long long)lisp_integer_value(column));
-            lisp_buffer_append_string(output, coordinates);
-        }
+    if (describe_position(output, lisp_map_get(descriptor, lisp_keyword_cstr("position")))) {
+        lisp_buffer_append_string(output, ": ");
     }
     lisp_buffer_append_string(output, "error ");
     lisp_describe_error(output, descriptor);
+
+    /* §8.5 — one line per frame of :trace, innermost first */
+    Value *trace = lisp_map_get(descriptor, lisp_keyword_cstr("trace"));
+    if (!trace || !lisp_is_list(trace)) return;
+    for (const Value *rest = trace; rest->kind == LISP_KIND_PAIR; rest = lisp_rest(rest)) {
+        const Value *frame = lisp_first(rest);
+        if (frame->kind != LISP_KIND_MAP) continue;
+        Value *function = lisp_map_get(frame, lisp_keyword_cstr("function"));
+        lisp_buffer_append_string(output, "\n  in ");
+        if (function) lisp_print(output, function, LISP_PRINT_DISPLAY);
+        LispBuffer where;
+        lisp_buffer_init(&where);
+        if (describe_position(&where, lisp_map_get(frame, lisp_keyword_cstr("position")))) {
+            lisp_buffer_append_string(output, ", called at ");
+            lisp_buffer_append(output, where.data, where.length);
+        }
+        lisp_buffer_free(&where);
+    }
+    Value *omitted = lisp_map_get(descriptor, lisp_keyword_cstr("trace-omitted"));
+    if (omitted && omitted->kind == LISP_KIND_INTEGER) {
+        char more[64];
+        snprintf(more, sizeof more, "\n  ... and %lld more", (long long)lisp_integer_value(omitted));
+        lisp_buffer_append_string(output, more);
+    }
 }

@@ -30,12 +30,25 @@ Value *lisp_error_kind(const LispState *state);
  * has one or the position is unknown (line 0). */
 void lisp_error_locate(LispState *state, LispPosition position);
 
+/* §8.5 — the most frames :trace keeps; the others are counted in
+ * :trace-omitted. */
+constexpr size_t LISP_TRACE_LIMIT = 32;
+
+/* §8.5 — adds a frame to the end of the pending error's :trace, as the error
+ * leaves a call of the function `name` (a Symbol) made at `position` (line
+ * 0: by a primitive, with no :position); past LISP_TRACE_LIMIT frames it
+ * counts the frame in :trace-omitted instead. Nothing happens when no
+ * error is pending or the descriptor's :trace is not a List. */
+void lisp_error_add_frame(LispState *state, Value *name, LispPosition position);
+
 /* Appends "kind: message values…" for a descriptor, for messages on stderr. */
 void lisp_describe_error(LispBuffer *output, const Value *descriptor);
 
 /* §8.7 — the message for an uncaught error: "file:line:column: error
  * kind: message values…", or "line:column: error …" without a file, or
- * "error …" without a position. */
+ * "error …" without a position; then one line per frame of :trace,
+ * "  in f, called at file:line:column", and "  ... and N more" for
+ * :trace-omitted. */
 void lisp_describe_uncaught_error(LispBuffer *output, const Value *descriptor);
 
 /* A new List of the given values (borrowed). */

@@ -1,5 +1,5 @@
 {
-  "spec": "Core Specification — Novelo, version 0.17.0",
+  "spec": "Core Specification — Novelo, version 0.18.0",
   "format": {
     "read": "Read 'input' (UTF-8). With 'equivalent': also read that text and compare the two datum sequences with equal?. With 'types': the sequence read has exactly these types, in order.",
     "read-error": "Read 'input' (or the bytes of 'input_hex'). Reading MUST fail with the code 'error' at position [line, column].",
@@ -5595,6 +5595,222 @@
       "program": "(import io)\n(define f (lambda () (current-time!)))\n(list (f) (current-time!) (f))",
       "current_time": 60000,
       "value": "(60000 60000 60000)",
+      "output": ""
+    },
+    {
+      "id": "trace-001",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define g (lambda (x) (first x)))\n(define f (lambda (x) (+ 1 (g x))))\n(f 5)",
+      "error": ":wrong-type",
+      "error_trace": [
+        "g",
+        "f"
+      ],
+      "output": ""
+    },
+    {
+      "id": "trace-002",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define g (lambda (x) (first x)))\n(define f (lambda (x) (g x)))\n(f 5)",
+      "error": ":wrong-type",
+      "error_trace": [
+        "g"
+      ],
+      "output": ""
+    },
+    {
+      "id": "trace-003",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(first 5)",
+      "error": ":wrong-type",
+      "error_trace": [],
+      "output": ""
+    },
+    {
+      "id": "trace-004",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define f (lambda (x) (let ((y (+ x 1))) (first y))))\n(+ 1 (f 5))",
+      "error": ":wrong-type",
+      "error_trace": [
+        "f"
+      ],
+      "output": ""
+    },
+    {
+      "id": "trace-005",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define f (lambda (x) (match x (a b) a otherwise (quotient 1 0))))\n(list (f 5))",
+      "error": ":division-by-zero",
+      "error_trace": [
+        "f"
+      ],
+      "output": ""
+    },
+    {
+      "id": "trace-006",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "((lambda (x) (first x)) 5)",
+      "error": ":wrong-type",
+      "error_trace": [
+        "lambda"
+      ],
+      "output": ""
+    },
+    {
+      "id": "trace-007",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define f (lambda ()\n  (let ((helper (lambda (n) (quotient n 0))))\n    (+ 1 (helper 3)))))\n(f)",
+      "error": ":division-by-zero",
+      "error_trace": [
+        "helper",
+        "f"
+      ],
+      "output": ""
+    },
+    {
+      "id": "trace-008",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define make (lambda () (lambda (n) (quotient n 0))))\n(define g (make))\n(+ 1 (g 3))",
+      "error": ":division-by-zero",
+      "error_trace": [
+        "lambda"
+      ],
+      "output": ""
+    },
+    {
+      "id": "trace-009",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define g (lambda (x) (first x)))\n(define f (lambda (x) (+ 1 (g x))))\n(let ((trace (get (catch (lambda () (+ 0 (f 5))) (lambda (e) e)) :trace)))\n  (list (get (first trace) :function)\n        (get (first trace) :position)\n        (get (first (rest trace)) :function)\n        (get (first (rest trace)) :position)\n        (first (rest (rest trace)))\n        (count trace)))",
+      "value": "(g {:line 2 :column 28 :file \"main.nvl\"} f {:line 3 :column 42 :file \"main.nvl\"} {:function lambda} 3)",
+      "output": ""
+    },
+    {
+      "id": "trace-010",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define f (lambda (n) (+ 1 (f (+ n 1)))))\n(let ((problem (catch (lambda () (f 0)) (lambda (e) e))))\n  (list (get problem :kind)\n        (count (get problem :trace))\n        (get (first (get problem :trace)) :function)\n        (> (get problem :trace-omitted) 1000)))",
+      "value": "(:stack-overflow 32 f #true)",
+      "output": ""
+    },
+    {
+      "id": "trace-011",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define f (lambda (n) (if (= n 0) (first n) otherwise (+ 1 (f (- n 1))))))\n(define problem (lambda (n) (catch (lambda () (f n)) (lambda (e) e))))\n(list (count (get (problem 31) :trace)) (get (problem 31) :trace-omitted :none)\n      (count (get (problem 32) :trace)) (get (problem 32) :trace-omitted :none))",
+      "value": "(32 :none 32 1)",
+      "output": ""
+    },
+    {
+      "id": "trace-012",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define inner (lambda () (quotient 1 0)))\n(define middle (lambda () (+ 1 (inner))))\n(define guarded (lambda () (+ 1 (catch (lambda () (middle)) (lambda (e) (raise e))))))\n(define outer (lambda () (+ 1 (guarded))))\n(outer)",
+      "error": ":division-by-zero",
+      "error_trace": [
+        "inner",
+        "middle",
+        "lambda",
+        "guarded",
+        "outer"
+      ],
+      "output": ""
+    },
+    {
+      "id": "trace-013",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define inner (lambda () (quotient 1 0)))\n(define outer (lambda () (+ 1 (try (inner) {:kind :wrong-type} 0))))\n(outer)",
+      "error": ":division-by-zero",
+      "error_trace": [
+        "inner",
+        "outer"
+      ],
+      "output": ""
+    },
+    {
+      "id": "trace-014",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define step (lambda (value next) (next value)))\n(define f (lambda () (chain step ((a 1) (b (quotient a 0))) b)))\n(+ 1 (f))",
+      "error": ":division-by-zero",
+      "error_trace": [
+        "step"
+      ],
+      "output": ""
+    },
+    {
+      "id": "trace-015",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(include \"lib.nvl\")\n(define use (lambda () (+ 1 (broken 5))))\n(use)",
+      "files": {
+        "lib.nvl": "(define broken (lambda (x) (first x)))\n"
+      },
+      "error": ":wrong-type",
+      "error_trace": [
+        "broken",
+        "use"
+      ],
+      "output": ""
+    },
+    {
+      "id": "trace-016",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define-macro bad (lambda () (first 5)))\n(bad)",
+      "error": ":wrong-type",
+      "error_trace": [
+        "bad"
+      ],
+      "output": ""
+    },
+    {
+      "id": "trace-017",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define f (lambda () (raise {:kind :custom :trace 5})))\n(catch (lambda () (+ 1 (f))) (lambda (e) (get e :trace)))",
+      "value": "5",
+      "output": ""
+    },
+    {
+      "id": "trace-018",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define f (lambda () (raise {:kind :custom :trace '(:earlier)})))\n(catch (lambda () (+ 1 (f))) (lambda (e) (let ((trace (get e :trace))) (list (first trace) (get (first (rest trace)) :function) (count trace)))))",
+      "value": "(:earlier f 3)",
+      "output": ""
+    },
+    {
+      "id": "trace-019",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define f (lambda (x) (first x)))\n(let ((problem (catch (lambda () (+ 1 (apply f (list 5)))) (lambda (e) e))))\n  (list (get (first (get problem :trace)) :function)\n        (contains? (first (get problem :trace)) :position)))",
+      "value": "(f #false)",
+      "output": ""
+    },
+    {
+      "id": "trace-020",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define f (lambda () (sequence (raise {:kind :custom :trace '(1 2 3) :trace-omitted :many}) 1)))\n(catch (lambda () (+ 1 (f))) (lambda (e) (list (count (get e :trace)) (get e :trace-omitted))))",
+      "value": "(5 :many)",
+      "output": ""
+    },
+    {
+      "id": "trace-021",
+      "kind": "eval",
+      "section": "8.5",
+      "program": "(define numbers (lambda (n gathered) (if (= n 0) gathered otherwise (numbers (- n 1) (prepend n gathered)))))\n(define full (lambda (omitted) (raise (if (void? omitted) {:kind :custom :trace (numbers 32 ())} otherwise {:kind :custom :trace (numbers 32 ()) :trace-omitted omitted}))))\n(define problem (lambda (omitted) (catch (lambda () (+ 1 (full omitted))) (lambda (e) e))))\n(list (count (get (problem #void) :trace)) (get (problem #void) :trace-omitted)\n      (get (problem :many) :trace-omitted) (get (problem 5) :trace-omitted))",
+      "value": "(32 2 :many 7)",
       "output": ""
     },
     {

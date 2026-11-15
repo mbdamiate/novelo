@@ -1,5 +1,5 @@
 {
-  "spec": "Standard Library — Novelo, version 0.11.0",
+  "spec": "Standard Library — Novelo, version 0.11.1",
   "format": {
     "eval": "Evaluate 'program' as a file (core section 8.7), with the libraries io, list, text, function, map, set, number, result and random available to import (core section 8.9). Standard output MUST be exactly 'output'. With 'value': the value of the last form is equal? to the datum read from 'value'. With 'error': the program terminates with an uncaught error whose :kind is the keyword 'error'."
   },
@@ -1329,6 +1329,20 @@
       "section": "4.8",
       "program": "(random-generator 0)",
       "error": ":unbound-symbol",
+      "output": ""
+    },
+    {
+      "id": "library-166",
+      "kind": "eval",
+      "section": "4.1",
+      "program": "(import list)\n(define f (lambda (x) (quotient 1 x)))\n(+ 1 (first (map f (list 1 0))))",
+      "error": ":division-by-zero",
+      "error_trace": [
+        "f",
+        "lambda",
+        "fold",
+        "map"
+      ],
       "output": ""
     }
   ]

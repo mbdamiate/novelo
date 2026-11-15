@@ -11,9 +11,16 @@ typedef struct LispSymbols {
     Value *quasiquote, *unquote, *unquote_splicing;
     Value *include, *import, *declare, *declare_type;
     Value *match, *try_, *chain, *wildcard;
+    /* the lambda of derived forms (try, chain), whose calls stay out of
+     * error traces (§8.5); a name the reader cannot produce */
+    Value *derived_lambda;
 } LispSymbols;
 
 const LispSymbols *lisp_symbols(void);
+
+/* §8.5 — if node is a lambda the program wrote with no name yet, names it
+ * `name` (a Symbol), for error traces. */
+void lisp_name_lambda(Value *node, Value *name);
 
 /* Expands an expression (not a top-level form) in a context (nullptr: the
  * empty context) into a node. Returns a new node, or nullptr with an

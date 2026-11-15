@@ -10,6 +10,7 @@
 #include "eval.h"
 
 #include "error.h"
+#include "expander.h"
 #include "include.h"
 #include "node.h"
 
@@ -165,6 +166,33 @@ static Value *not_a_function(LispState *state, Value *value) {
     return lisp_error(state, "not-a-function", LISP_LIST(value), "a %s is not a function", lisp_type_name(value));
 }
 
+/* §8.5 — the call in progress in one run of the loop: the function whose
+ * body runs, entered from a non-tail position, and where it was called. A
+ * tail call replaces it; when an error leaves the run, it becomes a frame
+ * of the error's :trace. Lambdas of derived forms are not calls. */
+typedef struct Frame {
+    Value *name;          /* Symbol, retained; nullptr: no call in progress */
+    LispPosition position; /* line 0: called by a primitive */
+} Frame;
+
+static void enter_frame(Frame *frame, const Value *closure, LispPosition position) {
+    const LispNode *lambda = lisp_as_node(((const LispClosure *)closure)->lambda);
+    if (!lambda->traced) return;
+    Value *name = lambda->name ? lambda->name : lisp_symbols()->lambda;
+    lisp_retain(name);
+    lisp_release(frame->name);
+    frame->name = name;
+    frame->position = position;
+}
+
+static void leave_frame(LispState *state, Frame *frame, bool failed) {
+    if (!frame->name) return;
+    if (failed) lisp_error_add_frame(state, frame->name, frame->position);
+    lisp_release(frame->name);
+}
+
+static Value *evaluate(LispState *state, Value *node, Value *environment, Value *context, Frame frame);
+
 Value *lisp_apply(LispState *state, Value *function, size_t count, Value *const *arguments) {
     if (function->kind == LISP_KIND_PRIMITIVE) return call_primitive(state, function, count, arguments);
     if (function->kind != LISP_KIND_CLOSURE) return not_a_function(state, function);
@@ -175,7 +203,9 @@ Value *lisp_apply(LispState *state, Value *function, size_t count, Value *const 
     if (owned != inline_arguments) free(owned);
     if (!environment) return nullptr;
     const LispClosure *closure = (const LispClosure *)function;
-    Value *result = lisp_eval(state, lisp_as_node(closure->lambda)->children[0], environment, closure->context);
+    Frame frame = {};
+    enter_frame(&frame, function, (LispPosition){});
+    Value *result = evaluate(state, lisp_as_node(closure->lambda)->children[0], environment, closure->context, frame);
     lisp_release(environment);
     return result;
 }
@@ -263,8 +293,14 @@ static void replace(Value **slot, Value *replacement) {
 }
 
 Value *lisp_eval(LispState *state, Value *node, Value *environment, Value *context) {
+    return evaluate(state, node, environment, context, (Frame){});
+}
+
+/* Takes the frame. */
+static Value *evaluate(LispState *state, Value *node, Value *environment, Value *context, Frame frame) {
     if (!lisp_check_stack(state)) {
         lisp_error_locate(state, lisp_as_node(node)->position);
+        leave_frame(state, &frame, true);
         return nullptr;
     }
     lisp_retain(node);
@@ -348,17 +384,18 @@ Value *lisp_eval(LispState *state, Value *node, Value *environment, Value *conte
             }
 
             /* A closure: continue the loop with its body (tail call). */
-            Value *frame = bind_arguments(state, function, count, arguments);
+            Value *bound = bind_arguments(state, function, count, arguments);
             if (arguments != inline_arguments) free(arguments);
-            if (!frame) {
+            if (!bound) {
                 lisp_release(function);
                 goto done;
             }
             const LispClosure *closure = (const LispClosure *)function;
+            enter_frame(&frame, function, current->position);
             replace(&node, lisp_as_node(closure->lambda)->children[0]);
             replace(&context, closure->context);
             lisp_release(environment);
-            environment = frame;
+            environment = bound;
             lisp_release(function);
             continue;
         }
@@ -368,6 +405,7 @@ Value *lisp_eval(LispState *state, Value *node, Value *environment, Value *conte
 done:
     /* §8.5: the innermost node with a position names where the error left. */
     if (!result) lisp_error_locate(state, lisp_as_node(node)->position);
+    leave_frame(state, &frame, !result);
     lisp_release(node);
     lisp_release(environment);
     lisp_release(context);

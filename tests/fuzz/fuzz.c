@@ -385,6 +385,8 @@ static const char *const awkward_fragments[] = {
     "(current-time!)", "(monotonic-time!)", "(random-seed!)", "(import random)",
     "(random-generator (random-seed!))", "(random-integer (random-generator 2) 0 10)",
     "(random-float (random-generator 0))", "(shuffle (random-generator 3) '(1 2 3))",
+    "(define f (lambda (x) (+ 1 (f x))))", "(f 1)", "(raise {:kind :custom :trace 5})",
+    "(raise {:kind :custom :trace '(1) :trace-omitted :x})", "(get e :trace)",
     "\"\xe2\x82\xac\"", "\xc2\xa0", "\xe3\x81\x82", "(import io)", "(import list)", "(import text)",
     "(include \"main.nvl\")", "(include \"missing.nvl\")",
 };
