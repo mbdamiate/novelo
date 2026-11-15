@@ -39,6 +39,7 @@ make coverage   # the same, rebuilt in build/coverage with clang's coverage, the
 make stress     # the programs of tests/stress at full size, about two minutes
 make asan-stress # the same at a hundredth of the size, under ASan + UBSan
 make fuzz       # mutated programs under ASan + UBSan, about a minute
+make bench      # the programs of tests/bench, five runs each, against the baseline
 make clean
 ```
 
@@ -208,6 +209,27 @@ What it found:
   - A leak on the reader's `:duplicate-element` path failed 6 reader inputs.
   - An extra release of a borrowed String in `substring`'s out-of-range error was caught as a use-after-free, once in the 20,000 programs. The path is rare in the seeds.
 - What it does not catch is a wrong value. An off-by-one that let `substring` end one past the text returned `"bc\u{0}"` for `(substring "abc" 1 4)`. It read the NUL terminator, inside the allocation, so nothing failed. Values are what the conformance cases check.
+
+### Benchmarks
+
+`make bench` runs the programs of `tests/bench` with `build/bench`, which starts `build/novelo` on each program, as from the command line, five times. For each program it shows the median wall time, the spread between the fastest and the slowest run, and the peak memory (the resident set that `wait4` reports). Beside them it shows the time in `tests/bench/baseline.txt` and the change. A program checks its own results and prints `ok`, as in `make stress`, and a comment line `; scale: N` at its top gives its size, which it reads from standard input.
+
+The times are only reported. A slower program never fails the build, because a time depends on the machine and on what else runs on it. Between two runs on an idle machine, the medians differ by 1–2%. `make bench-baseline` writes the medians and peaks as the new baseline. The baseline in the repository comes from an Apple M2 with Apple clang at `-O2`, so on another machine only the changes from a baseline taken there mean anything.
+
+| Program | What it exercises |
+|---|---|
+| `arithmetic` | tail loops over Integers and Floats |
+| `calls` | naive Fibonacci: calls outside tail position and global lookups |
+| `closures` | making closures, `partial` and composition |
+| `lists` | `range`, `map`, `filter`, `fold`, `reverse`, `append`, `zip` |
+| `sort` | `sort` with a comparison written in Novelo |
+| `maps` | `associate`, `get`, `dissociate`, `contains?`, and the libraries `map` and `set` |
+| `text` | `format`, `split`, `join`, `characters`, `lowercase`, `precedes?` |
+| `match` | a stack machine whose steps are `match` and patterns in `let` |
+| `json` | the reader and writer of example 12, which it includes, over a document it builds |
+| `random` | draws from the library `random`, and `shuffle` |
+
+`make asan-stress` also runs each benchmark once, at a hundredth of its size, under ASan + UBSan (`build/bench --quick`), so they keep working. `tests/bench/profile.md` records where the interpreter spends its time on these programs, measured with macOS's `sample`, and what to optimize first.
 
 ### Coverage
 

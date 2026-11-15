@@ -11,6 +11,8 @@
 #   make stress       the programs of tests/stress at full size: volume, depth, constant memory
 #   make asan-stress  the same at a hundredth of the size, with AddressSanitizer + UBSan
 #   make fuzz         mutated programs under AddressSanitizer + UBSan (ITERATIONS=20000 SEED=1)
+#   make bench        the programs of tests/bench, 5 runs each: median time and peak memory against the baseline
+#   make bench-baseline  the same, writing tests/bench/baseline.txt
 #   make clean
 
 CC      ?= cc
@@ -50,13 +52,15 @@ CONFORMANCE_BIN := $(BUILD)/conformance
 STRESS_SRC := tests/stress/stress.c
 STRESS_OBJ := $(BUILD)/tests/stress/stress.o
 STRESS_BIN := $(BUILD)/stress
+BENCH_OBJ := $(BUILD)/tests/bench/bench.o
+BENCH_BIN := $(BUILD)/bench
 FUZZ_OBJ := $(BUILD)/tests/fuzz/fuzz.o $(BUILD)/tests/conformance/json.o
 FUZZ_BIN := $(BUILD)/fuzz
 CLI_BIN := $(BUILD)/novelo
 ITERATIONS ?= 20000
 SEED ?= 1
 
-.PHONY: all test unit conformance examples cli asan coverage stress asan-stress fuzz fuzz-run clean
+.PHONY: all test unit conformance examples cli asan coverage stress asan-stress fuzz fuzz-run bench bench-baseline clean
 
 all: $(CLI_BIN)
 
@@ -80,8 +84,20 @@ asan:
 stress: $(STRESS_BIN)
 	./$(STRESS_BIN) $(STRESS_FLAGS) tests/stress
 
+# The benchmarks also run here, once at a hundredth of their size, so they keep working.
 asan-stress:
 	$(MAKE) stress BUILD=build/asan SANITIZE=1 STRESS_FLAGS=--quick
+	$(MAKE) build/asan/novelo BUILD=build/asan SANITIZE=1
+	$(MAKE) build/bench
+	./build/bench --quick build/asan/novelo tests/bench
+
+# Times are only reported: a slower benchmark never fails the build. The runner
+# itself is built without sanitizers, so it never slows the interpreter it times.
+bench: $(CLI_BIN) $(BENCH_BIN)
+	./$(BENCH_BIN) --baseline tests/bench/baseline.txt $(CLI_BIN) tests/bench
+
+bench-baseline: $(CLI_BIN) $(BENCH_BIN)
+	./$(BENCH_BIN) --write-baseline tests/bench/baseline.txt $(CLI_BIN) tests/bench
 
 # The fuzzer always runs with the sanitizers: a crash it finds is a report.
 fuzz:
@@ -115,6 +131,9 @@ $(CONFORMANCE_BIN): $(CONFORMANCE_OBJ) $(LIB_OBJ)
 $(STRESS_BIN): $(STRESS_OBJ) $(LIB_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
+$(BENCH_BIN): $(BENCH_OBJ)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
 $(FUZZ_BIN): $(FUZZ_OBJ) $(LIB_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
@@ -137,8 +156,12 @@ $(BUILD)/tests/stress/%.o: tests/stress/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -Isrc -c -o $@ $<
 
+$(BUILD)/tests/bench/%.o: tests/bench/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
 $(BUILD)/tests/fuzz/%.o: tests/fuzz/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -Isrc -Itests/conformance -c -o $@ $<
 
--include $(BUILD)/src/main.d $(LIB_OBJ:.o=.d) $(UNIT_OBJ:.o=.d) $(CONFORMANCE_OBJ:.o=.d) $(STRESS_OBJ:.o=.d) $(FUZZ_OBJ:.o=.d)
+-include $(BUILD)/src/main.d $(LIB_OBJ:.o=.d) $(UNIT_OBJ:.o=.d) $(CONFORMANCE_OBJ:.o=.d) $(STRESS_OBJ:.o=.d) $(BENCH_OBJ:.o=.d) $(FUZZ_OBJ:.o=.d)

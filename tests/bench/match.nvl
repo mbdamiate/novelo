@@ -1,0 +1,40 @@
+; match and patterns in let: a small stack machine whose instructions are
+; Lists taken apart by patterns at every step.
+; scale: 50000
+(import io)
+(import list)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define step
+  (lambda (instruction stack)
+    (match (list instruction stack)
+      ((:push n) stack) (prepend n stack)
+      ((:add) (a b &rest more)) (prepend (+ a b) more)
+      ((:multiply) (a b &rest more)) (prepend (* a b) more)
+      ((:modulo n) (a &rest more)) (prepend (remainder a n) more)
+      ((:pair) (a b &rest more)) (prepend {:left a :right b} more)
+      ((:sum) ({:left a :right b} &rest more)) (prepend (+ a b) more)
+      otherwise (error "bad instruction" instruction))))
+
+(define program
+  (list '(:push 3) '(:push 4) '(:multiply) '(:push 5) '(:add) '(:push 2) '(:pair) '(:sum) '(:add) '(:modulo 1000)))
+
+(define run
+  (lambda (instructions stack)
+    (if (empty? instructions) stack
+        otherwise
+        (let (((instruction &rest more) instructions))
+          (run more (step instruction stack))))))
+
+(define loop
+  (lambda (index stack)
+    (if (= index size) stack
+        otherwise (loop (+ index 1) (run program stack)))))
+
+; each round: s → (s + 17 + 2) mod 1000 = (s + 19) mod 1000, from 0
+(check "stack" (loop 0 '(0)) (list (remainder (* 19 size) 1000)))
+(display! "ok\n")

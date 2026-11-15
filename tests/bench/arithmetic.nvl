@@ -1,0 +1,30 @@
+; Integer and Float arithmetic in tail loops: the cost of a step of the
+; evaluator, a global lookup and a primitive call, with no allocation.
+; scale: 1000000
+(import io)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+; the sum of i * i mod 7 over 0 … n-1
+(define integer-loop
+  (lambda (index total)
+    (if (= index size) total
+        otherwise (integer-loop (+ index 1) (+ total (remainder (* index index) 7))))))
+
+; a running mean of 0.5, 1.5, …
+(define float-loop
+  (lambda (index total)
+    (if (= index size) total
+        otherwise (float-loop (+ index 1) (+ total (+ (integer-to-float index) 0.5))))))
+
+(define expected-integer
+  (lambda (index total)
+    (if (= index 7) total
+        otherwise (expected-integer (+ index 1) (+ total (* (remainder (* index index) 7) (quotient (+ (- size index) 6) 7)))))))
+
+(check "integers" (integer-loop 0 0) (expected-integer 0 0))
+(check "floats" (float-loop 0 0.0) (/ (* (integer-to-float size) (integer-to-float size)) 2.0))
+(display! "ok\n")

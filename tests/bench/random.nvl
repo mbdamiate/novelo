@@ -1,0 +1,25 @@
+; The library random: draws threaded through a loop, and shuffle, all
+; pure arithmetic in Novelo over checked Integers.
+; scale: 20000
+(import io)
+(import list)
+(import random)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define roll
+  (lambda (generator index total)
+    (if (= index size) total
+        otherwise
+        (let (((die next) (random-integer generator 1 7)))
+          (roll next (+ index 1) (+ total die))))))
+
+(define total (roll (random-generator 1) 0 0))
+(define shuffled (first (shuffle (random-generator 2) (range 0 size))))
+
+(check "total" (and (>= total size) (<= total (* 6 size))) #true)
+(check "shuffle" (sort < shuffled) (range 0 size))
+(display! "ok\n")

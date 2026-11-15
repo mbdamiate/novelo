@@ -1,0 +1,24 @@
+; Text: split, join, characters, format, case and comparison over lines
+; built by the program.
+; scale: 8000
+(import io)
+(import list)
+(import text t)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define line (lambda (index) (t/format "Item {}, Price {}, Code {}" index (* index 3) (t/pad-left 6 "0" (to-string index)))))
+(define lines (map line (range 0 size)))
+(define document (t/join "\n" lines))
+(define parsed (map (lambda (text) (t/split ", " text)) (t/split "\n" document)))
+(define letters (fold (lambda (total text) (+ total (count (filter t/letter? (t/characters text))))) 0 lines))
+(define sorted (sort t/precedes? (map (lambda (fields) (t/lowercase (first fields))) parsed)))
+
+(check "lines" (count parsed) size)
+(check "fields" (first (rest (rest (first (reverse parsed))))) (concatenate "Code " (t/pad-left 6 "0" (to-string (- size 1)))))
+(check "letters" letters (* size 13))
+(check "first" (first sorted) "item 0")
+(display! "ok\n")

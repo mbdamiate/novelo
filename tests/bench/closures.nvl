@@ -1,0 +1,29 @@
+; Closures: made in a loop, called through `partial` and composed, so most
+; of the work is creating environments and applying lambdas.
+; scale: 200000
+(import io)
+(import list)
+(import function)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define compose (lambda (f g) (lambda (x) (f (g x)))))
+(define add (lambda (a b) (+ a b)))
+
+(define loop
+  (lambda (index total)
+    (if (= index size) total
+        otherwise
+        (let ((step (compose (partial add index) (lambda (x) (* x 2)))))
+          (loop (+ index 1) (+ total (step 1)))))))
+
+(define counters (map (lambda (index) (partial add index)) (range 0 size)))
+
+; sum of (index + 2) = n(n-1)/2 + 2n
+(check "loop" (loop 0 0) (+ (quotient (* size (- size 1)) 2) (* 2 size)))
+(check "counters" (fold (lambda (total counter) (+ total (counter 1))) 0 counters)
+       (+ (quotient (* size (- size 1)) 2) size))
+(display! "ok\n")

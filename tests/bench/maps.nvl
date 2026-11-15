@@ -1,0 +1,41 @@
+; Maps and Sets: associate, get, contains? and dissociate in loops, and the
+; library functions over the result.
+; scale: 100000
+(import io)
+(import list)
+(import map m)
+(import set s)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+; the squares of 0 … n-1, keyed by Integer
+(define build
+  (lambda (index table)
+    (if (= index size) table
+        otherwise (build (+ index 1) (associate table index (* index index))))))
+
+(define sum-lookups
+  (lambda (table index total)
+    (if (= index size) total
+        otherwise (sum-lookups table (+ index 1) (+ total (get table index))))))
+
+; every third key removed
+(define thin
+  (lambda (table index)
+    (if (>= index size) table
+        otherwise (thin (dissociate table index) (+ index 3)))))
+
+(define table (build 0 {}))
+(define words (map (lambda (index) (concatenate "w" (to-string (remainder index 1000)))) (range 0 size)))
+(define distinct (s/from-list words))
+
+(check "count" (count table) size)
+(check "lookups" (sum-lookups table 0 0) (fold + 0 (map (lambda (n) (* n n)) (range 0 size))))
+(check "thin" (count (thin table 0)) (- size (quotient (+ size 2) 3)))
+(check "values" (fold + 0 (m/values (m/map-values (lambda (v) (remainder v 2)) table))) (quotient size 2))
+(check "set" (count distinct) (if (< size 1000) size otherwise 1000))
+(check "contains" (count (filter (lambda (word) (contains? distinct word)) words)) size)
+(display! "ok\n")

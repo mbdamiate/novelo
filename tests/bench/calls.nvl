@@ -1,0 +1,22 @@
+; Naive Fibonacci: calls outside tail position, the C stack and the lookup
+; of a global at every call.
+; scale: 31
+(import io)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define fibonacci
+  (lambda (n)
+    (if (< n 2) n
+        otherwise (+ (fibonacci (- n 1)) (fibonacci (- n 2))))))
+
+(define fibonacci-loop
+  (lambda (n previous current)
+    (if (= n 0) previous
+        otherwise (fibonacci-loop (- n 1) current (+ previous current)))))
+
+(check "fibonacci" (fibonacci size) (fibonacci-loop size 0 1))
+(display! "ok\n")

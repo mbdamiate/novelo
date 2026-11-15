@@ -1,0 +1,23 @@
+; Lists: range, map, filter, fold, reverse, append and take over a long
+; list, the work of most programs.
+; scale: 200000
+(import io)
+(import list)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define numbers (range 0 size))
+(define squares (map (lambda (n) (* n n)) numbers))
+(define evens (filter (lambda (n) (= (remainder n 2) 0)) squares))
+(define both (append numbers (reverse numbers)))
+
+(check "count" (count both) (* 2 size))
+(check "sum" (fold + 0 both) (* size (- size 1)))
+(check "evens" (count evens) (quotient (+ size 1) 2))
+(check "squares" (fold + 0 (take 10 (reverse squares)))
+       (fold + 0 (map (lambda (n) (* n n)) (range (- size 10) size))))
+(check "zip" (fold (lambda (total pair) (+ total (- (first pair) (first (rest pair))))) 0 (zip numbers numbers)) 0)
+(display! "ok\n")

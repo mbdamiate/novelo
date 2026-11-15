@@ -1,0 +1,28 @@
+; sort of pseudo-random Integers, with a comparison written in Novelo.
+; scale: 50000
+(import io)
+(import list)
+(define size (string-to-number (read-line!)))
+(define check
+  (lambda (name actual expected)
+    (if (equal? actual expected) #true
+        otherwise (error "check failed" name actual expected))))
+
+(define random-list
+  (lambda (n seed numbers)
+    (if (= n 0) numbers
+        otherwise
+        (let ((next (remainder (+ (* seed 1103515245) 12345) 2147483648)))
+          (random-list (- n 1) next (prepend next numbers))))))
+(define ascending?
+  (lambda (numbers)
+    (if (or (empty? numbers) (empty? (rest numbers))) #true
+        (> (first numbers) (first (rest numbers))) #false
+        otherwise (ascending? (rest numbers)))))
+
+(define numbers (random-list size 42 ()))
+(define sorted (sort (lambda (a b) (< a b)) numbers))
+(check "count" (count sorted) size)
+(check "order" (ascending? sorted) #true)
+(check "contents" (fold + 0 sorted) (fold + 0 numbers))
+(display! "ok\n")
