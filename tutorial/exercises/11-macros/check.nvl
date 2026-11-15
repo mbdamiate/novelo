@@ -1,0 +1,18 @@
+; The tests of exercise 11-macros.
+(include "harness.nvl")
+(include "answer.nvl")
+
+(define problem :the-callers-problem)
+(define value 7)
+
+(report! (list (check (when (< 1 2) 1 2 3) 3)
+               (check (when (> 1 2) (error "must not run")) #void)
+               (check (when (void? #void) :only) :only)
+               (check (with-default 0 (quotient 1 0)) 0)
+               (check (with-default 0 (quotient 6 2)) 3)
+               (check (with-default (error "must not run") 5) 5)
+               (check (with-default problem (first '())) :the-callers-problem)
+               (check (check-that (< 1 2)) '(:ok #true))
+               (check (check-that (> 1 2)) '(:error "check failed" (> 1 2)))
+               (check (check-that value) '(:ok 7))
+               (check (check-that (get {:n 1} :n)) '(:ok 1))))

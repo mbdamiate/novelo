@@ -1,0 +1,24 @@
+; Exercise 09-receipt (chapter 9).
+;
+; A shopping list has one item per line: a quantity, a price in cents and
+; a name, separated by single spaces:  "2 350 coffee"
+;
+; (receipt lines) returns the text of the receipt, one String:
+;   one line per good item:  "2 x coffee = 7.00\n"
+;   then the total:          "total 7.00\n"
+;   then one line per bad line, in order:  "bad line: <the line>\n"
+; Amounts are written in units with two decimals: 700 cents is "7.00".
+; A line is bad when it does not have three parts, or when the quantity
+; or the price is not an Integer. The name is everything after the price,
+; so "1 99 ice cream" is a good line named "ice cream".
+;
+; A program would print (receipt (read-lines!)).
+; Then run: tutorial/check.sh 09-receipt
+
+(import list)     ; map, filter, fold
+(import text)     ; split, join, format
+(import result)   ; ok, failure, ok?, failure?
+
+(define receipt
+  (lambda (lines)
+    (error "not implemented yet")))

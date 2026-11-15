@@ -1,0 +1,25 @@
+; Exercise 09-options (chapter 9).
+;
+; A command takes these arguments, in any order:
+;   --verbose          sets :verbose to #true
+;   --limit N          sets :limit to the Integer N
+;   anything else      a file name, added to :files in order
+; With no option, :verbose is #false and :limit is 10.
+;
+;   (parse-options '("a.txt" "--limit" "3" "b.txt"))
+;   is (:ok {:verbose #false :limit 3 :files ("a.txt" "b.txt")})
+;
+; The failures:
+;   (:error "--limit needs a number")     --limit at the end
+;   (:error "not a number" text)          --limit followed by a non-Integer
+;   (:error "no files")                   no file name at all
+;
+; A program would call it as (parse-options (program-arguments!)).
+; Then run: tutorial/check.sh 09-options
+
+(import result)   ; ok, failure
+(import list)     ; reverse
+
+(define parse-options
+  (lambda (arguments)
+    (error "not implemented yet")))

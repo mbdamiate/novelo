@@ -197,3 +197,5 @@ tutorial/check.sh 08-parse-date
 ```
 
 The examples [`07-errors`](../examples/07-errors/main.nvl), [`12-json`](../examples/12-json/main.nvl) and [`13-expressions`](../examples/13-expressions/main.nvl) show errors and results in larger programs.
+
+Next: [Programs and effects](09-programs-and-effects.md).

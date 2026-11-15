@@ -1,0 +1,38 @@
+; Exercise 12-log-summary (chapter 12).
+;
+; A log line is an instant, a level and a message, separated by spaces:
+;   2026-11-15T10:00:00Z ERROR disk full
+; The level is INFO, WARNING or ERROR. Other lines are not log lines.
+; Then run: tutorial/check.sh 12-log-summary
+
+(import list)     ; map, filter, fold
+(import map)      ; values
+(import text)     ; lowercase
+(import pattern)  ; find-match, matches?
+(import time)     ; read-time, format-time
+(import result)   ; ok?
+
+; A log line as {:time instant :level keyword :message text}, with the
+; instant in milliseconds read by read-time and the level as :info,
+; :warning or :error; or #void for a line that is not a log line, or whose
+; time read-time cannot read.
+;   (parse-log-line "2026-11-15T10:00:00Z ERROR disk full")
+;   is {:time 1794736800000 :level :error :message "disk full"}
+; string-to-symbol does not make keywords; a match on the level text does.
+(define parse-log-line
+  (lambda (line)
+    (error "not implemented yet")))
+
+; The number of log lines of each level, as a Map from the level to its
+; count, with only the levels that occur: (count-levels lines) might be
+; {:info 2 :error 1}. Lines that are not log lines are left out.
+(define count-levels
+  (lambda (lines)
+    (error "not implemented yet")))
+
+; The earliest ERROR line, by its time, as "<time> <message>", with the
+; time written by format-time: "2026-11-15T10:00:00.000Z disk full", or
+; #void when there is none.
+(define first-error
+  (lambda (lines)
+    (error "not implemented yet")))

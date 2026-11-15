@@ -1,0 +1,40 @@
+; Exercise 09-receipt (chapter 9): a solution.
+
+(import list)
+(import text)
+(import result)
+
+(define money
+  (lambda (cents)
+    (concatenate (to-string (quotient cents 100)) "."
+                 (if (< (remainder cents 100) 10) "0" otherwise "")
+                 (to-string (remainder cents 100)))))
+
+(define parse-item
+  (lambda (line)
+    (match (split " " line)
+      (quantity-text price-text first-word &rest more-words)
+      (let ((quantity (string-to-number quantity-text))
+            (price (string-to-number price-text)))
+        (if (and (integer? quantity) (integer? price))
+            (ok {:quantity quantity :price price :name (join " " (prepend first-word more-words))})
+            otherwise (failure line)))
+      otherwise (failure line))))
+
+(define item-line
+  (lambda (item)
+    (let (({:quantity quantity :price price :name name} item))
+      (format "{} x {} = {}\n" quantity name (money (* quantity price))))))
+
+(define detail (lambda (result) (first (rest result))))
+
+(define receipt
+  (lambda (lines)
+    (let ((parsed (map parse-item lines))
+          (items (map detail (filter ok? parsed)))
+          (bad-lines (map detail (filter failure? parsed)))
+          (total (fold (lambda (sum item) (+ sum (* (get item :quantity) (get item :price))))
+                       0 items)))
+      (concatenate (join "" (map item-line items))
+                   (format "total {}\n" (money total))
+                   (join "" (map (lambda (line) (format "bad line: {}\n" line)) bad-lines))))))

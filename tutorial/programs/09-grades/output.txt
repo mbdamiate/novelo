@@ -1,0 +1,7 @@
+Ada      91   passed
+Grace    58   passed
+Alan     72   passed
+Donald   49   failed
+average 67.5
+skipped: expected a name and a score: Barbara
+skipped: not a score: Edsger 4x

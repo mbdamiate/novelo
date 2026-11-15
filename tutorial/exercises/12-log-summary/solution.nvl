@@ -1,0 +1,45 @@
+; Exercise 12-log-summary (chapter 12): a solution.
+
+(import list)
+(import map)
+(import text)
+(import pattern)
+(import time)
+(import result)
+
+(define log-pattern (compile-pattern "^(\\S+) (INFO|WARNING|ERROR) (.*)$"))
+
+(define level-keyword
+  (lambda (text)
+    (match text "INFO" :info "WARNING" :warning "ERROR" :error)))
+
+(define parse-log-line
+  (lambda (line)
+    (let ((found (find-match log-pattern line)))
+      (if (void? found) #void
+          otherwise
+          (let (({:groups (time-text level-text message)} found))
+            (match (read-time time-text)
+              (:ok instant) {:time instant :level (level-keyword level-text) :message message}
+              otherwise #void))))))
+
+(define entries-of
+  (lambda (lines)
+    (filter (lambda (entry) (not (void? entry))) (map parse-log-line lines))))
+
+(define count-levels
+  (lambda (lines)
+    (fold (lambda (counts entry)
+            (let ((level (get entry :level)))
+              (associate counts level (+ 1 (get counts level 0)))))
+          {} (entries-of lines))))
+
+(define first-error
+  (lambda (lines)
+    (let ((errors (filter (lambda (entry) (equal? (get entry :level) :error)) (entries-of lines))))
+      (if (empty? errors) #void
+          otherwise
+          (let ((earliest (fold (lambda (best entry)
+                                  (if (< (get entry :time) (get best :time)) entry otherwise best))
+                                (first errors) (rest errors))))
+            (concatenate (format-time (get earliest :time)) " " (get earliest :message)))))))

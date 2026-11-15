@@ -1,0 +1,71 @@
+; Grades: reads "name score" lines from standard input and reports who
+; passed, with the average.
+;
+;   build/novelo tutorial/programs/09-grades/main.nvl 60 < tutorial/programs/09-grades/input.txt
+;
+; The only argument is the passing score, 50 when it is left out. A bad
+; argument is a usage error: a message on standard error and exit code 2.
+; A line that does not read as a name and a score is reported and skipped.
+;
+; The program has two parts. Everything down to "the edge" is pure: it
+; takes values and returns values, and can be tried in the REPL. Only the
+; last form reads the arguments and the input, and prints.
+
+(import io)
+(import list)      ; filter, map, fold
+(import text)      ; split, join, format, pad-right
+(import result)    ; ok, failure, ok?, failure?
+(import function)  ; partial
+
+; ---- pure ---------------------------------------------------------------------
+
+; The passing score from the arguments, as a result.
+(define passing-score
+  (lambda (arguments)
+    (match arguments
+      () (ok 50)
+      (text) (let ((score (string-to-number text)))
+               (if (integer? score) (ok score)
+                   otherwise (failure (format "the passing score must be an Integer, not {}" text))))
+      otherwise (failure "expected at most one argument"))))
+
+; One line, "Ada 91", as (:ok {:name "Ada" :score 91}) or a failure.
+(define parse-line
+  (lambda (line)
+    (match (filter (lambda (word) (not (empty? word))) (split " " line))
+      (name score-text)
+      (let ((score (string-to-number score-text)))
+        (if (integer? score) (ok {:name name :score score})
+            otherwise (failure (format "not a score: {}" line))))
+      otherwise (failure (format "expected a name and a score: {}" line)))))
+
+(define student-line
+  (lambda (passing student)
+    (let (({:name name :score score} student))
+      (format "{} {} {}\n" (pad-right 8 " " name) (pad-right 4 " " (to-string score))
+              (if (>= score passing) "passed" otherwise "failed")))))
+
+; The whole report, a String, from the passing score and the lines read.
+(define report
+  (lambda (passing lines)
+    (let ((parsed (map parse-line lines))
+          (students (map second (filter ok? parsed)))
+          (problems (map second (filter failure? parsed)))
+          (total (fold + 0 (map (lambda (student) (get student :score)) students))))
+      (concatenate
+        (join "" (map (partial student-line passing) students))
+        (if (empty? students) "no students\n"
+            otherwise (format "average {}\n"
+                              (float-to-fixed (/ (integer-to-float total)
+                                                 (integer-to-float (count students)))
+                                              1)))
+        (join "" (map (lambda (problem) (format "skipped: {}\n" problem)) problems))))))
+
+(define second (lambda (pair) (first (rest pair))))
+
+; ---- the edge -----------------------------------------------------------------
+
+(match (passing-score (program-arguments!))
+  (:ok passing) (display! (report passing (read-lines!)))
+  (:error message) (sequence (display-to-error! (format "grades: {}\n" message))
+                             (exit! 2)))

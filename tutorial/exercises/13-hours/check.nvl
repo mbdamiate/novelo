@@ -1,0 +1,14 @@
+; The tests of exercise 13-hours.
+(include "harness.nvl")
+(include "answer.nvl")
+
+(report! (list (check (parse-hours "1.5") '(:ok 1.5))
+               (check (parse-hours "2") '(:ok 2.0))
+               (check (parse-hours "lots") '(:error "not a number of hours: lots"))
+               (check (parse-hours "1:30") '(:ok 1.5))
+               (check (parse-hours "0:45") '(:ok 0.75))
+               (check (parse-hours "10:00") '(:ok 10.0))
+               (check (parse-hours "1:75") '(:error "not a number of hours: 1:75"))
+               (check (parse-hours "1:5") '(:error "not a number of hours: 1:5"))
+               (check (parse-hours "a:30") '(:error "not a number of hours: a:30"))
+               (check (parse-hours "1:30:00") '(:error "not a number of hours: 1:30:00"))))

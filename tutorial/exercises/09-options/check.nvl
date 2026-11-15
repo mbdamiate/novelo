@@ -1,0 +1,16 @@
+; The tests of exercise 09-options.
+(include "harness.nvl")
+(include "answer.nvl")
+
+(report! (list (check (parse-options '("a.txt" "--limit" "3" "b.txt"))
+                      '(:ok {:verbose #false :limit 3 :files ("a.txt" "b.txt")}))
+               (check (parse-options '("--verbose" "x"))
+                      '(:ok {:verbose #true :limit 10 :files ("x")}))
+               (check (parse-options '("x" "--limit"))
+                      '(:error "--limit needs a number"))
+               (check (parse-options '("--limit" "ten" "x"))
+                      '(:error "not a number" "ten"))
+               (check (parse-options '("--verbose"))
+                      '(:error "no files"))
+               (check (parse-options '())
+                      '(:error "no files"))))

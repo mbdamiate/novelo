@@ -1,0 +1,20 @@
+; Exercise 11-macros (chapter 11): a solution.
+
+(define-macro when
+  (lambda (test &rest body)
+    `(if ,test (sequence ,@body) otherwise #void)))
+
+; The pattern of the try is a fresh symbol, so that it cannot capture a
+; name used in `fallback`.
+(define-macro with-default
+  (lambda (fallback expression)
+    (let ((problem (generate-symbol)))
+      `(try ,expression
+         ,problem ,fallback))))
+
+(define-macro check-that
+  (lambda (expression)
+    (let ((value (generate-symbol)))
+      `(let ((,value ,expression))
+         (if ,value (list :ok ,value)
+             otherwise (list :error "check failed" (quote ,expression)))))))

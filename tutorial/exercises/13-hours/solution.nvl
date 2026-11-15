@@ -1,0 +1,27 @@
+; Exercise 13-hours (chapter 13): a solution.
+
+(import result)
+(import text)
+
+(define parse-number-of-hours
+  (lambda (text)
+    (let ((number (string-to-number text)))
+      (if (integer? number) (ok (integer-to-float number))
+          (float? number) (ok number)
+          otherwise (failure (format "not a number of hours: {}" text))))))
+
+; "H:MM": the hours an Integer, the minutes two digits below 60.
+(define parse-hours-and-minutes
+  (lambda (text hours-text minutes-text)
+    (let ((hours (string-to-number hours-text))
+          (minutes (string-to-number minutes-text)))
+      (if (and (integer? hours) (>= hours 0)
+               (integer? minutes) (= (count minutes-text) 2) (< minutes 60))
+          (ok (+ (integer-to-float hours) (/ (integer-to-float minutes) 60.0)))
+          otherwise (failure (format "not a number of hours: {}" text))))))
+
+(define parse-hours
+  (lambda (text)
+    (match (split ":" text)
+      (hours-text minutes-text) (parse-hours-and-minutes text hours-text minutes-text)
+      otherwise (parse-number-of-hours text))))

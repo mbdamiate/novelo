@@ -1,0 +1,20 @@
+; Amounts of money in cents, written for display. Included by main.nvl
+; with the prefix money, so its names arrive there as money/format-cents
+; and money/total.
+
+(import list)   ; fold
+
+; Used only inside this file. With the prefix, it is money/two-digits outside,
+; but here the plain name finds it.
+(define two-digits
+  (lambda (number)
+    (if (< number 10) (concatenate "0" (to-string number))
+        otherwise (to-string number))))
+
+(define format-cents
+  (lambda (cents)
+    (concatenate "$" (to-string (quotient cents 100)) "." (two-digits (remainder cents 100)))))
+
+(define total
+  (lambda (amounts)
+    (fold + 0 amounts)))

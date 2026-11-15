@@ -1,0 +1,23 @@
+; Exercise 13-hours (chapter 13).
+;
+; The timesheet of chapter 13 reads hours as a number, "1.5" or "2".
+; Extend its parse-hours to also read hours and minutes, "1:30", which is
+; 1.5 hours. The minutes are two digits from 00 to 59; anything else is a
+; failure with the same message as before:
+;   (parse-hours "1.5")   is (:ok 1.5)
+;   (parse-hours "2")     is (:ok 2.0)
+;   (parse-hours "1:30")  is (:ok 1.5)
+;   (parse-hours "0:45")  is (:ok 0.75)
+;   (parse-hours "1:75")  is (:error "not a number of hours: 1:75")
+; Then run: tutorial/check.sh 13-hours
+
+(import result)   ; ok, failure
+(import text)     ; split, format
+
+; As in programs/13-timesheet/main.nvl.
+(define parse-hours
+  (lambda (text)
+    (let ((number (string-to-number text)))
+      (if (integer? number) (ok (integer-to-float number))
+          (float? number) (ok number)
+          otherwise (failure (format "not a number of hours: {}" text))))))

@@ -1,0 +1,22 @@
+; The tests of exercise 12-log-summary.
+(include "harness.nvl")
+(include "answer.nvl")
+
+(define lines
+  '("2026-11-15T10:05:00Z INFO started"
+    "2026-11-15T10:07:30Z ERROR disk full"
+    "not a log line"
+    "2026-11-15T10:01:00-03:00 ERROR network down"
+    "2026-11-15T09:00:00Z WARNING slow disk"
+    "yesterday INFO no time"
+    "2026-11-15T10:09:00Z INFO stopped"))
+
+(report! (list (check (parse-log-line "2026-11-15T10:00:00Z ERROR disk full")
+                      {:time 1794736800000 :level :error :message "disk full"})
+               (check (parse-log-line "2026-11-15T10:00:00Z DEBUG x") #void)
+               (check (parse-log-line "hello") #void)
+               (check (parse-log-line "someday INFO hello") #void)
+               (check (count-levels lines) {:info 2 :error 2 :warning 1})
+               (check (count-levels '()) {})
+               (check (first-error lines) "2026-11-15T10:07:30.000Z disk full")
+               (check (first-error (list (first lines))) #void)))

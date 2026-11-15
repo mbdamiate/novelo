@@ -1,0 +1,14 @@
+; The tests of exercise 10-statistics. Note the prefix: every name the
+; module defines arrives as stats/name.
+(include "harness.nvl")
+(include "answer.nvl" stats)
+
+; A name of the program that the module must not pick up.
+(define mean (lambda (numbers) :the-programs-mean))
+
+(report! (list (check (stats/mean '(1.0 2.0 6.0)) 3.0)
+               (check (stats/mean '(5.0)) 5.0)
+               (check (stats/median '(3.0 1.0 2.0)) 2.0)
+               (check (stats/median '(4.0 1.0 3.0 2.0)) 2.5)
+               (check (stats/median '(7.0)) 7.0)
+               (check (stats/describe '(1.0 2.0 6.0)) {:count 3 :mean 3.0 :median 2.0})))

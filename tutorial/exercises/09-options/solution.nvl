@@ -1,0 +1,23 @@
+; Exercise 09-options (chapter 9): a solution.
+
+(import result)
+(import list)
+
+; `options` gathers what was read so far, with the files the latest first.
+(define parse-from
+  (lambda (arguments options)
+    (match arguments
+      () (if (empty? (get options :files)) (failure "no files")
+             otherwise (ok (associate options :files (reverse (get options :files)))))
+      ("--verbose" &rest more) (parse-from more (associate options :verbose #true))
+      ("--limit") (failure "--limit needs a number")
+      ("--limit" text &rest more)
+      (let ((limit (string-to-number text)))
+        (if (integer? limit) (parse-from more (associate options :limit limit))
+            otherwise (failure "not a number" text)))
+      (file &rest more)
+      (parse-from more (associate options :files (prepend file (get options :files)))))))
+
+(define parse-options
+  (lambda (arguments)
+    (parse-from arguments {:verbose #false :limit 10 :files '()})))

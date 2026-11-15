@@ -1,0 +1,28 @@
+; Exercise 12-csv-to-json (chapter 12).
+;
+; (csv-to-json text) reads a CSV text whose first record names the
+; columns, and returns a result with the JSON text of an array with one
+; object per record after the first, from each column name to its field:
+;
+;   (csv-to-json "name,score\nAda,91\n")
+;   is (:ok "[{\"name\": \"Ada\", \"score\": \"91\"}]")
+;
+; Fields stay Strings. The failures:
+;   the failure of read-csv as it is, for a text that is not CSV
+;   (:error "no header")                       for a text with no record
+;   (:error "wrong number of fields" number)   for a record with more or
+;                                              fewer fields than the header,
+;                                              where number counts the
+;                                              records from 1, the header
+;                                              being record 1
+; Then run: tutorial/check.sh 12-csv-to-json
+
+(import list)     ; map, zip, range
+(import map)      ; from-entries
+(import json)     ; write-json
+(import csv)      ; read-csv
+(import result)   ; ok, failure, then, map-results
+
+(define csv-to-json
+  (lambda (text)
+    (error "not implemented yet")))

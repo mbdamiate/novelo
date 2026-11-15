@@ -1,0 +1,14 @@
+by project
+novelo             9.75 ####################
+reading, papers    3.50 #######
+email              1.50 ###
+
+by weekday
+Mon                4.50 #########
+Tue                5.50 ###########
+Wed                2.75 ######
+Fri                2.00 ####
+
+total             14.75 ##############################
+skipped line 8: not a number of hours: lots
+skipped line 10: not a date: 2026-11-31

@@ -14,6 +14,11 @@ The two specifications, [`core-specification.md`](../core-specification.md) and 
 6. [Immutable data](06-immutable-data.md): Maps and Sets, and changing data without changing it.
 7. [Pattern matching](07-pattern-matching.md): `match` and patterns in `let`.
 8. [Errors and results](08-errors-and-results.md): `error`, `catch`, `try`, results and `chain`.
+9. [Programs and effects](09-programs-and-effects.md): the library `io`, files, arguments, exit codes, and effects at the edge.
+10. [Modules](10-modules.md): `include`, `import` and prefixes.
+11. [Macros](11-macros.md): quasiquote, `define-macro`, and when not to write one.
+12. [A tour of the standard library](12-standard-library.md): `text`, `number`, `random`, `json`, `csv`, `time` and `pattern`.
+13. [A complete program](13-a-complete-program.md): a command-line tool, built step by step.
 
 ## Before you start
 

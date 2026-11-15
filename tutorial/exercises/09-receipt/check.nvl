@@ -1,0 +1,12 @@
+; The tests of exercise 09-receipt.
+(include "harness.nvl")
+(include "answer.nvl")
+
+(report! (list (check (receipt '("2 350 coffee"))
+                      "2 x coffee = 7.00\ntotal 7.00\n")
+               (check (receipt '())
+                      "total 0.00\n")
+               (check (receipt '("1 99 ice cream" "3 5 gum"))
+                      "1 x ice cream = 0.99\n3 x gum = 0.15\ntotal 1.14\n")
+               (check (receipt '("2 coffee" "x 10 tea" "1 1050 cake"))
+                      "1 x cake = 10.50\ntotal 10.50\nbad line: 2 coffee\nbad line: x 10 tea\n")))

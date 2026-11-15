@@ -1,0 +1,154 @@
+; Timesheet: hours per project and per weekday, from a CSV file.
+;
+;   build/novelo tutorial/programs/13-timesheet/main.nvl tutorial/programs/13-timesheet/timesheet.csv
+;   build/novelo tutorial/programs/13-timesheet/main.nvl --project novelo tutorial/programs/13-timesheet/timesheet.csv
+;
+; The file has a header and one row per entry: date,project,hours, with the
+; date as YYYY-MM-DD and the hours as a number, such as 1.5 or 2. Rows that
+; do not read are reported after the summary and left out of it.
+;
+; Exit codes: 0 when the report was printed, 2 for a usage error, 1 when
+; the file cannot be read or is not CSV.
+;
+; Chapter 13 of the tutorial builds this program one step at a time.
+
+(import io)
+(import list)      ; map, filter, fold, sort, range
+(import map)       ; entries
+(import text)      ; format, join, pad-left, pad-right
+(import number)    ; max, round
+(import csv)       ; read-csv
+(import time)      ; read-time, time-to-date
+(import result)    ; ok, failure, then, ok?, failure?
+
+; ---- step 1: the arguments -------------------------------------------------------
+
+(define usage "usage: main.nvl [--project NAME] FILE")
+
+; (:ok {:file path :project name-or-#void}) or a failure with a message.
+(define parse-arguments
+  (lambda (arguments)
+    (match arguments
+      (file) (ok {:file file :project #void})
+      ("--project" project file) (ok {:file file :project project})
+      otherwise (failure "expected a file, and optionally --project NAME before it"))))
+
+; ---- step 2: the rows ----------------------------------------------------------------
+
+; Hours are a Float. string-to-number reads "2" as an Integer and "1.5" as
+; a Float, and the two never mix, so an Integer is converted here.
+(define parse-hours
+  (lambda (text)
+    (let ((number (string-to-number text)))
+      (if (integer? number) (ok (integer-to-float number))
+          (float? number) (ok number)
+          otherwise (failure (format "not a number of hours: {}" text))))))
+
+(define parse-date
+  (lambda (text)
+    (match (read-time text)
+      (:ok instant) (ok instant)
+      otherwise (failure (format "not a date: {}" text)))))
+
+; One record of the CSV as
+; (:ok {:project :hours :weekday}) or a failure.
+(define parse-row
+  (lambda (record)
+    (match record
+      (date-text project hours-text)
+      (chain then ((instant (parse-date date-text))
+                   (hours (parse-hours hours-text)))
+        (ok {:project project :hours hours :weekday (get (time-to-date instant) :weekday)}))
+      otherwise (failure (format "expected 3 fields, found {}" (count record))))))
+
+(define with-line
+  (lambda (line result)
+    (match result
+      (:error message) (failure (format "line {}: {}" line message))
+      otherwise result)))
+
+; Every row after the header, each a result. The header is line 1, and the
+; line of a row is its record number, which is right as long as no field
+; holds a line break.
+(define parse-rows
+  (lambda (records)
+    (map (lambda (pair)
+           (let (((line record) pair))
+             (with-line line (parse-row record))))
+         (zip (range 2 (+ (count records) 1)) (rest records)))))
+
+; ---- step 3: the summary -------------------------------------------------------------
+
+(define add-hours
+  (lambda (totals key hours)
+    (associate totals key (+ hours (get totals key 0.0)))))
+
+(define summarize
+  (lambda (rows)
+    (fold (lambda (summary row)
+            (let (({:project project :hours hours :weekday weekday} row))
+              {:projects (add-hours (get summary :projects) project hours)
+               :weekdays (add-hours (get summary :weekdays) weekday hours)
+               :total (+ (get summary :total) hours)}))
+          {:projects {} :weekdays {} :total 0.0}
+          rows)))
+
+; ---- step 4: the report -----------------------------------------------------------------
+
+(define weekday-names {1 "Mon" 2 "Tue" 3 "Wed" 4 "Thu" 5 "Fri" 6 "Sat" 7 "Sun"})
+
+; A bar of one # per half hour.
+(define bar
+  (lambda (hours)
+    (join "" (map (lambda (_) "#") (range 0 (round (* hours 2.0)))))))
+
+(define hours-line
+  (lambda (label hours)
+    (format "{} {} {}\n" (pad-right 16 " " label) (pad-left 6 " " (float-to-fixed hours 2)) (bar hours))))
+
+; Projects from the most hours to the fewest; weekdays in calendar order.
+(define report
+  (lambda (summary problems)
+    (let ((projects (sort (lambda (left right) (> (first (rest left)) (first (rest right))))
+                          (entries (get summary :projects))))
+          (weekdays (filter (lambda (day) (contains? (get summary :weekdays) day)) (range 1 8))))
+      (concatenate
+        "by project\n"
+        (join "" (map (lambda (entry) (hours-line (first entry) (first (rest entry)))) projects))
+        "\nby weekday\n"
+        (join "" (map (lambda (day) (hours-line (get weekday-names day) (get (get summary :weekdays) day)))
+                      weekdays))
+        "\n" (hours-line "total" (get summary :total))
+        (join "" (map (lambda (problem) (format "skipped {}\n" problem)) problems))))))
+
+; From the text of the file to the report, or a failure: everything the
+; program does between reading and printing.
+(define timesheet
+  (lambda (options text)
+    (chain then ((records (read-csv text)))
+      (let ((results (parse-rows records))
+            (rows (map second (filter ok? results)))
+            (wanted (let ((project (get options :project)))
+                      (if (void? project) rows
+                          otherwise (filter (lambda (row) (equal? (get row :project) project)) rows))))
+            (problems (map second (filter failure? results))))
+        (ok (report (summarize wanted) problems))))))
+
+(define second (lambda (pair) (first (rest pair))))
+
+; ---- step 5: the edge -----------------------------------------------------------------
+
+(define fail!
+  (lambda (message code)
+    (display-to-error! (format "timesheet: {}\n" message))
+    (exit! code)))
+
+(match (parse-arguments (program-arguments!))
+  (:error message) (fail! (concatenate message "\n" usage) 2)
+  (:ok options)
+  (match (read-file! (get options :file))
+    (:error reason path &rest _) (fail! (format "cannot read {}: {}" path reason) 1)
+    (:ok text)
+    (match (timesheet options text)
+      (:ok output) (display! output)
+      (:error message line column) (fail! (format "{}:{}:{}: {}" (get options :file) line column message) 1))))

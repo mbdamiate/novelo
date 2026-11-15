@@ -1,0 +1,26 @@
+; Exercise 11-macros (chapter 11).
+;
+; Replace each transformer's body. Each macro returns code, built with a
+; backquote. Then run: tutorial/check.sh 11-macros
+
+; (when test body …) evaluates the body, in order, and returns the value of
+; its last expression when `test` is not #false; otherwise it returns #void
+; without evaluating the body.
+(define-macro when
+  (lambda (test &rest body)
+    (error "not implemented yet")))
+
+; (with-default fallback expression) is the value of `expression`, or the
+; value of `fallback` when evaluating `expression` raises any error.
+; `fallback` is evaluated only in that case.
+(define-macro with-default
+  (lambda (fallback expression)
+    (error "not implemented yet")))
+
+; (check-that expression) is (:ok value) when the value of `expression` is
+; not #false, and (:error "check failed" expression) when it is, with the
+; expression as it was written: (check-that (> 1 2)) is
+; (:error "check failed" (> 1 2)). `expression` is evaluated once.
+(define-macro check-that
+  (lambda (expression)
+    (error "not implemented yet")))

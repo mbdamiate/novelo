@@ -1,0 +1,12 @@
+; The tests of exercise 12-csv-to-json.
+(include "harness.nvl")
+(include "answer.nvl")
+
+(report! (list (check (csv-to-json "name,score\nAda,91\n")
+                      '(:ok "[{\"name\": \"Ada\", \"score\": \"91\"}]"))
+               (check (csv-to-json "name,score\nAda,91\n\"Smith, J\",80\n")
+                      '(:ok "[{\"name\": \"Ada\", \"score\": \"91\"}, {\"name\": \"Smith, J\", \"score\": \"80\"}]"))
+               (check (csv-to-json "name,score\n") '(:ok "[]"))
+               (check (csv-to-json "") '(:error "no header"))
+               (check (csv-to-json "a,b\n1,2\n3\n") '(:error "wrong number of fields" 3))
+               (check (first (csv-to-json "a\n\"x\n")) :error)))

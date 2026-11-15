@@ -1,0 +1,24 @@
+; Exercise 12-csv-to-json (chapter 12): a solution.
+
+(import list)
+(import map)
+(import json)
+(import csv)
+(import result)
+
+; The object of one record, checked against the header. `number` is its
+; position among the records, from 1.
+(define record-object
+  (lambda (header pair)
+    (let (((number record) pair))
+      (if (= (count record) (count header)) (ok (from-entries (zip header record)))
+          otherwise (failure "wrong number of fields" number)))))
+
+(define csv-to-json
+  (lambda (text)
+    (chain then ((records (read-csv text))
+                 ((header &rest rows) (if (empty? records) (failure "no header")
+                                          otherwise (ok records)))
+                 (objects (map-results (lambda (pair) (record-object header pair))
+                                       (zip (range 2 (+ (count rows) 2)) rows))))
+      (ok (write-json objects)))))

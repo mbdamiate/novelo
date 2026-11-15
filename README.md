@@ -23,6 +23,8 @@ Those runs report no leaks, and they also pass under AddressSanitizer and Undefi
 ; prints 1, 4, 9, 16, 25
 ```
 
+To learn the language, start with the [tutorial](tutorial/README.md): thirteen chapters for programmers who have not written Lisp before, with REPL sessions and exercises that `make test` checks against the interpreter.
+
 ## Building
 
 It needs a C23 compiler, plus `make`, a POSIX libc and pthreads. There are no other dependencies. It is tested with Apple clang 21 on macOS and with gcc 14 on Linux (glibc), where every test also passes under ASan, UBSan and LeakSanitizer. With gcc, pass the compiler to make:
@@ -144,6 +146,7 @@ make coverage
   - `NOVELO_STDLIB`;
   - the REPL with standard input that is not a terminal.
 - **Examples (`examples/`):** numbered by complexity, each adding one idea, starting at `01-hello`. Each example is a directory: `main.nvl` is a complete program, commented, run by `build/novelo` through `tests/examples.sh`. It must exit with 0 and print exactly `output.txt`; `input.txt`, when present, is its standard input, and each line of `arguments.txt`, when present, is one of its arguments. Any other file is part of the example, such as the files `08-modules` includes.
+- **Tutorial (`tutorial/`):** chapters `NN-topic.md` and their exercises. `tests/tutorial.sh`, run by `make tutorial` and `make test`, types every ` ```novelo ` block whose lines start with `> ` into a fresh REPL and compares what it prints with the block's other lines. It also runs `tutorial/programs` like the examples, and checks that each exercise's `solution.nvl` passes its `check.nvl` and that its `answer.nvl` stub does not. `tutorial/check.sh NAME` checks a learner's answer.
 
 ### Stress
 

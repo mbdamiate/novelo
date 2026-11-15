@@ -1,0 +1,21 @@
+; Exercise 10-statistics (chapter 10): a solution.
+
+(import list)
+
+(define mean
+  (lambda (numbers)
+    (/ (fold + 0.0 numbers) (integer-to-float (count numbers)))))
+
+(define median
+  (lambda (numbers)
+    (let ((sorted (sort < numbers))
+          (middle (quotient (count numbers) 2))
+          (upper (first (drop middle sorted))))
+      (if (= (remainder (count numbers) 2) 1) upper
+          otherwise (mean (list (first (drop (- middle 1) sorted)) upper))))))
+
+; mean and median resolve to stats/mean and stats/median, because this
+; file defined them.
+(define describe
+  (lambda (numbers)
+    {:count (count numbers) :mean (mean numbers) :median (median numbers)}))

@@ -1,0 +1,24 @@
+; Modules: a program split over two files.
+;
+;   build/novelo tutorial/programs/10-modules/main.nvl
+;
+; `include` reads money.nvl, a path relative to this file, and the prefix
+; money puts its definitions under money/. `import` does the same for a
+; library of the standard library, by name instead of by path.
+
+(import io)
+(import list)               ; map
+(import text t)            ; t/join, t/pad-left
+(include "money.nvl" money)
+
+; A name of our own that would clash with the module's, without the prefix.
+(define total "not the module's total")
+
+(define prices '(1999 250 5))
+
+(display! (t/join "\n" (map money/format-cents prices)))
+(display! "\n")
+(display! (t/pad-left 10 " " (money/format-cents (money/total prices))))
+(display! "\n")
+(display! total)
+(display! "\n")

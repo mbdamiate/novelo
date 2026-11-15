@@ -1,0 +1,28 @@
+; Exercise 10-statistics (chapter 10).
+;
+; This file is a module: check.nvl includes it with the prefix stats, as
+;   (include "answer.nvl" stats)
+; and calls stats/mean, stats/median and stats/describe. Inside this file,
+; call your functions by their plain names.
+; Then run: tutorial/check.sh 10-statistics
+
+(import list)   ; fold, sort, drop
+
+; The mean of a non-empty list of Floats: (mean '(1.0 2.0 6.0)) is 3.0.
+(define mean
+  (lambda (numbers)
+    (error "not implemented yet")))
+
+; The median of a non-empty list of Floats: the middle value once sorted,
+; or the mean of the two middle values when the count is even:
+; (median '(3.0 1.0 2.0)) is 2.0, (median '(4.0 1.0 3.0 2.0)) is 2.5.
+(define median
+  (lambda (numbers)
+    (error "not implemented yet")))
+
+; A Map with the :count, :mean and :median of the list, using the two
+; functions above: (describe '(1.0 2.0 6.0)) is
+; {:count 3 :mean 3.0 :median 2.0}.
+(define describe
+  (lambda (numbers)
+    (error "not implemented yet")))
