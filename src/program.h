@@ -19,6 +19,9 @@ typedef struct LispGlobals {
     LispGlobal *entries;
     size_t count;
     size_t capacity; /* zero or a power of two */
+    /* Unique in the process to each table this state's entries were in: it
+     * changes when the table grows, which moves every entry (eval.c). */
+    uint64_t generation;
 } LispGlobals;
 
 struct LispState {

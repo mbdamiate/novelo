@@ -45,6 +45,13 @@ typedef struct LispNode {
     /* §8.5 — where the code was read, or the position of the nearest
      * enclosing form that has one (§6.3); line 0 when none is known. */
     LispPosition position;
+    /* GLOBAL: the entry its name resolved to, for the context and the table
+     * generation it was found in (eval.c); a generation of 0 for none. A
+     * name keeps its entry until the table grows, since a global is never
+     * removed and redefining it only changes the value. */
+    struct LispGlobal *global;
+    uint64_t global_generation;
+    const Value *global_context;
 } LispNode;
 
 extern const LispClass lisp_node_class;

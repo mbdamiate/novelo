@@ -5,6 +5,7 @@
 #include "printer.h"
 #include "program.h"
 
+#include <stdio.h>
 #include <string.h>
 
 /* ---- helpers ---------------------------------------------------------------------- */
@@ -289,6 +290,29 @@ static void t_import(void) {
     CHECK_RUN_ERROR("(import no-such-library)", ":import-error");
 }
 
+/* A global node keeps the entry its name resolved to: it must still see a
+ * redefinition, a definition made after it failed, a macro of the same name,
+ * and the entries after the table grows and moves them. */
+static void t_global_entries(void) {
+    CHECK_RUN("(define f 1) (define g (lambda () f)) (g) (define f 2) (g)", "2");
+    CHECK_RUN("(define g (lambda () later)) (catch g (lambda (e) 0)) (define later 5) (g)", "5");
+    CHECK_RUN_ERROR("(define h 1) (define g (lambda () h)) (g) (define-macro h (lambda () 1)) (g)",
+                    ":unbound-symbol");
+
+    /* 600 more globals grow the table twice past its first 256 entries */
+    LispBuffer source;
+    lisp_buffer_init(&source);
+    lisp_buffer_append_string(&source, "(define f 1) (define g (lambda () f)) (g)");
+    for (int index = 0; index < 600; index++) {
+        char definition[64];
+        snprintf(definition, sizeof definition, " (define filler-%d %d)", index, index);
+        lisp_buffer_append_string(&source, definition);
+    }
+    lisp_buffer_append_string(&source, " (define f (+ (g) filler-599)) (g)");
+    CHECK_RUN(source.data, "600");
+    lisp_buffer_free(&source);
+}
+
 const TestSuite eval_suite = {"eval", (const TestCase[]){
     {"special form shapes", t_special_form_shapes},
     {"derived forms", t_derived_forms},
@@ -302,5 +326,6 @@ const TestSuite eval_suite = {"eval", (const TestCase[]){
     {"strings index code points", t_code_point_indexing},
     {"other primitives", t_other_primitives},
     {"import", t_import},
+    {"global nodes keep their entries", t_global_entries},
     {},
 }};

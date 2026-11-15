@@ -50,7 +50,9 @@ LispGlobal *lisp_global_find(LispState *state, const Value *name) {
 }
 
 static void grow_globals(LispGlobals *globals) {
-    LispGlobals bigger = {.capacity = globals->capacity ? globals->capacity * 2 : 256};
+    static uint64_t last_generation;
+    LispGlobals bigger = {.capacity = globals->capacity ? globals->capacity * 2 : 256,
+                          .generation = ++last_generation};
     bigger.entries = lisp_xcalloc(bigger.capacity, sizeof(LispGlobal));
     for (size_t slot = 0; slot < globals->capacity; slot++) {
         if (globals->entries[slot].name) {
@@ -89,10 +91,28 @@ void lisp_globals_free(LispGlobals *globals) {
     *globals = (LispGlobals){};
 }
 
+/* The entry of a global node's name, or nullptr when it is not defined yet.
+ * Once found, it is kept in the node, so later evaluations skip resolving the
+ * name in the context and probing the table. */
+static LispGlobal *global_entry(LispState *state, const LispNode *node, const Value *context) {
+    if (node->global_generation == state->globals.generation && node->global_context == context) {
+        return node->global;
+    }
+    LispGlobal *global = lisp_global_find(state, lisp_context_resolve(context, node->value));
+    if (global) {
+        LispNode *cache = (LispNode *)node;
+        cache->global = global;
+        cache->global_generation = state->globals.generation;
+        cache->global_context = context;
+    }
+    return global;
+}
+
 /* §8.1: a symbol that is not local names a global, looked up at the moment of
  * evaluation; a name bound to a macro is not a value. */
-static Value *global_value(LispState *state, Value *symbol, Value *context) {
-    LispGlobal *global = lisp_global_find(state, lisp_context_resolve(context, symbol));
+static Value *global_value(LispState *state, const LispNode *node, Value *context) {
+    Value *symbol = node->value;
+    LispGlobal *global = global_entry(state, node, context);
     if (!global || global->is_macro) {
         return lisp_error(state, "unbound-symbol", LISP_LIST(symbol), "unbound symbol %s",
                           lisp_as_name(symbol)->text);
@@ -338,7 +358,7 @@ Value *lisp_eval(LispState *state, Value *node, Value *environment, Value *conte
     case LISP_NODE_LOCAL:
         return local_value(environment, current->depth, current->index);
     case LISP_NODE_GLOBAL:
-        return located(state, global_value(state, current->value, context), current->position);
+        return located(state, global_value(state, current, context), current->position);
     default:
         return evaluate(state, node, environment, context, (Frame){});
     }
@@ -367,7 +387,7 @@ static Value *evaluate(LispState *state, Value *node_value, Value *environment_v
             result = local_value(environment.value, current->depth, current->index);
             goto done;
         case LISP_NODE_GLOBAL:
-            result = global_value(state, current->value, context.value);
+            result = global_value(state, current, context.value);
             goto done;
         case LISP_NODE_LAMBDA:
             result = lisp_closure(node.value, environment.value, context.value);
