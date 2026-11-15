@@ -292,8 +292,27 @@ static void replace(Value **slot, Value *replacement) {
     *slot = replacement;
 }
 
+/* The value, or on failure nullptr with the error located at the position. */
+static Value *located(LispState *state, Value *value, LispPosition position) {
+    if (!value) lisp_error_locate(state, position);
+    return value;
+}
+
+/* A constant, a local or a global is read in place: it neither recurses nor
+ * calls, so it needs no stack check, no references of its own and no frame.
+ * Most operands and tests are one of these. */
 Value *lisp_eval(LispState *state, Value *node, Value *environment, Value *context) {
-    return evaluate(state, node, environment, context, (Frame){});
+    const LispNode *current = lisp_as_node(node);
+    switch (current->kind) {
+    case LISP_NODE_CONSTANT:
+        return lisp_retain(current->value);
+    case LISP_NODE_LOCAL:
+        return local_value(environment, current->depth, current->index);
+    case LISP_NODE_GLOBAL:
+        return located(state, global_value(state, current->value, context), current->position);
+    default:
+        return evaluate(state, node, environment, context, (Frame){});
+    }
 }
 
 /* Takes the frame. */
