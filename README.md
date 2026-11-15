@@ -289,6 +289,7 @@ Most of the branches left are null checks and the other side of `assert`s.
 - The heap cannot form cycles: values are immutable, and recursion goes through global names.
 - Release is iterative, so dropping a list of a million elements does not recurse in C.
 - Some values are immortal and are never counted: `#true`, `#false`, `#void`, `()`, the empty map, small integers, and interned symbols and keywords.
+- Freed blocks of up to 64 bytes go back to a free list of their size, which keeps at most 4,096 of them. They are reused by the next object of that size, so a loop that allocates and frees its values does not reach `malloc`. Under AddressSanitizer every block goes back to `malloc` instead, so that a use after free is still caught.
 - Ownership rule: a function returning a `Value *` returns a new reference. Its arguments are borrowed, unless its name ends in `_take`.
 
 **Errors are return values.** A failing call returns `nullptr` and leaves a descriptor pending in the state. `catch` takes that descriptor. There is no `longjmp`, so every release on the way out still happens. Read errors are a separate struct and never reach `catch`.
@@ -296,6 +297,7 @@ Most of the branches left are null checks and the other side of `assert`s.
 **Tail calls and deep recursion.**
 
 - The evaluator is a loop. A call in tail position replaces the current node and environment, so a tail-recursive loop runs in constant memory. A loop of 10 million iterations stays at about 1.8 MB resident.
+- An operand that is a constant, a local or a global is read in place, without entering the loop. The loop borrows the node, the environment and the context it is given, and takes references only to what replaces them. A global node keeps the table entry its name resolved to, so it is looked up once. `tests/bench/profile.md` measures what each of these saves.
 - Non-tail recursion uses the C stack. The CLI and the conformance runner run on a thread with a 512 MB stack.
 - A guard raises the catchable `:stack-overflow` before that stack runs out.
 

@@ -1,6 +1,6 @@
 # Profile of the interpreter, November 2026
 
-This report records where the tree-walking interpreter spends its time on the programs of `tests/bench`, before any optimization. It picks the work of the next phase. The times are in `baseline.txt`.
+This report records where the tree-walking interpreter spends its time on the programs of `tests/bench`. The first part is the profile before any optimization, which picked the work of phase 6. The last section, [After phase 6](#after-phase-6), measures the result. `baseline.txt` holds the times after phase 6.
 
 ## How it was measured
 
@@ -112,3 +112,55 @@ Each step is one commit, with `make bench` before and after.
    - The `qsort` that orders a map's entries on its first iteration, at 2% of `maps`.
 
 The first three steps change only `eval.c` and `value.h`. Steps 4 and 5 are larger and should be measured after them, because the share of everything else grows as the first three shrink their part.
+
+## After phase 6
+
+All five steps were kept, each as one commit. Each one gained more than 3% on at least one program. Median seconds of `make bench`:
+
+| Program | Before | Leaves | Borrow | Inline release | Free lists | Global entries | Change |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| arithmetic | 0.594 | 0.483 | 0.448 | 0.423 | 0.288 | 0.281 | −53% |
+| calls | 0.687 | 0.543 | 0.506 | 0.453 | 0.389 | 0.385 | −44% |
+| closures | 0.895 | 0.724 | 0.697 | 0.644 | 0.461 | 0.447 | −50% |
+| json | 1.279 | 1.184 | 1.163 | 1.140 | 1.028 | 0.979 | −24% |
+| lists | 0.813 | 0.637 | 0.601 | 0.551 | 0.447 | 0.433 | −47% |
+| maps | 0.791 | 0.680 | 0.664 | 0.616 | 0.499 | 0.478 | −40% |
+| match | 1.402 | 1.038 | 0.895 | 0.826 | 0.651 | 0.664 | −53% |
+| random | 0.698 | 0.550 | 0.514 | 0.474 | 0.355 | 0.350 | −50% |
+| sort | 1.053 | 0.805 | 0.753 | 0.701 | 0.538 | 0.523 | −50% |
+| text | 1.417 | 1.135 | 1.085 | 1.006 | 0.793 | 0.690 | −51% |
+
+Peak memory did not change. The free lists keep at most 4,096 blocks of each size, which is under 2 MB in all.
+
+Each step did the following:
+- **Leaves:** `lisp_eval` reads a constant, a local or a global in place, without entering `evaluate`.
+- **Borrow:** `evaluate` takes its own reference only to a node, environment or context that replaces the one it was given. The branch of an `if`, or the last expression of a `sequence`, stays borrowed while the node it comes from is.
+- **Inline release:** `lisp_release` is `static inline`, and enters `value.c` only when a count reaches zero.
+- **Free lists:** `lisp_object_new` reuses freed blocks of up to 64 bytes, by size. They are off under AddressSanitizer, so a use after free is still caught there.
+- **Global entries:** a global node keeps the entry its name resolved to, for its context and the table's generation.
+
+The profile at `-O2` after the five steps, taken the same way as before:
+
+| Program | `evaluate` | `lisp_eval` | releasing | `malloc`/`free` | other hot spots |
+|---|---:|---:|---:|---:|---|
+| arithmetic | 35% | 16% | 9% | 0% | `global_value` 13%, `expect_numbers` 8% |
+| calls | 31% | 16% | 5% | 0% | `expect_numbers` 14%, `global_value` 9%, `<` 7% |
+| closures | 28% | 14% | 13% | 5% | `global_value` 8%, `bind_arguments` 6% |
+| lists | 35% | 15% | 9% | 10% | `global_value` 7%, `bind_arguments` 5% |
+| maps | 15% | 13% | 4% | 19% | `node_with_slot` 14%, `drop_trie_node` 6%, `qsort` 4% |
+| match | 49% | 21% | 7% | 0% | `first`, `bind_arguments`, environments, 3% each |
+| random | 33% | 14% | 9% | 4% | `global_value` 7%, `node_with_slot` 6% |
+| sort | 35% | 18% | 8% | 1% | `global_value` 9%, `bind_arguments` 6% |
+| text | 35% | 16% | 9% | 3% | `global_value` 8% |
+
+"Releasing" counts `lisp_destroy_unreferenced`, `destroy` and `free_object`. At four times its scale, `json` spends 92% in `count`.
+
+### What is left
+
+- **The loop itself.** `evaluate` and `lisp_eval` now take half of most programs. This is the cost of walking a tree of nodes, and the reason for a bytecode compiler, which the roadmap leaves out.
+- **`global_value`** still takes 7–13%. That is now the macro check, the retain and the cache comparison, not the lookup. A primitive such as `+`, called by name, could be bound in its node when the name can never be redefined, but the spec allows a program to redefine any global (§8.1), so this would need a rule first.
+- **Maps.** `associate` copies trie nodes, each with two arrays of its own: 14% in `node_with_slot` and most of the remaining `malloc` in `maps`. Allocating a node and its arrays as one block would halve the allocations. The `qsort` of the first iteration is 4%.
+- **`expect_numbers`** checks the types of arithmetic arguments one at a time. It is 14% of `calls`, a candidate if numbers matter more than they do in the examples.
+- **`json`** is still quadratic. Phase 7a fixes it in the library.
+
+None of these is needed by any example now, so phase 6 stops here.
